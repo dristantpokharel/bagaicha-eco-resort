@@ -42,11 +42,13 @@ export function MapBlock({ business, map }: { business: Business; map?: PublicMe
         {business.directionsUrl && (
           <a href={business.directionsUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand", size: "lg" })}>
             Get Directions
+            <span className="sr-only"> (opens in a new tab)</span>
           </a>
         )}
         {business.googleMapsUrl && (
           <a href={business.googleMapsUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-ink-heading" })}>
             Open in Google Maps
+            <span className="sr-only"> (opens in a new tab)</span>
           </a>
         )}
       </div>
@@ -90,7 +92,7 @@ export function LocationSection({ business, nearby, map }: { business: Business;
               <a href={whatsappHref(business.whatsapp)} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand", size: "lg", className: "self-start" })}>
                 <WhatsAppIcon size={18} />
                 Chat on WhatsApp
-                <span className="sr-only"> {formatWhatsapp(business.whatsapp)}</span>
+                <span className="sr-only"> {formatWhatsapp(business.whatsapp)} (opens in a new tab)</span>
               </a>
             )}
           </address>

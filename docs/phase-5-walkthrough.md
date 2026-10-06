@@ -1,7 +1,7 @@
 # Phase 5 walkthrough: Public site
 
 Branch: `phase-5-public-site`. Phase 5 is split in two halves; this file covers **5a (content + homepage)**.
-5b (remaining pages and polish) is added below when it is done.
+5b (remaining pages and polish) follows after the 5a sections.
 
 ## 5a: what was done
 
@@ -48,3 +48,65 @@ Deluxe Room description and amenities; the activity overview, duration, best tim
 2. Photo alt text is still the filename draft ("Hero", "Room"…) and flagged "needs review" in Media. It is what screen readers read, so please review it before launch.
 3. Facebook URL and a second WhatsApp/phone number: none given, so they are not shown.
 4. The Chill Pool is listed as an activity because the preview did. Move it to Dining if you prefer.
+
+
+---
+
+# 5b: remaining pages and polish
+
+## Mobile tightening (from your homepage feedback)
+Phones only; desktop is unchanged. Section padding is about half of desktop (`--spacing-section-sm` 4rem to 2.5rem, always paired with the desktop value), heading-to-content gaps are 1.5rem instead of 2.5rem, and stacked image groups, the pull-quote block, icon rows and the footer have tighter margins. The 390px page went from 12,120px to 11,264px tall. Before/after: `docs/phase-5-screenshots/mobile-before-after-1.jpg` to `-3.jpg` (left = before, right = after).
+
+## What was added
+Every link in the header and footer now has a page. Each reads from the database (nothing hardcoded) and has its own title, description, canonical URL and Open Graph tags (hero photo as the share image).
+
+| Page | What it has |
+|---|---|
+| `/stay` | Alternating room rows: photos, description, price per night, "children under 8" rate, max guests, amenities, and **Book this room** linking to `/book?room=<slug>` |
+| `/dine` | Dining sections and items from Content (prices only when set), photos from the Dine slot |
+| `/explore` | Expandable panels (native disclosure, so keyboard and no-JS friendly) |
+| `/events` | Weddings and celebrations, conferences and trainings, with CTAs to `/enquiry?type=EVENT` and `?type=CONFERENCE` |
+| `/gallery` | Masonry, category filters (only categories that have photos), lightbox with arrows, Esc, focus return |
+| `/location` | Address, nearby destinations, illustrated map, Get Directions, Open in Google Maps, click-to-load embedded map |
+| `/contact`, `/faq`, `/policies` | From BusinessInfo, FAQs and Policies |
+
+- `/book` and `/enquiry` are restyled (page heading, brochure form controls, square corners, label type) with no change to their behaviour. The room chosen on `/stay` is kept through the date search, and a note says which room you are booking. `/book` now shows room descriptions through the same placeholder-safe path as the rest of the site.
+- Event types are Weddings, Birthdays & Celebrations, Private Gatherings and Conferences & Trainings.
+- The Chill Pool stays under Explore as an activity.
+
+## SEO
+Per-page metadata and canonical URLs (from `NEXT_PUBLIC_SITE_URL`), Open Graph and Twitter cards, `sitemap.xml` (all public pages, no admin or login), `robots.txt` (blocks `/admin`, `/login`, `/api/`), and `LodgingBusiness` JSON-LD on the homepage built only from BusinessInfo fields that are filled in (name, intro, phone, email, address, coordinates, map link, Instagram). `<` is escaped in the JSON-LD.
+
+## Accessibility and performance
+- **Checked in a real browser on all 12 public pages:** one `h1` and one `main` each, no skipped heading levels, no images without `alt`, no unnamed links, buttons or fields, no duplicate ids, title, description and canonical present.
+- **Contrast:** the one failure (muted text on sage, 3.75:1) was fixed. All other pairs are 4.6:1 or better.
+- **Focus:** a baseline visible focus ring for anything without its own; skip link; active page marked with `aria-current`; links that open a new tab say so.
+- **Reduced motion:** reveals, fade-ups, hover zooms, accordion rotations and smooth scrolling all stop.
+- **Keyboard and screen reader:** gallery filters use `aria-pressed` and announce the count; the lightbox is a native modal dialog (focus trapped, Esc closes, focus returns); the mobile menu has `aria-expanded` and closes on Esc and on navigation.
+- **Images:** every image goes through the Cloudinary loader with `sizes`; the hero is preloaded with high priority (and the first photo on Dine and Explore).
+- **No horizontal scroll at 390px on any page** (measured).
+
+## How to test
+1. Click every header and footer link. None should 404.
+2. `/stay`: click Book this room on the Deluxe Room; pick dates; you should go straight to the request form for that room.
+3. `/gallery`: try each filter; open a photo and use the arrow keys and Esc.
+4. `/location`: Get Directions opens Google Maps; **Show map** loads the embed only after the click.
+5. `/events`: both buttons open the enquiry form with the right type preselected.
+6. Admin: edit something in Content and see it on the public page straight away.
+7. Phone width: open the menu, go through the pages, check the WhatsApp button.
+8. `npm run build && npm start`: placeholders and the wedding mockup are hidden everywhere (verified for all public pages).
+
+## Checks run
+Typecheck, lint, 124 tests (new: contact links, sitemap, robots, header/footer link consistency) and a production build pass. Browser audit, gallery, lightbox, menu and room-prefill checks all pass.
+
+## Placeholders and launch blockers (Phase 6)
+- Everything on the dashboard Placeholders panel (now 13 items, including the cancellation text in `src/config/booking.ts`).
+- **Booking config:** `BOOKING.cancellationPolicy` is still a dev placeholder and is separate from the Policies content (two sources for one fact). It shows in the booking form and emails, and **is not hidden in production**. It should be decided and then either read from the Policies content or filled in.
+- **Check-in 2:00 PM and check-out 11:00 AM** come from `src/config/booking.ts`, not the database, and I could not confirm the owner chose them. Please confirm. The FAQ answer for check-in times is still a placeholder.
+- Photo alt text is still the filename draft; review it in Media.
+- `/faq` and `/policies` show "will be added soon" in production until real content replaces the placeholders.
+- Turnstile shows its widget on `/enquiry` and `/book` in development (existing behaviour).
+
+## Notes
+- Scripts that write straight to the database (`place:photos`, `seed:content`) don't refresh the website cache; it catches up within the hour, or immediately on any admin save.
+- Screenshots of every page, desktop and phone, are in `docs/phase-5-screenshots/` (JPEG, downscaled).

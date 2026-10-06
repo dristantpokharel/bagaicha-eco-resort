@@ -11,10 +11,12 @@ type Props = {
   childUnderAge: number;
   defaults: { checkIn: string; checkOut: string; adults: number; children: number };
   errors?: Record<string, string>;
+  /** Room type slug chosen on /stay; kept through the search so the room is preselected. */
+  room?: string;
 };
 
 /** Dates + party. Plain GET form, so results are a normal, shareable URL. */
-export function SearchForm({ today, maxGuests, childUnderAge, defaults, errors }: Props) {
+export function SearchForm({ today, maxGuests, childUnderAge, defaults, errors, room }: Props) {
   const [checkIn, setCheckIn] = useState(defaults.checkIn);
   const [checkOut, setCheckOut] = useState(defaults.checkOut);
 
@@ -38,6 +40,7 @@ export function SearchForm({ today, maxGuests, childUnderAge, defaults, errors }
 
   return (
     <form action="/book" method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end" noValidate>
+      {room && <input type="hidden" name="room" value={room} />}
       <Field id="checkIn" label="Check-in" error={errors?.checkIn}>
         <Input
           id="checkIn"

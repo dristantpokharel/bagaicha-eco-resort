@@ -206,6 +206,20 @@ body {
   html {
     scroll-behavior: auto;
   }
+  /* Hover zooms, accordion rotations and image fades all stop moving */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Baseline keyboard focus for anything that doesn't set its own (zero specificity, so components win) */
+:where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
 }
 
 /* ─── Admin-specific overrides ─── */
@@ -213,4 +227,23 @@ body {
 .admin-shell {
   background-color: #f9fafb;
   color: var(--color-charcoal);
+}
+
+/* ─── Public forms (/book, /enquiry): brochure look for the shared form controls ─── */
+.form-brand label {
+  font-family: var(--font-label);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-heading);
+}
+.form-brand :is(input, select, textarea) {
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+.form-brand :is(input, select, textarea):focus-visible {
+  border-color: var(--color-forest);
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
 }

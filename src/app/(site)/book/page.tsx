@@ -13,11 +13,16 @@ import { findAvailableRoomTypes } from "@/lib/booking/availability";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
 import { validateStay } from "@/lib/booking/rules";
 import { formatNpr } from "@/lib/money";
+import { getRoomTypes } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
+import { PageIntro } from "@/components/site/page-intro";
 
-export const metadata: Metadata = {
-  title: "Book your stay",
-  alternates: { canonical: "/book" },
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata({
+    title: "Book your stay",
+    description: "Request a stay at Bagaicha Eco Resort in Bardiya, Nepal. Choose your dates, see what is available and send a booking request.",
+    path: "/book",
+  });
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
@@ -32,6 +37,9 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
     _max: { maxGuests: true },
   });
   const maxGuests = capacity._max.maxGuests;
+  // Public copy of each room (placeholder text is hidden in production) and the room picked on /stay.
+  const publicRooms = new Map((await getRoomTypes()).map((r) => [r.slug, r]));
+  const preselected = publicRooms.get(first(sp.room));
 
   const defaults = {
     checkIn: first(sp.checkIn),
@@ -107,7 +115,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                 <li key={roomType.id} className="flex flex-col border border-forest/20 bg-white p-5">
                   <h3 className="font-display text-xl font-semibold italic text-ink-heading">{roomType.name}</h3>
                   <p className="mt-1 text-sm text-ink-muted">Sleeps up to {roomType.maxGuests}, children included</p>
-                  <p className="mt-3 text-sm text-ink">{roomType.description}</p>
+                  {publicRooms.get(roomType.slug)?.description && <p className="mt-3 text-sm text-ink">{publicRooms.get(roomType.slug)?.description}</p>}
                   <div className="mt-4 text-sm">
                     {quoteLines(quote, formatNpr).map((line) => (
                       <p key={line} className="text-ink-muted">
@@ -139,21 +147,29 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   }
 
   return (
+    <>
+      <PageIntro
+        id="book-heading"
+        strong="Book"
+        soft="your stay"
+        line={`Choose your dates to see what's available. Check-in is from ${BOOKING.checkInTime}, check-out by ${BOOKING.checkOutTime}.`}
+      />
     <PublicShell>
-      <h1 className="font-display text-3xl font-bold italic text-ink-heading sm:text-4xl">Book your stay</h1>
-      <p className="mt-2 max-w-prose text-ink">
-        Choose your dates to see what&apos;s available. Check-in is from {BOOKING.checkInTime}, check-out by{" "}
-        {BOOKING.checkOutTime}.
-      </p>
+      {preselected && !searched && (
+        <p className="mb-4 border-l-4 border-leaf bg-sage px-4 py-3 text-ink" role="status">
+          You are booking the <strong>{preselected.name}</strong>. Choose your dates to continue.
+        </p>
+      )}
 
       {maxGuests ? (
-        <div className="mt-8 border border-forest/20 bg-white p-5">
+        <div className="border border-forest/20 bg-white p-5">
           <SearchForm
             today={toDateOnlyString(today)}
             maxGuests={maxGuests}
             childUnderAge={BOOKING.childUnderAge}
             defaults={defaults}
             errors={formErrors}
+            room={preselected?.slug}
           />
         </div>
       ) : (
@@ -168,6 +184,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
       <div className="mt-10">{content}</div>
     </PublicShell>
+    </>
   );
 }
 

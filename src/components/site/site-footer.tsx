@@ -52,6 +52,7 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
                 <a href={whatsappHref(business.whatsapp)} className={linkClass} target="_blank" rel="noopener noreferrer">
                   <WhatsAppIcon size={20} />
                   WhatsApp {formatWhatsapp(business.whatsapp)}
+                  <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               )}
               {email && (
@@ -64,6 +65,7 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
                 <a href={business.instagramUrl} className={linkClass} target="_blank" rel="noopener noreferrer">
                   <InstagramIcon size={20} />
                   {instagramHandle(business.instagramUrl)}
+                  <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               )}
             </address>

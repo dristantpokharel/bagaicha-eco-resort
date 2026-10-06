@@ -15,7 +15,7 @@ const linkClass = "inline-flex min-h-11 items-center gap-3 text-ink-heading unde
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-sage p-6">
-      <h2 className="text-label text-ink-muted">{title}</h2>
+      <h2 className="text-label text-ink-heading">{title}</h2>
       <div className="mt-3 flex flex-col items-start gap-1">{children}</div>
     </section>
   );

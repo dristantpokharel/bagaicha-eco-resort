@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { BOOKING } from "@/config/booking";
 import { isMockupPhoto } from "./placeholder";
 
 export type PlaceholderEntry = { section: string; title: string; fields: string[]; href: string };
@@ -37,5 +38,7 @@ export async function listPlaceholders(): Promise<PlaceholderEntry[]> {
     if (isMockupPhoto(slot.media.originalFilename))
       out.push({ section: "Photos", title: `${slot.media.originalFilename} (homepage: ${slot.slot})`, fields: ["mockup image"], href: "/admin/media/homepage" });
   }
+  if (BOOKING.cancellationPolicy.isPlaceholder)
+    out.push({ section: "Booking", title: "Cancellation policy text in booking emails and form", fields: ["src/config/booking.ts"], href: "/admin/content/policies" });
   return out;
 }

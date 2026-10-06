@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BOOKING } from "@/config/booking";
 import { PublicShell } from "@/components/booking/public-shell";
 import { EnquiryForm } from "@/components/booking/enquiry-form";
 import { ENQUIRY_TYPE_LABELS } from "@/lib/booking/labels";
+import { pageMetadata } from "@/lib/seo";
+import { PageIntro } from "@/components/site/page-intro";
 
-export const metadata: Metadata = {
-  title: "Enquiry",
-  alternates: { canonical: "/enquiry" },
-};
+export const generateMetadata = (): Promise<Metadata> =>
+  pageMetadata({
+    title: "Send an enquiry",
+    description: "Enquire about events, conferences, larger groups or a custom stay at Bagaicha Eco Resort in Bardiya, Nepal.",
+    path: "/enquiry",
+  });
 
 export default async function EnquiryPage({ searchParams }: { searchParams: Promise<{ type?: string | string[] }> }) {
   const { type } = await searchParams;
@@ -15,19 +20,26 @@ export default async function EnquiryPage({ searchParams }: { searchParams: Prom
   const defaultType = requested && requested in ENQUIRY_TYPE_LABELS ? requested : "STAY";
 
   return (
+    <>
+      <PageIntro
+        id="enquiry-heading"
+        strong="Send an"
+        soft="enquiry"
+        line="For events, conferences, larger groups or anything that doesn't fit a regular booking."
+      >
+        <p className="text-body mt-3 max-w-2xl">
+          For a stay in one room, you can{" "}
+          <Link href="/book" className="text-forest underline underline-offset-4">
+            request a booking
+          </Link>{" "}
+          directly.
+        </p>
+      </PageIntro>
     <PublicShell>
-      <h1 className="font-display text-3xl font-bold italic text-ink-heading sm:text-4xl">Send an enquiry</h1>
-      <p className="mt-2 max-w-prose text-ink">
-        For events, conferences, larger groups or anything that doesn&apos;t fit a regular booking. For a stay in one
-        room, you can{" "}
-        <a href="/book" className="text-forest underline underline-offset-4">
-          request a booking
-        </a>{" "}
-        directly.
-      </p>
-      <div className="mt-8">
+      <div>
         <EnquiryForm defaultType={defaultType} defaultCountryCode={BOOKING.defaultCountryCode} />
       </div>
     </PublicShell>
+    </>
   );
 }
