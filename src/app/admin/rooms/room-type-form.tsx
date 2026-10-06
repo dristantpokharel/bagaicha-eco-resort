@@ -13,6 +13,7 @@ export type RoomTypeValues = {
   slug: string;
   description: string;
   basePriceNpr: number;
+  childPricePerNightNpr: number;
   maxGuests: number;
   amenities: string[];
   sortOrder: number;
@@ -68,7 +69,7 @@ export function RoomTypeForm({ roomType }: { roomType?: RoomTypeValues }) {
         />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field
           id="rt-price"
           label="Price per night (NPR)"
@@ -82,6 +83,20 @@ export function RoomTypeForm({ roomType }: { roomType?: RoomTypeValues }) {
             required
             defaultValue={roomType?.basePriceNpr}
             {...a11y("basePriceNpr", true)}
+          />
+        </Field>
+        <Field
+          id="rt-child-price"
+          label="Per child under 8 (NPR/night)"
+          error={errors?.childPricePerNightNpr}
+          hint="Added per child per night. 0 = free."
+        >
+          <Input
+            id="rt-child-price"
+            name="childPricePerNightNpr"
+            inputMode="numeric"
+            defaultValue={roomType?.childPricePerNightNpr ?? 0}
+            {...a11y("childPricePerNightNpr", true)}
           />
         </Field>
         <Field id="rt-guests" label="Maximum guests" error={errors?.maxGuests}>

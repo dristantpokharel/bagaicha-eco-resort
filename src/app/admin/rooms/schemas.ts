@@ -26,12 +26,23 @@ const wholeNpr = z.preprocess(
     .max(10_000_000, { error: "That price looks too high." }),
 );
 
+/** Whole NPR, 0 allowed (children stay free). */
+const wholeNprOrZero = z.preprocess(
+  (value) => (typeof value === "string" ? value.replace(/[,\s]/g, "") || "0" : value),
+  z.coerce
+    .number({ error: "Enter an amount in NPR." })
+    .int({ error: "Use whole rupees, no paisa." })
+    .min(0, { error: "Can't be negative." })
+    .max(10_000_000, { error: "That amount looks too high." }),
+);
+
 export const roomTypeSchema = z
   .object({
     name: z.string().trim().min(2, { error: "Enter a name." }).max(80),
     slug: z.string().trim().toLowerCase().max(80).optional().default(""),
     description: z.string().trim().min(10, { error: "Write a short description (at least 10 characters)." }).max(2000),
     basePriceNpr: wholeNpr,
+    childPricePerNightNpr: wholeNprOrZero,
     maxGuests: z.coerce
       .number({ error: "Enter the maximum number of guests." })
       .int({ error: "Use a whole number." })

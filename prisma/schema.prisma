@@ -125,17 +125,19 @@ model ActivityLog {
 // ─── Rooms ───────────────────────────────────────────────────────────────────
 
 model RoomType {
-  id           String   @id @default(cuid())
-  slug         String   @unique
-  name         String
-  description  String
-  basePriceNpr Int
-  maxGuests    Int
-  amenities    String[]
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  slug                  String   @unique
+  name                  String
+  description           String
+  basePriceNpr          Int
+  /// Extra per night for each child under the age limit (src/config/booking.ts). 0 = free.
+  childPricePerNightNpr Int      @default(0)
+  maxGuests             Int
+  amenities             String[]
+  isActive              Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   rooms    Room[]
   bookings Booking[]
@@ -198,33 +200,35 @@ model Guest {
 }
 
 model Booking {
-  id                 String        @id @default(cuid())
+  id                    String        @id @default(cuid())
   /// e.g. BG-2026-000123
-  bookingNumber      String        @unique
-  guestId            String
-  roomTypeId         String
+  bookingNumber         String        @unique
+  guestId               String
+  roomTypeId            String
   /// Assigned on confirm.
-  roomId             String?
-  checkIn            DateTime      @db.Date
-  checkOut           DateTime      @db.Date
-  adults             Int
-  children           Int           @default(0)
-  status             BookingStatus @default(PENDING)
-  source             BookingSource
+  roomId                String?
+  checkIn               DateTime      @db.Date
+  checkOut              DateTime      @db.Date
+  adults                Int
+  children              Int           @default(0)
+  status                BookingStatus @default(PENDING)
+  source                BookingSource
   /// Price snapshot at booking time, whole NPR.
-  pricePerNightNpr   Int
-  totalPriceNpr      Int
-  currency           String        @default("NPR")
-  specialRequests    String?
-  internalNotes      String?
-  createdById        String?
-  confirmedAt        DateTime?
-  checkedInAt        DateTime?
-  checkedOutAt       DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  pricePerNightNpr      Int
+  /// Per-child nightly rate at booking time (children under the age limit).
+  childPricePerNightNpr Int           @default(0)
+  totalPriceNpr         Int
+  currency              String        @default("NPR")
+  specialRequests       String?
+  internalNotes         String?
+  createdById           String?
+  confirmedAt           DateTime?
+  checkedInAt           DateTime?
+  checkedOutAt          DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Restrict)
   roomType  RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
@@ -241,7 +245,8 @@ model Booking {
 model Enquiry {
   id        String        @id @default(cuid())
   name      String
-  email     String
+  /// At least one of email / phone is required (CHECK constraint).
+  email     String?
   phone     String?
   type      EnquiryType
   message   String
@@ -251,6 +256,18 @@ model Enquiry {
 
   @@index([status, createdAt])
   @@map("enquiries")
+}
+
+/// Fixed-window counters for rate limiting (serverless-safe: state lives in Postgres).
+model RateLimit {
+  /// "<bucket>:<hashed identifier>"
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limits")
 }
 
 // ─── Media ───────────────────────────────────────────────────────────────────
