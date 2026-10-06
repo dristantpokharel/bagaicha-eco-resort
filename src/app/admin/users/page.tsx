@@ -34,7 +34,8 @@ export default async function UsersPage() {
         <h2 id="all-users" className="px-6 pt-6 font-serif text-lg text-forest">
           All users
         </h2>
-        <div className="overflow-x-auto p-6 pt-4">
+        {/* relative: keeps the sr-only labels inside the scroll area on narrow screens */}
+        <div className="relative overflow-x-auto p-6 pt-4">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-forest/10 text-xs uppercase tracking-wide text-charcoal-light">
               <tr>

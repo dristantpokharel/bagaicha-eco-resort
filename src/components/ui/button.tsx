@@ -4,7 +4,7 @@ type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "sm" | "md";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors ease-smooth " +
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors ease-smooth " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
