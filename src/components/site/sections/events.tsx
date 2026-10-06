@@ -32,8 +32,8 @@ export function EventsSection({
 
   return (
     <section aria-labelledby="events-heading" className="pt-section-sm md:pt-section">
-      <div className="container-page grid items-center gap-12 md:grid-cols-12 md:gap-16">
-        <Reveal className="flex flex-col gap-10 md:col-span-5">
+      <div className="container-page grid items-center gap-8 md:grid-cols-12 md:gap-16">
+        <Reveal className="flex flex-col gap-6 md:gap-10 md:col-span-5">
           <Kicker words={copy.kicker} />
           <SectionHeading id="events-heading" strong={copy.strong} soft={copy.soft} />
           <p className="text-body max-w-md">{copy.body}</p>
@@ -51,7 +51,7 @@ export function EventsSection({
       </div>
 
       {items.length > 0 && (
-        <div className="mt-16 bg-sage py-12 md:mt-24 md:py-14">
+        <div className="mt-10 bg-sage py-8 md:mt-24 md:py-14">
           <div className="container-page">
             <IconRow items={items} />
           </div>
@@ -59,7 +59,7 @@ export function EventsSection({
       )}
 
       {conference && (
-        <div className="container-page grid items-center gap-12 py-section-sm md:grid-cols-12 md:gap-16 md:py-section">
+        <div className="container-page grid items-center gap-8 py-section-sm md:grid-cols-12 md:gap-16 md:py-section">
           {conferencePhoto && (
             <Reveal className="md:col-span-7">
               <MediaPhoto media={conferencePhoto} sizes="(min-width: 768px) 55vw, 100vw" className="aspect-[16/10]" />

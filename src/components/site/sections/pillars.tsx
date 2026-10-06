@@ -25,7 +25,7 @@ export function Pillars({ slots }: { slots: HomepageSlots }) {
             </Reveal>
           </div>
         </div>
-        <div className="mt-14 md:mt-20">
+        <div className="mt-8 md:mt-20">
           <PillarList pillars={pillars} />
         </div>
       </div>

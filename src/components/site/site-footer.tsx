@@ -21,7 +21,7 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
     <footer className="mt-auto">
       <Wave />
       <div className="bg-forest pb-10 text-cream">
-        <div className="container-page grid gap-12 pt-8 md:grid-cols-[1.3fr_1fr_1fr] md:pt-4">
+        <div className="container-page grid gap-8 pt-6 md:gap-12 md:pt-4 md:grid-cols-[1.3fr_1fr_1fr]">
           <div>
             <span className="block size-20 rounded-full bg-cream p-1">
               <Image src="/logo-mark.png" alt="" width={80} height={80} className="size-full" />
@@ -83,7 +83,7 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
           </nav>
         </div>
 
-        <div className="container-page mt-12">
+        <div className="container-page mt-8 md:mt-12">
           <p className="border-t border-cream/20 pt-6 text-sm text-sage">
             © {year} {business.name}
           </p>

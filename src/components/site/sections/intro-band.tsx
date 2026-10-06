@@ -13,7 +13,7 @@ export function IntroBand({ intro }: { intro: string | null }) {
             <IconRow items={HOME.highlights} tone="light" />
           </Reveal>
           {intro && (
-            <div className="mt-12 flex items-center justify-center gap-5 md:mt-14">
+            <div className="mt-8 flex items-center justify-center gap-5 md:mt-14">
               <span className="rule-short hidden shrink-0 text-cream/60 sm:block" aria-hidden="true" />
               <h2 id="intro-heading" className="text-quote text-center">
                 {intro}

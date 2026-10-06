@@ -11,7 +11,7 @@ export function About({ photos }: { photos: PublicMedia[] }) {
   const [main, second, third] = photos;
   return (
     <section aria-labelledby="about-heading" className="relative overflow-hidden pb-section-sm md:pb-section">
-      <div className="container-page grid items-center gap-y-24 md:grid-cols-12 md:gap-x-10">
+      <div className="container-page grid items-center gap-y-20 md:grid-cols-12 md:gap-x-10">
         <Reveal className="relative md:col-span-7">
           {main && <MediaPhoto media={main} sizes="(min-width: 768px) 55vw, 90vw" className="aspect-[4/3] w-[88%]" />}
           {second && (
@@ -31,7 +31,7 @@ export function About({ photos }: { photos: PublicMedia[] }) {
         </Reveal>
       </div>
 
-      <div className="relative mt-16 py-20 md:mt-20 md:py-28">
+      <div className="relative mt-10 py-12 md:mt-20 md:py-28">
         <SageBlob className="pointer-events-none absolute inset-y-0 -right-40 h-full w-[34rem] md:-right-24 md:w-[44rem]" />
         <LeafSprig className="pointer-events-none absolute -top-10 right-2 w-24 -scale-x-100 md:right-[8%] md:w-32" />
         <div className="container-page relative">
@@ -44,7 +44,7 @@ export function About({ photos }: { photos: PublicMedia[] }) {
         </div>
       </div>
 
-      <div className="container-page relative mt-12 md:mt-16">
+      <div className="container-page relative mt-8 md:mt-16">
         <Reveal>
           <IconRow items={HOME.about.amenities} />
         </Reveal>

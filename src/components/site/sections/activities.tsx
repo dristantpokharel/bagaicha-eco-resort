@@ -62,7 +62,7 @@ export function ActivitiesSection({ activities, photo }: { activities: PublicAct
   const caption = activities.find((a) => a.slug === "chill-pool")?.title;
   return (
     <section aria-labelledby="explore-heading" className="py-section-sm md:py-section">
-      <div className="container-page grid gap-12 md:grid-cols-12 md:gap-16">
+      <div className="container-page grid gap-8 md:grid-cols-12 md:gap-16">
         {photo && (
           <div className="md:col-span-5">
             <div className="md:sticky md:top-28">
@@ -79,12 +79,12 @@ export function ActivitiesSection({ activities, photo }: { activities: PublicAct
           </div>
         )}
         <div className={photo ? "md:col-span-7" : "md:col-span-12"}>
-          <Reveal className="flex flex-col gap-10">
+          <Reveal className="flex flex-col gap-6 md:gap-10">
             <Kicker words={copy.kicker} />
             <SectionHeading id="explore-heading" strong={copy.strong} soft={copy.soft} />
             <p className="text-body max-w-md">{copy.line}</p>
           </Reveal>
-          <div className="mt-12">
+          <div className="mt-8 md:mt-12">
             <ExperienceList activities={activities} />
           </div>
         </div>

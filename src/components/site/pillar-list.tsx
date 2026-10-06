@@ -20,7 +20,7 @@ export function PillarList({ pillars }: { pillars: readonly Pillar[] }) {
   const [active, setActive] = useState(0);
 
   return (
-    <div className="grid items-center gap-10 md:grid-cols-[1fr_1.1fr] md:gap-16">
+    <div className="grid items-center gap-8 md:grid-cols-[1fr_1.1fr] md:gap-16">
       <ul className="border-t border-ink/20">
         {pillars.map((p, i) => (
           <li key={p.word} className="border-b border-ink/20">
@@ -28,10 +28,10 @@ export function PillarList({ pillars }: { pillars: readonly Pillar[] }) {
               href={p.href}
               onMouseEnter={() => setActive(i)}
               onFocus={() => setActive(i)}
-              className="group block py-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest md:py-8"
+              className="group block py-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest md:py-8"
             >
               {p.image && (
-                <span className="relative mb-5 block aspect-[4/3] overflow-hidden bg-sage md:hidden">
+                <span className="relative mb-4 block aspect-[4/3] overflow-hidden bg-sage md:hidden">
                   <MediaImage media={p.image} sizes="100vw" className="object-cover" />
                 </span>
               )}

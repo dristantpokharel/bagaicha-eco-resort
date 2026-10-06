@@ -16,8 +16,8 @@ export function RoomsTeaser({ rooms }: { rooms: PublicRoomType[] }) {
   return (
     <section aria-labelledby="stay-heading" className="bg-cream-dark py-section-sm md:py-section">
       <div className="container-page">
-        <div className="grid gap-12 md:grid-cols-12 md:gap-10">
-          <Reveal className="flex flex-col gap-10 md:col-span-4">
+        <div className="grid gap-8 md:grid-cols-12 md:gap-10">
+          <Reveal className="flex flex-col gap-6 md:col-span-4 md:gap-10">
             <Kicker words={copy.kicker} />
             <SectionHeading id="stay-heading" lead={copy.lead} accent={copy.accent} soft={copy.soft} />
             <p className="text-body">{copy.line}</p>

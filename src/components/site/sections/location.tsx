@@ -96,9 +96,9 @@ export function LocationSection({ business, nearby, map }: { business: Business;
           </address>
         </div>
 
-        <p className="text-body mt-10 max-w-3xl">{HOME.location.body}</p>
+        <p className="text-body mt-6 max-w-3xl md:mt-10">{HOME.location.body}</p>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:gap-12">
+        <div className="mt-8 grid gap-8 lg:mt-12 lg:grid-cols-12 lg:gap-12">
           {nearby.length > 0 && (
             <div className="lg:col-span-5">
               <h3 className="sr-only">Nearby places</h3>
