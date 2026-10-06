@@ -65,7 +65,7 @@ export const ICON_OPTIONS: readonly { value: IconName; label: string }[] = [
   { value: "sun", label: "Sun" },
 ];
 
-export const COLLECTIONS = {
+export const COLLECTIONS: Record<CollectionKey, Collection> = {
   business: {
     key: "business",
     label: "Business info",
@@ -181,7 +181,7 @@ export const COLLECTIONS = {
       { name: "icon", label: "Icon", kind: "select", options: ICON_OPTIONS },
     ],
   },
-} as const satisfies Record<CollectionKey, Collection>;
+};
 
 export function isCollectionKey(value: unknown): value is CollectionKey {
   return typeof value === "string" && value in COLLECTIONS;

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/content/revalidate";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
@@ -157,6 +158,7 @@ export async function updateAltText(_prev: ActionResult | null, formData: FormDa
     });
 
     revalidatePath(MEDIA_PATH, "layout");
+    revalidatePublicSite();
     return { ok: true, message: "Alt text saved." };
   });
 }
@@ -203,6 +205,7 @@ export async function deleteMedia(_prev: ActionResult | null, formData: FormData
     );
 
     revalidatePath(MEDIA_PATH, "layout");
+    revalidatePublicSite();
     return { ok: true, message: "Image deleted from the library and Cloudinary." };
   });
 }

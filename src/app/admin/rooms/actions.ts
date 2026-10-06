@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { remainingPlaceholders } from "@/lib/content/placeholder";
+import { revalidatePublicSite } from "@/lib/content/revalidate";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
@@ -21,6 +23,7 @@ function isUniqueViolation(error: unknown) {
 function revalidateRooms(roomTypeId?: string) {
   revalidatePath(ROOMS_PATH);
   if (roomTypeId) revalidatePath(`${ROOMS_PATH}/${roomTypeId}`);
+  revalidatePublicSite();
 }
 
 // ─── Room types ──────────────────────────────────────────────────────────────
@@ -67,7 +70,8 @@ export async function updateRoomType(_prev: ActionResult | null, formData: FormD
       await db.$transaction(async (tx) => {
         const before = await tx.roomType.findUnique({ where: { id: roomTypeId } });
         if (!before) throw new ActionError("That room type no longer exists.");
-        await tx.roomType.update({ where: { id: roomTypeId }, data: input });
+        const placeholderFields = remainingPlaceholders(before, input, before.placeholderFields);
+        await tx.roomType.update({ where: { id: roomTypeId }, data: { ...input, placeholderFields } });
 
         const changed = (Object.keys(input) as (keyof typeof input)[]).filter(
           (key) => JSON.stringify(before[key]) !== JSON.stringify(input[key]),

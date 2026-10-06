@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/content/revalidate";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
@@ -75,6 +76,7 @@ function placements(tx: Prisma.TransactionClient, target: PlacementTarget) {
 function revalidate(paths: string[]) {
   for (const path of paths) revalidatePath(path);
   revalidatePath("/admin/media"); // usage badges in the library
+  revalidatePublicSite();
 }
 
 function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
