@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import type { GalleryCategory, HomepageSlotKey } from "@/generated/prisma/enums";
 import type { MediaImageData } from "@/components/media/media-image";
 import { CONTENT_TAG } from "./revalidate";
+import { loadStayTerms } from "./stay-terms";
+import { fillTokens, type TokenContext } from "./tokens";
 import { hasPlaceholderIn, isMockupPhoto, liveValue, showPlaceholders } from "./placeholder";
 
 /**
@@ -34,6 +36,8 @@ export type Business = {
   facebookUrl: string | null;
   googleMapsUrl: string | null;
   directionsUrl: string | null;
+  checkInTime: string | null;
+  checkOutTime: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -47,6 +51,8 @@ const BUSINESS_FIELDS = [
   "facebookUrl",
   "googleMapsUrl",
   "directionsUrl",
+  "checkInTime",
+  "checkOutTime",
   "latitude",
   "longitude",
 ] as const;
@@ -62,6 +68,8 @@ export const getBusiness = cached(async (): Promise<Business> => {
   out.emails = hide("emails") ? [] : row.emails;
   return out;
 }, "business");
+
+export const getStayTerms = cached(loadStayTerms, "stay-terms");
 
 // ─── Activities, events, dining, FAQs, policies, nearby ─────────────────────
 
@@ -163,22 +171,57 @@ export const getDining = cached(async (): Promise<PublicDiningSection[]> => {
     }));
 }, "dining");
 
+/** Facts that FAQ answers and policies may insert with {{tokens}} (see tokens.ts). */
+async function loadTokenContext(): Promise<TokenContext> {
+  const [business, terms, rooms, nearby] = await Promise.all([getBusiness(), getStayTerms(), getRoomTypes(), getNearby()]);
+  return {
+    checkInTime: terms.checkInTime,
+    checkOutTime: terms.checkOutTime,
+    address: business.address,
+    cancellationPolicy: terms.cancellationPolicy,
+    rooms,
+    nearby,
+  };
+}
+
 export type PublicFaq = { id: string; question: string; answer: string; placeholderFields: string[] };
 
 export const getFaqs = cached(async (): Promise<PublicFaq[]> => {
-  const rows = await db.faq.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
+  const [rows, ctx] = await Promise.all([
+    db.faq.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
+    loadTokenContext(),
+  ]);
   return rows
     .filter((r) => showPlaceholders || !hasPlaceholderIn(r, ["question", "answer"]))
-    .map((r) => ({ id: r.id, question: r.question, answer: r.answer, placeholderFields: showPlaceholders ? r.placeholderFields : [] }));
+    .map((r) => ({ r, answer: fillTokens(r.answer, ctx) }))
+    // A fact the answer relies on isn't saved yet: show it in dev (with the raw token), never in production.
+    .filter(({ answer }) => answer.complete || showPlaceholders)
+    .map(({ r, answer }) => ({
+      id: r.id,
+      question: r.question,
+      answer: answer.text,
+      placeholderFields: showPlaceholders ? r.placeholderFields : [],
+    }));
 }, "faqs");
 
 export type PublicPolicy = { id: string; slug: string; title: string; body: string; placeholderFields: string[] };
 
 export const getPolicies = cached(async (): Promise<PublicPolicy[]> => {
-  const rows = await db.policy.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { title: "asc" }] });
+  const [rows, ctx] = await Promise.all([
+    db.policy.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
+    loadTokenContext(),
+  ]);
   return rows
     .filter((r) => showPlaceholders || !hasPlaceholderIn(r, ["title", "body"]))
-    .map((r) => ({ id: r.id, slug: r.slug, title: r.title, body: r.body, placeholderFields: showPlaceholders ? r.placeholderFields : [] }));
+    .map((r) => ({ r, body: fillTokens(r.body, ctx) }))
+    .filter(({ body }) => body.complete || showPlaceholders)
+    .map(({ r, body }) => ({
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      body: body.text,
+      placeholderFields: showPlaceholders ? r.placeholderFields : [],
+    }));
 }, "policies");
 
 export type PublicNearby = { id: string; name: string; distance: string | null; travelTime: string | null; icon: string | null };

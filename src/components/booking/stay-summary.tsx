@@ -11,6 +11,8 @@ export function StaySummary({
   adults,
   childCount,
   quote,
+  checkInTime,
+  checkOutTime,
 }: {
   roomTypeName: string;
   checkIn: Date;
@@ -18,6 +20,8 @@ export function StaySummary({
   adults: number;
   childCount: number;
   quote: Quote;
+  checkInTime: string | null;
+  checkOutTime: string | null;
 }) {
   const lines = quoteLines(quote, formatNpr);
   return (
@@ -27,13 +31,13 @@ export function StaySummary({
         <div>
           <dt className="text-ink-muted">Check-in</dt>
           <dd className="text-ink">
-            {formatStayDate(checkIn)}, from {BOOKING.checkInTime}
+            {formatStayDate(checkIn)}{checkInTime ? `, from ${checkInTime}` : ""}
           </dd>
         </div>
         <div>
           <dt className="text-ink-muted">Check-out</dt>
           <dd className="text-ink">
-            {formatStayDate(checkOut)}, by {BOOKING.checkOutTime}
+            {formatStayDate(checkOut)}{checkOutTime ? `, by ${checkOutTime}` : ""}
           </dd>
         </div>
         <div>

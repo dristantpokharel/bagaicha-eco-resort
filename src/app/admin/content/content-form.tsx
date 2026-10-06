@@ -138,6 +138,16 @@ export function ContentForm({
         )}
       </div>
 
+      {row && row.placeholderFields.length > 0 && (
+        <label className="flex items-start gap-2 border-l-4 border-warning bg-warning/5 p-3 text-sm text-charcoal">
+          <input type="checkbox" name="markReviewed" className="mt-0.5 size-4 accent-forest" />
+          <span>
+            <strong>I have reviewed this and it is final.</strong> Tick this to remove the placeholder flag
+            ({row.placeholderFields.join(", ")}) without changing the text. Editing a flagged field also clears its flag.
+          </span>
+        </label>
+      )}
+
       <Button type="submit" disabled={pending}>
         {pending ? "Saving…" : row ? "Save changes" : `Add ${collection.singular}`}
       </Button>

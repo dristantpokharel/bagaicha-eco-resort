@@ -1,5 +1,6 @@
 import { SITE } from "@/config/site";
 import { db } from "@/lib/db";
+import { loadStayTerms } from "@/lib/content/stay-terms";
 import { logActivity } from "@/lib/activity-log";
 import { nightsBetween } from "@/lib/booking/dates";
 import { computeQuote } from "@/lib/booking/pricing";
@@ -51,6 +52,7 @@ export async function loadBookingEmailData(bookingId: string): Promise<BookingEm
     }),
     specialRequests: b.specialRequests,
     cancellationReason: b.cancellationReason,
+    terms: await loadStayTerms(),
   };
 }
 

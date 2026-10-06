@@ -4,8 +4,6 @@ import { useActionState, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import { TurnstileWidget } from "@/components/forms/turnstile-widget";
-import { Placeholder } from "@/components/site/placeholder";
-import { BOOKING } from "@/config/booking";
 import { submitBookingRequest, type BookingRequestState } from "@/app/(site)/book/actions";
 
 type Props = {
@@ -13,10 +11,12 @@ type Props = {
   defaultCountryCode: string;
   /** Server-rendered stay recap, shown beside the form and after success. */
   summary: ReactNode;
+  /** Wording from Content → Policies; null hides the line. */
+  cancellationPolicy: string | null;
 };
 
 /** Guest details + submit. The server recomputes price and availability; nothing priced is posted. */
-export function BookingForm({ stay, defaultCountryCode, summary }: Props) {
+export function BookingForm({ stay, defaultCountryCode, summary, cancellationPolicy }: Props) {
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [state, action, pending] = useActionState<BookingRequestState, FormData>(async (prev, formData) => {
@@ -51,9 +51,7 @@ export function BookingForm({ stay, defaultCountryCode, summary }: Props) {
               We couldn&apos;t send the confirmation email, but your request is saved. Please note your booking number.
             </p>
           )}
-          <p className="text-sm text-ink-muted">
-            Cancellation policy: {BOOKING.cancellationPolicy.isPlaceholder ? <Placeholder>{BOOKING.cancellationPolicy.text}</Placeholder> : BOOKING.cancellationPolicy.text}
-          </p>
+          {cancellationPolicy && <p className="text-sm text-ink-muted">Cancellation policy: {cancellationPolicy}</p>}
         </div>
         <div>{summary}</div>
       </div>

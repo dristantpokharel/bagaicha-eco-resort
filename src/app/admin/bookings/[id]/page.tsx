@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BOOKING } from "@/config/booking";
 import { db } from "@/lib/db";
+import { loadStayTerms } from "@/lib/content/stay-terms";
 import { can, requirePagePermission } from "@/lib/auth";
 import { ADMIN_SECTIONS } from "@/lib/admin-nav";
 import { formatDateTime, todayInResort } from "@/lib/dates";
@@ -44,6 +45,7 @@ export default async function BookingPage({
     },
   });
   if (!booking) notFound();
+  const terms = await loadStayTerms();
 
   const flags = editableFlags(booking.status);
   const canSeeLog = can(user.role, "activityLog.view");
@@ -113,10 +115,10 @@ export default async function BookingPage({
           <Card title="Stay">
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Item label="Check-in">
-                {formatStayDate(booking.checkIn)}, from {BOOKING.checkInTime}
+                {formatStayDate(booking.checkIn)}{terms.checkInTime ? `, from ${terms.checkInTime}` : ""}
               </Item>
               <Item label="Check-out">
-                {formatStayDate(booking.checkOut)}, by {BOOKING.checkOutTime}
+                {formatStayDate(booking.checkOut)}{terms.checkOutTime ? `, by ${terms.checkOutTime}` : ""}
               </Item>
               <Item label="Nights">{nights}</Item>
               <Item label="Guests">

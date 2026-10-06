@@ -1,4 +1,5 @@
 import { BOOKING } from "@/config/booking";
+import type { StayTerms } from "@/lib/content/stay-terms";
 import { SITE } from "@/config/site";
 import { formatShortDate, formatStayDate } from "@/lib/booking/dates";
 import { quoteLines, type Quote } from "@/lib/booking/pricing";
@@ -22,6 +23,8 @@ export type BookingEmailData = {
   quote: Quote;
   specialRequests: string | null;
   cancellationReason: string | null;
+  /** Times and cancellation wording from the database (BusinessInfo, Policies). */
+  terms: StayTerms;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -38,8 +41,8 @@ type Row = [label: string, value: string];
 function bookingRows(b: BookingEmailData): Row[] {
   const rows: Row[] = [
     ["Booking number", b.bookingNumber],
-    ["Check-in", `${formatStayDate(b.checkIn)}, from ${BOOKING.checkInTime}`],
-    ["Check-out", `${formatStayDate(b.checkOut)}, by ${BOOKING.checkOutTime}`],
+    ["Check-in", `${formatStayDate(b.checkIn)}${b.terms.checkInTime ? `, from ${b.terms.checkInTime}` : ""}`],
+    ["Check-out", `${formatStayDate(b.checkOut)}${b.terms.checkOutTime ? `, by ${b.terms.checkOutTime}` : ""}`],
     ["Nights", String(b.quote.nights)],
     ["Room", b.roomName ? `${b.roomTypeName} (${b.roomName})` : `${b.roomTypeName} (room assigned on confirmation)`],
     ["Guests", guestsLabel(b)],
@@ -77,8 +80,9 @@ function table(rows: Row[]): string {
     .join("")}</table>`;
 }
 
-function policyBlock() {
-  const { text } = BOOKING.cancellationPolicy;
+function policyBlock(b: BookingEmailData) {
+  const text = b.terms.cancellationPolicy;
+  if (!text) return { html: "", text: "" };
   return {
     html: `<p style="font-size:13px;color:${COLORS.muted}"><strong>Cancellation policy:</strong> ${esc(text)}</p>`,
     text: `Cancellation policy: ${text}`,
@@ -88,13 +92,13 @@ function policyBlock() {
 function compose(subject: string, title: string, intro: string, b: BookingEmailData, outro?: string): RenderedEmail {
   const rows = bookingRows(b);
   const price = priceBlock(b);
-  const policy = policyBlock();
+  const policy = policyBlock(b);
   const html = layout(
     title,
     `<p style="font-size:15px;line-height:1.5">${esc(intro)}</p>
 ${table(rows)}
 <div style="margin-top:12px;font-size:14px">${price.html}</div>
-<div style="margin-top:16px">${policy.html}</div>
+${policy.html ? `<div style="margin-top:16px">${policy.html}</div>` : ""}
 ${outro ? `<p style="font-size:14px">${esc(outro)}</p>` : ""}`,
   );
   const text = [
@@ -105,8 +109,7 @@ ${outro ? `<p style="font-size:14px">${esc(outro)}</p>` : ""}`,
     ...rows.map(([l, v]) => `${l}: ${v}`),
     "",
     price.text,
-    "",
-    policy.text,
+    ...(policy.text ? ["", policy.text] : []),
     ...(outro ? ["", outro] : []),
     "",
     `${SITE.name}, ${SITE.address}`,

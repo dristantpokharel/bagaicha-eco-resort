@@ -79,7 +79,12 @@ export async function saveContentItem(_prev: ActionResult | null, formData: Form
         const previous = collection.singleton ? await model.findUnique({ where }) : id ? await model.findUnique({ where }) : null;
         if (id && !previous) throw new ActionError("That item no longer exists.");
 
-        const data = { ...input, placeholderFields: remainingPlaceholders(previous, input, previous?.placeholderFields ?? []) };
+        // "I've reviewed this" clears every flag, even when the text is kept as it is.
+        const reviewed = formData.get("markReviewed") === "on";
+        const data = {
+          ...input,
+          placeholderFields: reviewed ? [] : remainingPlaceholders(previous, input, previous?.placeholderFields ?? []),
+        };
         const saved = previous ? await model.update({ where, data }) : await model.create({ data });
         await logActivity(tx, {
           userId: actor.id,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { IconName } from "@/components/site/icons";
+import { TOKEN_HELP } from "./tokens";
 
 /**
  * One description per editable content collection. It drives the admin form, the
@@ -85,6 +86,8 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
       { name: "facebookUrl", label: "Facebook link", kind: "url", hint: URL_HINT },
       { name: "googleMapsUrl", label: "Google Maps link", kind: "url", hint: "Opens the place in Google Maps." },
       { name: "directionsUrl", label: "Get Directions link", kind: "url", hint: "Opens turn-by-turn directions." },
+      { name: "checkInTime", label: "Check-in time", kind: "text", max: 20, hint: 'Shown as written, e.g. "2:00 PM". Used on the booking page, in emails and the FAQ.' },
+      { name: "checkOutTime", label: "Check-out time", kind: "text", max: 20, hint: 'Shown as written, e.g. "11:00 AM".' },
       { name: "latitude", label: "Latitude", kind: "float", min: -90, maxValue: 90 },
       { name: "longitude", label: "Longitude", kind: "float", min: -180, maxValue: 180 },
     ],
@@ -153,7 +156,7 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
     requiredLive: ["question", "answer"],
     fields: [
       { name: "question", label: "Question", kind: "text", required: true, max: 200 },
-      { name: "answer", label: "Answer", kind: "textarea", required: true, max: 2000, rows: 4 },
+      { name: "answer", label: "Answer", kind: "textarea", required: true, max: 2000, rows: 4, hint: TOKEN_HELP },
     ],
   },
   policies: {
@@ -165,7 +168,7 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
     requiredLive: ["title", "body"],
     fields: [
       { name: "title", label: "Title", kind: "text", required: true, max: 120 },
-      { name: "body", label: "Text", kind: "textarea", required: true, max: 5000, rows: 8, hint: "Blank lines start a new paragraph." },
+      { name: "body", label: "Text", kind: "textarea", required: true, max: 5000, rows: 8, hint: `Blank lines start a new paragraph. ${TOKEN_HELP}` },
     ],
   },
   nearby: {

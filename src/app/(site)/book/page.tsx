@@ -13,7 +13,7 @@ import { findAvailableRoomTypes } from "@/lib/booking/availability";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
 import { validateStay } from "@/lib/booking/rules";
 import { formatNpr } from "@/lib/money";
-import { getRoomTypes } from "@/lib/content/queries";
+import { getRoomTypes, getStayTerms } from "@/lib/content/queries";
 import { pageMetadata } from "@/lib/seo";
 import { PageIntro } from "@/components/site/page-intro";
 
@@ -38,6 +38,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   });
   const maxGuests = capacity._max.maxGuests;
   // Public copy of each room (placeholder text is hidden in production) and the room picked on /stay.
+  const terms = await getStayTerms();
   const publicRooms = new Map((await getRoomTypes()).map((r) => [r.slug, r]));
   const preselected = publicRooms.get(first(sp.room));
 
@@ -82,6 +83,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             <BookingForm
               stay={{ ...defaults, roomTypeId: chosen.roomType.id }}
               defaultCountryCode={BOOKING.defaultCountryCode}
+              cancellationPolicy={terms.cancellationPolicy}
               summary={
                 <StaySummary
                   roomTypeName={chosen.roomType.name}
@@ -90,6 +92,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                   adults={defaults.adults}
                   childCount={defaults.children}
                   quote={chosen.quote}
+                  checkInTime={terms.checkInTime}
+                  checkOutTime={terms.checkOutTime}
                 />
               }
             />
@@ -152,7 +156,12 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         id="book-heading"
         strong="Book"
         soft="your stay"
-        line={`Choose your dates to see what's available. Check-in is from ${BOOKING.checkInTime}, check-out by ${BOOKING.checkOutTime}.`}
+        line={[
+          "Choose your dates to see what's available.",
+          terms.checkInTime && terms.checkOutTime ? `Check-in is from ${terms.checkInTime}, check-out by ${terms.checkOutTime}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       />
     <PublicShell>
       {preselected && !searched && (

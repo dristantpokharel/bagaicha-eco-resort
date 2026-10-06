@@ -99,12 +99,19 @@ Per-page metadata and canonical URLs (from `NEXT_PUBLIC_SITE_URL`), Open Graph a
 ## Checks run
 Typecheck, lint, 124 tests (new: contact links, sitemap, robots, header/footer link consistency) and a production build pass. Browser audit, gallery, lightbox, menu and room-prefill checks all pass.
 
+## Follow-up: single sources, confirmed facts and FAQs
+- **Cancellation policy** is now only in Content → Policies ("Plans changed? Please let us know at least 24 hours before your arrival so we can release your room to other guests."). It was removed from `src/config/booking.ts`. `/book`, the booking emails, the FAQ and `/policies` all read it from the database.
+- **Check-in 2:00 PM and check-out 11:00 AM** are now Business info fields (migration `business_stay_times`), editable in admin, and removed from the config file. One loader, `loadStayTerms()` (`src/lib/content/stay-terms.ts`), feeds `/book`, the stay summary, the admin booking page and every email. Verified end to end: changing the time in admin changed `/book` and the FAQ straight away, then I restored it.
+- **Six FAQs drafted** from confirmed facts only (check-in/out, children's rates, rooms and capacity, how requests and confirmation work, cancellation, location and distance to Nepalgunj). They are flagged as placeholders for your review, so they show with a badge in development and are **hidden in production until you review them**.
+- **Facts in FAQ answers are not typed in.** Answers can use tokens such as `{{checkInTime}}`, `{{childRates}}`, `{{rooms}}`, `{{nearby:Nepalgunj}}`, so if a price, time or distance changes the FAQ follows. The token list is shown under the Answer field. If a token has no value saved, the answer is hidden in production.
+- **"I have reviewed this and it is final"** tick-box on any flagged item in Content removes the placeholder flag without changing the text. Editing a flagged field also clears its flag.
+- The "Check-in and check-out" policy now reads "Check-in is from 2:00 PM. Check-out is by 11:00 AM." from the same fields.
+
 ## Placeholders and launch blockers (Phase 6)
-- Everything on the dashboard Placeholders panel (now 13 items, including the cancellation text in `src/config/booking.ts`).
-- **Booking config:** `BOOKING.cancellationPolicy` is still a dev placeholder and is separate from the Policies content (two sources for one fact). It shows in the booking form and emails, and **is not hidden in production**. It should be decided and then either read from the Policies content or filled in.
-- **Check-in 2:00 PM and check-out 11:00 AM** come from `src/config/booking.ts`, not the database, and I could not confirm the owner chose them. Please confirm. The FAQ answer for check-in times is still a placeholder.
-- Photo alt text is still the filename draft; review it in Media.
-- `/faq` and `/policies` show "will be added soon" in production until real content replaces the placeholders.
+- Everything on the dashboard Placeholders panel: the six FAQs (for your review), the Deluxe Room description and amenities, activity details, the Restaurant description and the wedding mockup photo.
+- **Children's rate:** the FAQ states each room's rate from the database. The Deluxe Room is NPR 500 per child per night, but the **Family Room is set to free for children** (child rate 0). If the Family Room should also be NPR 500, change it in Rooms.
+- Photo alt text is being done in Media (you).
+- Until the FAQs are reviewed, `/faq` shows "will be added soon" in production.
 - Turnstile shows its widget on `/enquiry` and `/book` in development (existing behaviour).
 
 ## Notes

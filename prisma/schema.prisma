@@ -374,6 +374,9 @@ model BusinessInfo {
   facebookUrl       String?
   googleMapsUrl     String?
   directionsUrl     String?
+  /// Shown to guests as written, e.g. "2:00 PM". Used on /book, in emails and the FAQ.
+  checkInTime       String?
+  checkOutTime      String?
   latitude          Float?
   longitude         Float?
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.

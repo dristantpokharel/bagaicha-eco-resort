@@ -30,6 +30,9 @@ const BUSINESS = {
   instagramUrl: "https://www.instagram.com/bagaichaecoresort/",
   googleMapsUrl: "https://maps.app.goo.gl/hK9US5mdfKxnD9Rr9",
   directionsUrl: "https://maps.app.goo.gl/8937HDumqd3MSTDA7",
+  // Confirmed by the owner.
+  checkInTime: "2:00 PM",
+  checkOutTime: "11:00 AM",
   latitude: 28.229779,
   longitude: 81.332061,
 };
@@ -75,14 +78,51 @@ const NEARBY = [
   { name: "Karnali Bridge", distance: "~53 km", travelTime: "75 mins", icon: "bridge" },
 ];
 
+/**
+ * Answers use {{tokens}} (src/lib/content/tokens.ts) so facts like times, rates and distances
+ * are read from the database, not repeated here. Flagged for the owner's review.
+ */
 const FAQS = [
-  { question: "What are the check-in and check-out times?", answer: ph("check-in and check-out times"), flags: ["answer"] },
-  { question: "What is the cancellation policy?", answer: ph("cancellation policy"), flags: ["answer"] },
+  {
+    question: "What are the check-in and check-out times?",
+    answer: "Check-in is from {{checkInTime}} and check-out is by {{checkOutTime}}.",
+  },
+  {
+    question: "Do children pay for a stay?",
+    answer:
+      "Children under {{childUnderAge}} pay a rate per child per night, added to the room price: {{childRates}}. Children {{childUnderAge}} and over count as adults.",
+  },
+  {
+    question: "What rooms do you have, and how many people can stay?",
+    answer:
+      "We have {{rooms}}. Each booking request is for one room. For a larger group, make separate bookings or send us an enquiry.",
+  },
+  {
+    question: "How do booking requests work?",
+    answer:
+      "Choose your dates and a room on the booking page and send your details. You receive a booking number straight away and, if you gave an email address, a copy of your request. A request is not a confirmed booking yet: we check availability and confirm by email or phone.",
+  },
+  {
+    question: "What is the cancellation policy?",
+    answer: "{{cancellationPolicy}}",
+  },
+  {
+    question: "Where is Bagaicha, and how far is Nepalgunj?",
+    answer: "Bagaicha Eco Resort is at {{address}}. Nepalgunj is {{nearby:Nepalgunj}} away.",
+  },
 ];
 
+/** Replaces placeholder text only; once a person has edited or reviewed a row it is never touched. */
+const CANCELLATION_TEXT =
+  "Plans changed? Please let us know at least 24 hours before your arrival so we can release your room to other guests.";
+
 const POLICIES = [
-  { slug: "cancellation-policy", title: "Cancellation policy", body: ph("cancellation policy"), flags: ["body"] },
-  { slug: "check-in-and-check-out", title: "Check-in and check-out", body: ph("check-in and check-out times"), flags: ["body"] },
+  { slug: "cancellation-policy", title: "Cancellation policy", body: CANCELLATION_TEXT },
+  {
+    slug: "check-in-and-check-out",
+    title: "Check-in and check-out",
+    body: "Check-in is from {{checkInTime}}. Check-out is by {{checkOutTime}}.",
+  },
 ];
 
 async function main() {
@@ -143,15 +183,29 @@ async function main() {
     }
 
     for (const [i, f] of FAQS.entries()) {
-      if (await db.faq.findFirst({ where: { question: f.question } })) continue;
-      note(`FAQ: ${f.question}`);
-      if (apply) await db.faq.create({ data: { question: f.question, answer: f.answer, placeholderFields: f.flags, sortOrder: i } });
+      const existing = await db.faq.findFirst({ where: { question: f.question } });
+      if (!existing) {
+        note(`FAQ (for review): ${f.question}`);
+        if (apply) await db.faq.create({ data: { ...f, placeholderFields: ["answer"], sortOrder: i } });
+      } else if (existing.placeholderFields.includes("answer") && existing.answer.startsWith("Placeholder:")) {
+        note(`FAQ answer drafted (for review): ${f.question}`);
+        if (apply) await db.faq.update({ where: { id: existing.id }, data: { answer: f.answer, sortOrder: i } });
+      }
     }
 
     for (const [i, p] of POLICIES.entries()) {
-      if (await db.policy.findUnique({ where: { slug: p.slug } })) continue;
-      note(`policy: ${p.title}`);
-      if (apply) await db.policy.create({ data: { slug: p.slug, title: p.title, body: p.body, placeholderFields: p.flags, sortOrder: i } });
+      const existing = await db.policy.findUnique({ where: { slug: p.slug } });
+      if (!existing) {
+        note(`policy: ${p.title}`);
+        if (apply) await db.policy.create({ data: { ...p, sortOrder: i } });
+      } else if (existing.placeholderFields.includes("body") && existing.body.startsWith("Placeholder:")) {
+        note(`policy filled with owner-confirmed text: ${p.title}`);
+        if (apply)
+          await db.policy.update({
+            where: { id: existing.id },
+            data: { body: p.body, placeholderFields: existing.placeholderFields.filter((f) => f !== "body") },
+          });
+      }
     }
 
     console.log(`${created} row(s) ${apply ? "created" : "would be created"}.`);
