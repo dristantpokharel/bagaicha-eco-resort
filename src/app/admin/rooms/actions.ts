@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { todayInResort } from "@/lib/dates";
+import { lockRoom } from "@/lib/booking/availability";
 import { createRoomSchema, renameRoomSchema, roomTypeSchema, setActiveSchema, updateRoomTypeSchema } from "./schemas";
 
 const ROOMS_PATH = "/admin/rooms";
@@ -195,6 +196,8 @@ export async function setRoomActive(_prev: ActionResult | null, formData: FormDa
       if (room.isActive === isActive) return;
 
       if (!isActive) {
+        // Same lock as confirming a booking, so an archive and a confirm can't both pass.
+        await lockRoom(tx, id);
         // A guest is staying or confirmed to stay: archiving would hide a live booking.
         const upcoming = await tx.booking.count({
           where: { roomId: id, status: { in: ["CONFIRMED", "CHECKED_IN"] }, checkOut: { gt: todayInResort() } },
