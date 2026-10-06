@@ -34,8 +34,8 @@ export const nav = [
   { label: "Location", href: "#location" },
 ] as const;
 
-/** Booking flow arrives in Phase 3; until then CTAs point at the contact details. */
-export const bookingHref = "#contact";
+/** "Book your stay" buttons go to the booking request flow. */
+export const bookingHref = "/book";
 
 export const hero = {
   desktop: { src: photo("hero.jpg"), width: 1432, height: 910 },
