@@ -17,7 +17,9 @@
     "preview:photos": "sh scripts/preview-photos.sh",
     "media:seed-photos": "tsx scripts/seed-photos.ts",
     "seed:inventory": "tsx prisma/seed-inventory.ts",
-    "inventory:check": "tsx scripts/check-stock-balances.ts"
+    "inventory:check": "tsx scripts/check-stock-balances.ts",
+    "setup:deluxe-room": "tsx scripts/setup-deluxe-room.ts",
+    "place:photos": "tsx scripts/place-photos.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
