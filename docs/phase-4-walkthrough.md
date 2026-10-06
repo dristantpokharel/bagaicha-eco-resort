@@ -64,7 +64,7 @@ Applied to the dev database with `migrate dev`. No seed data: no fake items and 
 5. On Rice, record **Used 8**. Balance 4.5 kg, and a **Low stock** badge appears. Try **Used 10**: refused with "Only 4.5 kg in stock".
 6. **Adjusted** with a count of 6 and no note: refused. Add a note: balance 6 kg.
 7. Edit Rice: change the supplier and threshold. The unit select is locked.
-8. Dashboard: after step 5, Rice shows under **Low stock** (it won't at 6 kg, since 6 is above 5; use Used 2 to see it again).
+8. Dashboard: after step 5 (4.5 kg), Rice shows under **Low stock**. After step 6 (6 kg, above the threshold of 5) it disappears from the widget.
 9. List: try the search, category filter and "Low stock only".
 10. Archive Rice: it leaves the list and the dashboard. "Show archived" brings it back. The record form is replaced by a message. Make it active again.
 
