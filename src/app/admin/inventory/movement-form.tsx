@@ -3,18 +3,33 @@
 import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
-import { Field, Input, Textarea } from "@/components/ui/form";
+import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
 import { formatQuantityWithUnit } from "@/lib/inventory/format";
 import { newSubmissionId } from "@/lib/inventory/submission-id";
 import { MOVEMENT_LABELS } from "@/lib/inventory/labels";
-import { NOTE_MAX_LENGTH } from "@/lib/inventory/schemas";
-import type { StockMovementType } from "@/generated/prisma/enums";
+import { MOVEMENT_TYPES, NOTE_MAX_LENGTH } from "@/lib/inventory/schemas";
 import { recordMovement } from "./actions";
 
-export type MovementItem = { id: string; name: string; category: string; unit: string; quantity: string };
+/** The three movements recorded on this form; moves and write-offs have their own forms. */
+type RecordableType = (typeof MOVEMENT_TYPES)[number];
 
-const AMOUNT_LABEL: Record<StockMovementType, string> = {
+export type MovementItem = {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  /** Total on the property. */
+  quantity: string;
+  /** Reusable items aren't "used up" and are counted per location. */
+  isConsumable: boolean;
+  /** Reusable items: amount at each location id (missing = 0). */
+  balances?: Record<string, string>;
+};
+
+export type MovementLocation = { id: string; label: string; isStore: boolean };
+
+const AMOUNT_LABEL: Record<RecordableType, string> = {
   RECEIVED: "Amount received",
   USED: "Amount used",
   ADJUSTED: "Counted quantity on the shelf",
@@ -30,18 +45,22 @@ export function MovementForm({
   types,
   defaultType,
   defaultItemId,
+  locations = [],
 }: {
   items: MovementItem[];
-  types: readonly StockMovementType[];
-  defaultType: StockMovementType;
+  types: readonly RecordableType[];
+  defaultType: RecordableType;
   defaultItemId?: string;
+  /** Needed when reusable items can be counted (ADJUSTED): where the count was taken. */
+  locations?: MovementLocation[];
 }) {
   const fixed = items.length === 1;
   const [itemId, setItemId] = useState(fixed ? items[0].id : (defaultItemId ?? ""));
-  const [type, setType] = useState<StockMovementType>(defaultType);
+  const [type, setType] = useState<RecordableType>(defaultType);
   const [search, setSearch] = useState("");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
+  const [locationId, setLocationId] = useState(locations.find((location) => location.isStore)?.id ?? "");
 
   // One token per attempt. It is kept after a failure or a lost response, so tapping
   // Record again can't save the same movement twice, and cleared once saved.
@@ -74,9 +93,13 @@ export function MovementForm({
 
   const item = items.find((candidate) => candidate.id === itemId);
   const term = search.trim().toLowerCase();
+  // Reusable items aren't used up; they are moved, written off, received or counted.
+  const eligible = type === "USED" ? items.filter((candidate) => candidate.isConsumable) : items;
   const shown = term
-    ? items.filter((candidate) => `${candidate.name} ${candidate.category}`.toLowerCase().includes(term))
-    : items;
+    ? eligible.filter((candidate) => `${candidate.name} ${candidate.category}`.toLowerCase().includes(term))
+    : eligible;
+  const countingAtPlace = item && !item.isConsumable && type === "ADJUSTED";
+  const placeBalance = countingAtPlace ? (item.balances?.[locationId] ?? "0") : null;
   const noteRequired = type === "ADJUSTED";
 
   return (
@@ -99,7 +122,10 @@ export function MovementForm({
                   name="type"
                   value={option}
                   checked={type === option}
-                  onChange={() => setType(option)}
+                  onChange={() => {
+                    setType(option);
+                    if (option === "USED" && !fixed && item && !item.isConsumable) setItemId("");
+                  }}
                   className="sr-only"
                 />
                 {MOVEMENT_LABELS[option]}
@@ -154,14 +180,30 @@ export function MovementForm({
         </fieldset>
       )}
 
+      {countingAtPlace && locations.length > 0 && (
+        <Field id="movement-location" label="Where did you count?">
+          <Select id="movement-location" name="locationId" value={locationId} onChange={(event) => setLocationId(event.target.value)} className="min-h-12">
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
       <Field
         id="movement-quantity"
         label={AMOUNT_LABEL[type]}
         error={errors?.quantity}
         hint={
           item
-            ? `In stock: ${formatQuantityWithUnit(item.quantity, item.unit)}${
-                type === "ADJUSTED" ? ". Enter what you actually count." : ""
+            ? `${
+                placeBalance === null
+                  ? `In stock: ${formatQuantityWithUnit(item.quantity, item.unit)}`
+                  : `At this place: ${formatQuantityWithUnit(placeBalance, item.unit)}`
+              }${type === "ADJUSTED" ? ". Enter what you actually count." : ""}${
+                !item.isConsumable && type === "RECEIVED" ? ". Goes into the Store." : ""
               }`
             : "Choose an item first."
         }

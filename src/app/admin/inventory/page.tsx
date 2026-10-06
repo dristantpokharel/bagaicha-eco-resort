@@ -65,6 +65,15 @@ export default async function InventoryPage({
             <Link href="/admin/inventory/record" className={buttonClasses()}>
               Record usage
             </Link>
+            <Link href="/admin/inventory/move" className={buttonClasses({ variant: "secondary" })}>
+              Move stock
+            </Link>
+            <Link href="/admin/inventory/locations" className={buttonClasses({ variant: "secondary" })}>
+              Store and laundry
+            </Link>
+            <Link href="/admin/inventory/lost-damaged" className={buttonClasses({ variant: "secondary" })}>
+              Lost / damaged
+            </Link>
             {canManage && (
               <Link href="/admin/inventory/new" className={buttonClasses({ variant: "secondary" })}>
                 New item

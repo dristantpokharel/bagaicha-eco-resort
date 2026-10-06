@@ -16,6 +16,8 @@ export type ItemValues = {
   lowStockThreshold: string;
   unitCostNpr: number | null;
   supplier: string | null;
+  isConsumable: boolean;
+  isFixedInRoom: boolean;
   /** The unit is locked once any stock has been recorded. */
   hasMovements: boolean;
 };
@@ -120,6 +122,29 @@ export function ItemForm({ item, categories }: { item?: ItemValues; categories: 
           <Input id="item-supplier" name="supplier" maxLength={80} defaultValue={item?.supplier ?? ""} {...a11y("supplier")} />
         </Field>
       </div>
+
+      <fieldset className="space-y-3">
+        <legend className="mb-1 text-sm font-medium text-charcoal">How it is used</legend>
+        <label className="flex min-h-10 items-start gap-2 text-sm">
+          <input type="checkbox" name="isConsumable" defaultChecked={item?.isConsumable ?? true} className="mt-0.5 size-4" />
+          <span>
+            Consumable
+            <span className="block text-xs text-charcoal-light">
+              Used up when handed out (soap, paper). Untick for items that come back (towels, kettles): those are tracked by place.
+            </span>
+            {errors?.isConsumable && <span className="block text-xs text-error">{errors.isConsumable}</span>}
+          </span>
+        </label>
+        <label className="flex min-h-10 items-start gap-2 text-sm">
+          <input type="checkbox" name="isFixedInRoom" defaultChecked={item?.isFixedInRoom ?? false} className="mt-0.5 size-4" />
+          <span>
+            Stays in the room at checkout
+            <span className="block text-xs text-charcoal-light">
+              For reusable items like a kettle or glasses. Left unticked, the item goes to the laundry after a stay.
+            </span>
+          </span>
+        </label>
+      </fieldset>
 
       <Button type="submit" disabled={pending}>
         {pending ? "Saving…" : item ? "Save changes" : "Add item"}

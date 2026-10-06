@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
+import { ensureRoomLocation } from "@/lib/inventory/locations";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { todayInResort } from "@/lib/dates";
 import { lockRoom } from "@/lib/booking/availability";
@@ -130,6 +131,7 @@ export async function createRoom(_prev: ActionResult | null, formData: FormData)
         const roomType = await tx.roomType.findUnique({ where: { id: input.roomTypeId }, select: { id: true } });
         if (!roomType) throw new ActionError("That room type no longer exists.");
         const room = await tx.room.create({ data: input });
+        await ensureRoomLocation(tx, room.id);
         await logActivity(tx, {
           userId: actor.id,
           action: "room.created",

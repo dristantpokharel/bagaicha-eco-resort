@@ -18,6 +18,7 @@ export default async function RecordStockPage({
 
   const items = await listInventoryItems();
   const options = items.map((item) => ({
+    isConsumable: item.isConsumable,
     id: item.id,
     name: item.name,
     category: item.category,
