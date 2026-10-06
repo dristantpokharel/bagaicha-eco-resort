@@ -19,7 +19,8 @@
     "seed:inventory": "tsx prisma/seed-inventory.ts",
     "inventory:check": "tsx scripts/check-stock-balances.ts",
     "setup:deluxe-room": "tsx scripts/setup-deluxe-room.ts",
-    "place:photos": "tsx scripts/place-photos.ts"
+    "place:photos": "tsx scripts/place-photos.ts",
+    "seed:content": "tsx prisma/seed-content.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
