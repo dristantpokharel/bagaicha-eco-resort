@@ -71,16 +71,18 @@ export async function saveUpload(input: z.input<typeof saveUploadSchema>): Promi
     const resource = await withCloudinary(() => getResource(publicId));
     if (!resource) throw new ActionError("Cloudinary couldn't confirm this upload. Nothing was saved.");
 
-    const problem = !isInMediaFolder(resource)
-      ? "it isn't in the media folder"
-      : !isAllowedFormat(resource.format)
-        ? `${resource.format.toUpperCase()} isn't an accepted format`
-        : resource.bytes > MAX_UPLOAD_BYTES
-          ? "it's larger than 10 MB"
-          : null;
+    // Never delete something outside our folder: it may be another asset in the account.
+    if (!isInMediaFolder(resource)) {
+      throw new ActionError("That upload isn't in the media folder, so it wasn't added. Nothing was deleted.");
+    }
+    const problem = !isAllowedFormat(resource.format)
+      ? `${resource.format.toUpperCase()} isn't an accepted format`
+      : resource.bytes > MAX_UPLOAD_BYTES
+        ? "it's larger than 10 MB"
+        : null;
     if (problem) {
-      await withCloudinary(() => destroyImage(publicId));
-      throw new ActionError(`The upload was rejected because ${problem}.`);
+      await withCloudinary(() => destroyImage(resource.public_id));
+      throw new ActionError(`The upload was rejected and removed because ${problem}.`);
     }
 
     const blurDataUrl = await fetchBlurDataUrl(resource.secure_url);

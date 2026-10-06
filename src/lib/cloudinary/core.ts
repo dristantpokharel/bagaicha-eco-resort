@@ -37,3 +37,19 @@ export const cloudinaryApi = {
       .map(encodeURIComponent)
       .join("/")}`,
 };
+
+/** Tiny blurred preview for next/image placeholders. Optional: returns null on any failure. */
+export async function fetchBlurDataUrl(secureUrl: string): Promise<string | null> {
+  try {
+    const marker = "/image/upload/";
+    const index = secureUrl.indexOf(marker) + marker.length;
+    const url = `${secureUrl.slice(0, index)}w_24,c_limit,e_blur:200,q_30,f_jpg/${secureUrl.slice(index)}`;
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > 4096) return null;
+    return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}

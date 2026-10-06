@@ -14,8 +14,12 @@ export const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "ima
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-/** Public IDs we accept back from the browser: inside MEDIA_FOLDER, no odd characters. */
-export const PUBLIC_ID_PATTERN = new RegExp(`^${MEDIA_FOLDER}/[A-Za-z0-9_\\-/]{1,200}$`);
+/**
+ * Shape of public IDs we accept back from the browser. Folder membership is NOT
+ * decided here: in Cloudinary's dynamic-folder mode the folder may not prefix the
+ * ID, so the server checks Cloudinary's own record (see isInMediaFolder).
+ */
+export const PUBLIC_ID_PATTERN = /^[A-Za-z0-9_\-/]{1,255}$/;
 
 /** Fields we read from Cloudinary's upload and Admin API responses. */
 export type CloudinaryResource = {
