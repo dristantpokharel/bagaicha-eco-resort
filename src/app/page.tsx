@@ -4,11 +4,14 @@ import { SITE } from "@/config/site";
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-      <h1 className="font-serif text-4xl text-forest">{SITE.name}</h1>
+      <h1 className="font-display text-4xl text-forest">{SITE.name}</h1>
       <p className="text-charcoal-light">{SITE.tagline}</p>
       <p className="mt-6 rounded-sm border border-dashed border-forest px-3 py-1 text-sm text-forest">
         Dev placeholder — public site arrives in Phase 5
       </p>
+      <a href="/preview" className="text-sm text-forest underline underline-offset-4">
+        Open the Phase 1.5 design preview
+      </a>
     </main>
   );
 }

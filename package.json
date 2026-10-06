@@ -11,7 +11,8 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "preview:photos": "sh scripts/preview-photos.sh"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -20,6 +21,7 @@
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
+    "lucide-react": "^1.52.0",
     "next": "16.3.8",
     "next-auth": "^5.0.0-beta.32",
     "prisma": "^7.10.0",
