@@ -20,7 +20,7 @@ export class ActionError extends Error {
 /**
  * Runs an action body and turns expected failures into an ActionResult.
  * The body is responsible for calling requirePermission / requireRole first.
- * Unexpected errors are logged without user data and reported generically.
+ * Unexpected errors are logged by name/code only and reported generically.
  */
 export async function runAction(body: () => Promise<ActionResult>): Promise<ActionResult> {
   try {
@@ -33,7 +33,9 @@ export async function runAction(body: () => Promise<ActionResult>): Promise<Acti
         fieldErrors: error instanceof ActionError ? error.fieldErrors : undefined,
       };
     }
-    console.error("Action failed:", error instanceof Error ? error.name : "unknown error");
+    // Never log the error message: Prisma errors can echo query arguments.
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    console.error("Action failed:", error instanceof Error ? error.name : "unknown error", code);
     return { ok: false, error: "Something went wrong. Nothing was saved. Please try again." };
   }
 }

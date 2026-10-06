@@ -65,6 +65,9 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Seed failed.");
+  // Prisma messages can echo query arguments (e.g. the password hash): print the code only.
+  if (error instanceof Prisma.PrismaClientKnownRequestError) console.error(`Seed failed: database error ${error.code}`);
+  else if (error instanceof Error && error.name === "Error") console.error(error.message);
+  else console.error(`Seed failed: ${error instanceof Error ? error.name : "unknown error"}`);
   process.exit(1);
 });
