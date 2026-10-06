@@ -18,7 +18,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${title.variable} ${redHat.variable} ${montserrat.variable} h-full`}>
+    // suppressHydrationWarning: browser extensions (e.g. dark-mode ones) add attributes to <html>
+    // before React loads. It only silences attribute mismatches on this element, not its children.
+    <html
+      lang="en"
+      className={`${title.variable} ${redHat.variable} ${montserrat.variable} h-full`}
+      suppressHydrationWarning
+    >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );

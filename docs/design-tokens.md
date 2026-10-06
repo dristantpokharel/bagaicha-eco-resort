@@ -185,7 +185,7 @@ Admin shadows and radii stay as they are; the public site doesn't use them.
 | Weddings subheading and copy | design.md's version; the brochure's "or gathering together" typo isn't carried over |
 | Wedding photo | `wedding-mock.png` is a mockup, shown only with a placeholder badge |
 | Nearby distances | Nepalgunj ~40 km (53 mins), Krishnasaar ~5 km (10–15 mins), Thakurdwara ~30 km (50 mins), Karnali Bridge ~53 km (75 mins), matching the brochure map |
-| Maps | Map link `maps.app.goo.gl/hK9US5mdfKxnD9Rr9`; "Get Directions" uses a Google Maps directions URL to the resort coordinates 28.229779, 81.332061 |
+| Maps | Map link `maps.app.goo.gl/hK9US5mdfKxnD9Rr9`; "Get Directions" uses the same link as the directions QR, `maps.app.goo.gl/8937HDumqd3MSTDA7`; resort coordinates 28.229779, 81.332061 |
 | Domain | `bagaichaecoresort.com`, set only through `NEXT_PUBLIC_SITE_URL` (`.env.example`) |
 
 ---

@@ -22,7 +22,7 @@ export const business = {
   // Owner-provided Google Maps details. Coordinates are kept for Phase 5 (map embed, structured data).
   coordinates: { lat: 28.229779, lng: 81.332061 },
   mapUrl: "https://maps.app.goo.gl/hK9US5mdfKxnD9Rr9",
-  directionsUrl: "https://www.google.com/maps/dir/?api=1&destination=28.229779,81.332061",
+  directionsUrl: "https://maps.app.goo.gl/8937HDumqd3MSTDA7",
 } as const;
 
 export const nav = [
