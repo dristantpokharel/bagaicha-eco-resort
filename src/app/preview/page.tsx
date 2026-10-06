@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Alegreya_Sans, Fira_Sans } from "next/font/google";
 import Image, { getImageProps } from "next/image";
 import { MapPin, Phone, Plus } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
@@ -27,7 +26,6 @@ import {
   pillars,
   rooms,
 } from "./content";
-import { TitleFontSwitcher, type TitleFont } from "./title-font-switcher";
 
 export const metadata: Metadata = {
   title: "Design preview",
@@ -35,39 +33,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Seravek stand-in candidates (docs/design-tokens.md §2). Source Sans 3 is the
-// root layout's --font-title; the other two load only on this preview page.
-const fira = Fira_Sans({ subsets: ["latin"], weight: ["300", "400", "700", "900"], style: ["normal", "italic"] });
-const alegreya = Alegreya_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "700", "900"],
-  style: ["normal", "italic"],
-});
-
-const titleFonts: TitleFont[] = [
-  {
-    id: "source",
-    label: "Source Sans 3",
-    family: "var(--font-title)",
-    note: "Closest proportions and italic letterforms; full 200–900 range. Recommended.",
-  },
-  {
-    id: "fira",
-    label: "Fira Sans",
-    family: fira.style.fontFamily,
-    note: "Humanist and warm, slightly more technical.",
-  },
-  {
-    id: "alegreya",
-    label: "Alegreya Sans",
-    family: alegreya.style.fontFamily,
-    note: "Most calligraphic and editorial; smaller x-height.",
-  },
-];
-
 export default function PreviewPage() {
   return (
-    <TitleFontSwitcher fonts={titleFonts}>
+    <>
       <PreviewBanner />
       <SiteHeader name={business.name} nav={nav} bookingHref={bookingHref} />
       <main>
@@ -79,10 +47,9 @@ export default function PreviewPage() {
         <Activities />
         <Events />
         <Location />
-        <FontCompare />
       </main>
       <SiteFooter {...business} nav={nav} bookingHref={bookingHref} />
-    </TitleFontSwitcher>
+    </>
   );
 }
 
@@ -489,21 +456,30 @@ function Location() {
                   <p className="mt-1 text-sm text-ink">
                     {n.distance} · {n.time}
                   </p>
-                  {n.placeholder ? <Placeholder className="mt-2">{n.placeholder}</Placeholder> : null}
                 </div>
               </li>
             ))}
           </ul>
 
           <div className="lg:col-span-7">
-            <Image
-              src={location.map.src}
-              alt={location.map.alt}
-              width={1536}
-              height={1024}
-              sizes="(min-width: 1024px) 55vw, 100vw"
-              className="h-auto w-full"
-            />
+            <a
+              href={business.mapUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
+            >
+              <Image
+                src={location.map.src}
+                alt={location.map.alt}
+                width={1536}
+                height={1024}
+                sizes="(min-width: 1024px) 55vw, 100vw"
+                className="h-auto w-full"
+              />
+              <span className="mt-2 inline-block text-label text-ink-heading underline-offset-4 group-hover:underline">
+                Open in Google Maps
+              </span>
+            </a>
             <div className="mt-4 flex flex-col gap-5 bg-cream p-5 sm:flex-row sm:items-center">
               <Image
                 src={location.qr.src}
@@ -515,59 +491,16 @@ function Location() {
               <div className="flex flex-col items-start gap-3">
                 <p className="text-body">Scan for directions on Google Maps, or open them on this device.</p>
                 <a
-                  href={business.directions.href}
+                  href={business.directionsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={buttonClasses({ variant: "brand", size: "lg" })}
                 >
                   Get Directions
                 </a>
-                <Placeholder>{business.directions.placeholder}</Placeholder>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── DEV ONLY: title font comparison ─── */
-
-function FontCompare() {
-  return (
-    <section
-      id="font-compare"
-      aria-labelledby="font-compare-heading"
-      className="border-y-2 border-dashed border-warning py-section-sm"
-    >
-      <div className="container-page">
-        <p className="text-label text-warning">Design preview only</p>
-        <h2 id="font-compare-heading" className="mt-2 font-label text-xl font-semibold text-ink">
-          Title font candidates (Seravek stand-ins)
-        </h2>
-        <p className="text-body mt-2 max-w-2xl text-ink-muted">
-          Same headings in each candidate. Body stays Red Hat Display and labels stay Montserrat. Use the switcher at
-          the bottom of the screen to see a candidate across the whole page.
-        </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {titleFonts.map((f) => (
-            <div
-              key={f.id}
-              style={{ "--font-display": f.family } as React.CSSProperties}
-              className="flex flex-col gap-6 bg-cream-dark p-6 [&_.text-heading-soft]:text-4xl [&_.text-heading-strong]:text-4xl [&_.text-quote]:text-2xl"
-            >
-              <div>
-                <p className="text-label text-ink-heading">{f.label}</p>
-                <p className="mt-1 text-sm text-ink-muted">{f.note}</p>
-              </div>
-              <SectionHeading strong="Local Flavours" soft="Rooted in Culture" as="h3" />
-              <SectionHeading lead="a" accent="stay" soft="closer to nature" as="h3" rule={false} />
-              <p className="text-heading-strong">Weddings &amp; Events</p>
-              <p className="text-quote text-ink-heading">Wake up to birdsong, fresh air and a quieter way to stay.</p>
-              <p className="font-display text-2xl text-ink-heading italic">Aa Gg Yy ly 0123</p>
-            </div>
-          ))}
         </div>
       </div>
     </section>

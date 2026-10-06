@@ -19,12 +19,10 @@ export const business = {
   whatsapp: { display: "+977 9851081502", href: "https://wa.me/9779851081502" },
   email: { display: "bagaichaecoresort@gmail.com", href: "mailto:bagaichaecoresort@gmail.com" },
   instagram: { display: "@bagaichaecoresort", href: "https://www.instagram.com/bagaichaecoresort/" },
-  // Link printed on the brochure QR code (a qr.codes short link). Placeholder until
-  // the owner confirms a direct Google Maps link for the resort.
-  directions: {
-    href: "https://qr.codes/3pb4MX",
-    placeholder: "Confirm direct Google Maps link (currently the brochure QR short link)",
-  },
+  // Owner-provided Google Maps details. Coordinates are kept for Phase 5 (map embed, structured data).
+  coordinates: { lat: 28.229779, lng: 81.332061 },
+  mapUrl: "https://maps.app.goo.gl/hK9US5mdfKxnD9Rr9",
+  directionsUrl: "https://www.google.com/maps/dir/?api=1&destination=28.229779,81.332061",
 } as const;
 
 export const nav = [
@@ -184,29 +182,26 @@ export const location = {
     alt: "Illustrated map of the area around Bagaicha Eco Resort, showing Krishnasaar Conservation Area, Thakurdwara and Bardiya National Park, Karnali Bridge and Nepalgunj",
   },
   qr: { src: photo("location-QR-code.png"), alt: "QR code that opens directions to Bagaicha Eco Resort" },
-  // Distances from brochure p4. Where the brochure list and map disagree, the value is a placeholder.
+  // Distances from brochure p4, confirmed by the owner.
   nearby: [
     {
       icon: "plane",
       name: "Nepalgunj",
-      distance: "~41 km",
+      distance: "~40 km",
       time: "53 mins",
-      placeholder: "Unconfirmed: brochure list says ~41 km, map says ~40 km",
     },
     {
       icon: "conservation",
       name: "Blackbuck / Krishnasaar Conservation Area",
       distance: "~5 km",
-      time: "10 mins",
-      placeholder: "Unconfirmed: brochure list says 10 mins, map says 10–15 min",
+      time: "10–15 mins",
     },
     {
       icon: "park",
       name: "Bardiya National Park / Thakurdwara",
       distance: "~30 km",
       time: "50 mins",
-      placeholder: null,
     },
-    { icon: "bridge", name: "Karnali Bridge", distance: "~53 km", time: "75 mins", placeholder: null },
+    { icon: "bridge", name: "Karnali Bridge", distance: "~53 km", time: "75 mins" },
   ],
 } as const;
