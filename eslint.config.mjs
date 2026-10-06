@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Old site, read-only reference (AGENTS.md rule 10).
+    "_legacy/**",
+    // Prisma generated client.
+    "src/generated/**",
   ]),
 ]);
 
