@@ -16,5 +16,7 @@ export const SITE = {
   tagline: "Where nature meets comfort",
   /** Intro line under the hero and default meta description (from the brochure). */
   description: "A perfect escape in the heart of Bardiya",
+  /** Postal address (docs/design.md). Phone and email live in BusinessInfo. */
+  address: "Khairi, Gulariya-3, Bardiya, Nepal",
   url: siteUrl,
 } as const;
