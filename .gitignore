@@ -9,3 +9,4 @@ src/generated/
 docs/photos/
 /public/preview/
 /docs/screenshots/
+!.env.example

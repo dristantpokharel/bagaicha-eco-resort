@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { SITE } from "@/config/site";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 // DEV PLACEHOLDER — replaced by the public homepage in Phase 5. Must not ship.
 export default function HomePage() {

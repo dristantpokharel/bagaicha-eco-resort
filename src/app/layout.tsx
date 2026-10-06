@@ -4,14 +4,16 @@ import { SITE } from "@/config/site";
 import "./globals.css";
 
 // Brochure fonts (docs/design-tokens.md §2). Seravek isn't licensed for web, so
-// titles use a Google stand-in; Source Sans 3 until the owner picks one.
+// titles use Source Sans 3, the owner-approved stand-in.
 const title = Source_Sans_3({ variable: "--font-title", subsets: ["latin"], style: ["normal", "italic"] });
 const redHat = Red_Hat_Display({ variable: "--font-red-hat", subsets: ["latin"], style: ["normal", "italic"] });
 const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: SITE.url,
   title: { default: SITE.name, template: `%s · ${SITE.name}` },
   description: SITE.description,
+  openGraph: { siteName: SITE.name, type: "website", locale: "en" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
