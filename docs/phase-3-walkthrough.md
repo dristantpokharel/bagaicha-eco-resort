@@ -137,4 +137,4 @@ Before you start: add `BOOKING_ALERT_TO` to `.env.local`; in Rooms, set the chil
 - New dev dependency: `vitest` (and `@types/node` moved to `^22`, since Vitest requires it).
 - Form controls are now 16 px on phones (14 px from the `sm` breakpoint up), which also applies to the admin.
 - The "Book Your Stay" buttons on `/preview` now go to `/book`.
-- Uncommitted changes that were already there before I started and that I left alone: the deleted `docs/Logo-with-text.png` and `next-env.d.ts`.
+- **Heads up:** `docs/Logo-with-text.png` was already deleted in your working tree when I started. My commit `b80f9ee` ("Fix typing in Turnstile test", made with `git commit -a`) accidentally included that deletion. The file is absent either way, so nothing is lost in your tree; if you didn't mean to delete it, restore it with `git checkout 9b663e1 -- docs/Logo-with-text.png`. `next-env.d.ts` was also already modified and I left it alone.
