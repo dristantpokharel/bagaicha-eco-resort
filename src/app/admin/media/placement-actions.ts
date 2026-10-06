@@ -16,6 +16,7 @@ import { ActionError, runAction, type ActionResult } from "@/lib/actions";
  */
 const targetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("roomType"), roomTypeId: z.string().min(1).max(64) }),
+  z.object({ kind: z.literal("activity"), activityId: z.string().min(1).max(64) }),
   z.object({ kind: z.literal("gallery"), category: z.enum(GalleryCategory) }),
   z.object({ kind: z.literal("homepage"), slot: z.enum(HomepageSlotKey) }),
 ]);
@@ -42,6 +43,21 @@ function placements(tx: Prisma.TransactionClient, target: PlacementTarget) {
           if (!exists) throw new ActionError("That room type no longer exists.");
         },
         paths: ["/admin/rooms", `/admin/rooms/${target.roomTypeId}`],
+      };
+    }
+    case "activity": {
+      const where = { activityId: target.activityId };
+      return {
+        where,
+        list: (): Promise<Row[]> => tx.activityMedia.findMany({ where, orderBy: { sortOrder: "asc" } }),
+        create: (mediaId: string, sortOrder: number) => tx.activityMedia.create({ data: { ...where, mediaId, sortOrder } }),
+        setOrder: (id: string, sortOrder: number) => tx.activityMedia.update({ where: { id }, data: { sortOrder } }),
+        remove: (id: string) => tx.activityMedia.delete({ where: { id } }),
+        async assertTarget() {
+          const exists = await tx.activity.findUnique({ where: { id: target.activityId }, select: { id: true } });
+          if (!exists) throw new ActionError("That activity no longer exists.");
+        },
+        paths: ["/admin/content/activities"],
       };
     }
     case "gallery": {

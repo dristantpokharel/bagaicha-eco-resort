@@ -39,8 +39,3 @@ export function remainingPlaceholders(
   if (!previous) return [];
   return flagged.filter((field) => same(previous[field], next[field]));
 }
-
-/** Seeded stand-in photos (e.g. wedding-mock.png) are recognised by their original filename. */
-export function isMockupPhoto(originalFilename: string | null | undefined): boolean {
-  return !!originalFilename && /mock/i.test(originalFilename);
-}

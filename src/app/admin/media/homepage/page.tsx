@@ -12,6 +12,8 @@ const SLOT_HINTS: Partial<Record<HomepageSlotKey, string>> = {
   HERO_DESKTOP: "Wide landscape photo for large screens.",
   HERO_MOBILE: "Photo cropped for phones; a portrait-friendly subject works best.",
   ABOUT: "Main photo first, then the smaller overlapping photos.",
+  EXPLORE_HERO_DESKTOP: "Wide landscape photo at the top of the Explore page.",
+  EXPLORE_HERO_MOBILE: "Portrait-friendly photo at the top of the Explore page on phones.",
 };
 
 export default async function HomepageMediaPage() {

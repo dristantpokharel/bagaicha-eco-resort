@@ -11,6 +11,7 @@ export const metadata = { title: "Media" };
 const FILTERS = {
   all: "All",
   review: "Alt text needs review",
+  placeholder: "Placeholder / rights unconfirmed",
   unused: "Not used",
 } as const;
 type Filter = keyof typeof FILTERS;
@@ -18,17 +19,17 @@ type Filter = keyof typeof FILTERS;
 export default async function MediaLibraryPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   await requirePagePermission(ADMIN_SECTIONS.media.permission);
   const { show } = await searchParams;
-  const filter: Filter = show === "review" || show === "unused" ? show : "all";
+  const filter: Filter = show === "review" || show === "unused" || show === "placeholder" ? show : "all";
 
   const rows = await db.media.findMany({
-    where: filter === "review" ? { altNeedsReview: true } : undefined,
+    where: filter === "review" ? { altNeedsReview: true } : filter === "placeholder" ? { isPlaceholder: true } : undefined,
     select: { ...mediaSelect, ...mediaUsageSelect },
     orderBy: { createdAt: "desc" },
   });
   const items: LibraryItem[] = rows
-    .map(({ roomTypes, galleryItems, homepageSlots, activities, eventTypes, ...media }) => ({
+    .map(({ roomTypes, galleryItems, homepageSlots, activities, activityPhotos, eventTypes, ...media }) => ({
       ...media,
-      usage: describeUsage({ roomTypes, galleryItems, homepageSlots, activities, eventTypes }),
+      usage: describeUsage({ roomTypes, galleryItems, homepageSlots, activities, activityPhotos, eventTypes }),
     }))
     .filter((item) => filter !== "unused" || item.usage.length === 0);
 

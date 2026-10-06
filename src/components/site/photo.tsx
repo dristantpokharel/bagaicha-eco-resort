@@ -43,7 +43,7 @@ export function MediaPhoto({
   preload = false,
   children,
 }: {
-  media: MediaImageData & { isPlaceholder?: boolean };
+  media: MediaImageData & { isPlaceholder?: boolean; placeholderNote?: string | null };
   sizes: string;
   className?: string;
   imgClassName?: string;
@@ -55,7 +55,7 @@ export function MediaPhoto({
       <MediaImage media={media} sizes={sizes} preload={preload} className={`object-cover ${imgClassName}`} />
       {media.isPlaceholder && (
         <Placeholder className="absolute top-3 right-3 left-3 sm:right-auto">
-          Mockup image, not a real Bagaicha photo. Replace with real photography.
+          {media.placeholderNote ?? "Placeholder / rights unconfirmed"}. Hidden on the live site.
         </Placeholder>
       )}
       {children}

@@ -25,11 +25,13 @@ export function ContentForm({
   row,
   mediaOptions = [],
   sectionOptions = [],
+  destinationOptions = [],
 }: {
   collection: CollectionKey;
   row?: ContentRow;
   mediaOptions?: Option[];
   sectionOptions?: Option[];
+  destinationOptions?: Option[];
 }) {
   const collection = COLLECTIONS[key];
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(saveContentItem, null);
@@ -56,8 +58,8 @@ export function ContentForm({
         return <Input {...common} type="url" inputMode="url" placeholder="https://" />;
       case "select":
         return (
-          <Select {...common}>
-            <option value="">None</option>
+          <Select {...common} required={f.required}>
+            {!f.required && <option value="">None</option>}
             {(f.options ?? []).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -70,6 +72,17 @@ export function ContentForm({
           <Select {...common}>
             <option value="">None</option>
             {mediaOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        );
+      case "destination":
+        return (
+          <Select {...common}>
+            <option value="">None</option>
+            {destinationOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

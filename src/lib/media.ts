@@ -12,6 +12,8 @@ export const mediaSelect = {
   format: true,
   bytes: true,
   originalFilename: true,
+  isPlaceholder: true,
+  placeholderNote: true,
   createdAt: true,
 } satisfies Prisma.MediaSelect;
 
@@ -21,6 +23,7 @@ export const mediaUsageSelect = {
   galleryItems: { select: { category: true } },
   homepageSlots: { select: { slot: true } },
   activities: { select: { id: true, title: true } },
+  activityPhotos: { select: { activity: { select: { id: true, title: true } } } },
   eventTypes: { select: { id: true, name: true } },
 } satisfies Prisma.MediaSelect;
 
@@ -32,6 +35,7 @@ export function describeUsage(media: UsageRow): string[] {
     ...media.galleryItems.map((g) => `Gallery: ${GALLERY_LABELS[g.category]}`),
     ...media.homepageSlots.map((h) => `Homepage: ${HOMEPAGE_SLOT_LABELS[h.slot]}`),
     ...media.activities.map((a) => `Activity: ${a.title}`),
+    ...media.activityPhotos.map((a) => `Activity photos: ${a.activity.title}`),
     ...media.eventTypes.map((e) => `Event: ${e.name}`),
   ];
 }
@@ -42,6 +46,7 @@ export const GALLERY_LABELS = {
   ACTIVITIES: "Activities",
   EVENTS: "Events",
   PROPERTY: "Property",
+  SURROUNDINGS: "Surroundings",
 } as const;
 
 export const HOMEPAGE_SLOT_LABELS = {
@@ -54,6 +59,8 @@ export const HOMEPAGE_SLOT_LABELS = {
   EVENTS: "Events",
   CONFERENCE: "Conference",
   LOCATION: "Location",
+  EXPLORE_HERO_DESKTOP: "Explore page hero (desktop)",
+  EXPLORE_HERO_MOBILE: "Explore page hero (phone)",
 } as const;
 
 export function formatBytes(bytes: number | null) {

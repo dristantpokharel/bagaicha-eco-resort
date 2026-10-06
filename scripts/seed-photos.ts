@@ -41,6 +41,7 @@ const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".heic", ".h
 const SKIP: Record<string, string> = {
   "night-farmhouse.jpg": "skipped at the owner's request",
   "brochure-front-page-vertical.png": "brochure reference, not a website photo",
+  "explore-bardiya-caravan.jpeg": "shows another organisation's vehicle; left out at the owner's request",
 };
 
 /** Illustrations stay PNG (sharp edges, text); everything else becomes JPEG. */
@@ -49,6 +50,40 @@ const KEEP_PNG = new Set(["Bagaicha-MAP.png", "location-QR-code.png"]);
 /** Fixed alt text instead of the filename draft. The mockup must never pass as a real event photo. */
 const ALT_OVERRIDES: Record<string, string> = {
   "wedding-mock.png": "Placeholder – wedding mockup",
+  // Drafts written by looking at each image. They describe only what is visible and are flagged for review.
+  "explore-Bardiya-NP-gate.jpg": "The green and yellow entrance gate of Bardiya National Park, with a welcome sign and painted wildlife murals",
+  "explore-bardiya-elephants.jpg": "Three elephants carrying riders with umbrellas, walking through tall grass in the forest",
+  "explore-bardiya-crocodile.jpeg": "A crocodile resting on sand beside a pool in a concrete enclosure under trees",
+  "explore-bardiya-rhino.jpeg": "A one-horned rhino eating leaves beside a wooden post and a low fence",
+  "explore-bardiya-red-sunset-vertical.jpeg": "A red sun setting behind thin clouds over a dark line of trees",
+  "explore-bardiya-tiger.jpg": "A tiger walking along the edge of a river, reflected in the water",
+  "explore-birdwatching.jpg": "Painted storks and a woolly-necked stork standing at the edge of a shallow wetland",
+  "explore-hero-vertical.jpeg": "Tall trees at sunset over a grassy field, with a motorbike parked in the foreground",
+  "explore-jeep-safari.jpg": "A safari jeep with tourists photographing a leopard crossing a grass track",
+  "explore-jungle-walk.jpg": "A person in a blue rain jacket walking along a forest path between tall trees and green undergrowth",
+  "explore-karnali.jpeg": "A bridge over a wide stony riverbed, with forested hills behind",
+  "explore-krishnasaar.jpg": "A herd of blackbuck, males and females, standing in tall golden grass",
+  "explore-mustard-plan-vertical.jpeg": "A field of yellow mustard flowers with a row of young trees behind, under a blue sky",
+  "explore-pickleball.png": "A pickleball court with a net, a bench with two paddles and yellow balls, and white cottages among palm trees behind",
+  "explore-tharu-village.jpg": "Mud-walled village houses with tiled roofs and a thatched shelter in a green field, with hills behind",
+};
+
+/**
+ * Images that must not appear on the live site yet. New library rows are created with the
+ * placeholder flag set (badge in development, hidden in production) until someone ticks
+ * "Rights confirmed / final" in Media.
+ */
+const RIGHTS = "Rights unconfirmed";
+const PLACEHOLDER_NOTES: Record<string, string> = {
+  "explore-tharu-village.jpg": "Watermarked Adobe Stock preview, not licensed",
+  "explore-jeep-safari.jpg": "Looks like a stock or edited image, probably not Bardiya",
+  "explore-pickleball.png": "Looks AI-generated: confirm it shows Bagaicha's court",
+  "explore-bardiya-tiger.jpg": RIGHTS,
+  "explore-bardiya-elephants.jpg": RIGHTS,
+  "explore-Bardiya-NP-gate.jpg": RIGHTS,
+  "explore-krishnasaar.jpg": RIGHTS,
+  "explore-jungle-walk.jpg": RIGHTS,
+  "explore-birdwatching.jpg": RIGHTS,
 };
 
 const dryRun = process.argv.includes("--dry-run");
@@ -57,6 +92,7 @@ type Prepared = {
   file: string;
   publicId: string;
   altDraft: string;
+  placeholderNote: string | null;
   buffer: Buffer;
   format: "jpeg" | "png";
   width: number;
@@ -122,6 +158,7 @@ async function prepare(file: string, workDir: string): Promise<Prepared> {
     file,
     publicId: `${MEDIA_FOLDER}/seed/${slug(basename(file, extname(file)))}`,
     altDraft: ALT_OVERRIDES[file] ?? altFromFilename(file),
+    placeholderNote: PLACEHOLDER_NOTES[file] ?? null,
     buffer: result.data,
     format,
     width: result.info.width,
@@ -181,7 +218,8 @@ async function main() {
         console.log(
           `  would upload  ${p.file}${p.convertedFromHeic ? " (HEIC → JPEG)" : ""}\n` +
             `      → ${p.publicId}  ${p.format.toUpperCase()} ${p.width}×${p.height}, ${(p.buffer.byteLength / 1024 / 1024).toFixed(2)} MB\n` +
-            `      alt draft: "${p.altDraft}" (flagged for review)`,
+            `      alt draft: "${p.altDraft}" (flagged for review)` +
+            (p.placeholderNote ? `\n      FLAGGED placeholder: ${p.placeholderNote}` : ""),
         );
       }
       console.log("Dry run finished. Photos already in the database would be skipped in a real run.");
@@ -223,6 +261,8 @@ async function main() {
               blurDataUrl,
               altText: photo.altDraft,
               altNeedsReview: true,
+              isPlaceholder: photo.placeholderNote !== null,
+              placeholderNote: photo.placeholderNote,
             },
           });
           await logActivity(tx, {

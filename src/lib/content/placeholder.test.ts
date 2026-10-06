@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasPlaceholderIn, isMockupPhoto, isPlaceholder, remainingPlaceholders } from "./placeholder";
+import { hasPlaceholderIn, isPlaceholder, remainingPlaceholders } from "./placeholder";
 
 describe("placeholder flags", () => {
   const row = { placeholderFields: ["overview", "duration"] };
@@ -33,11 +33,5 @@ describe("placeholder flags", () => {
 
   it("flags nothing on create", () => {
     expect(remainingPlaceholders(null, { a: 1 }, ["a"])).toEqual([]);
-  });
-
-  it("recognises mockup photos by filename", () => {
-    expect(isMockupPhoto("wedding-mock.png")).toBe(true);
-    expect(isMockupPhoto("garden.png")).toBe(false);
-    expect(isMockupPhoto(null)).toBe(false);
   });
 });

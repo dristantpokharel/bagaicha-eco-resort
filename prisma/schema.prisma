@@ -54,12 +54,19 @@ enum EnquiryStatus {
   CLOSED
 }
 
+enum ActivityGroup {
+  AT_BAGAICHA
+  CLOSE_BY
+  DAY_TRIP
+}
+
 enum GalleryCategory {
   ROOMS
   DINING
   ACTIVITIES
   EVENTS
   PROPERTY
+  SURROUNDINGS
 }
 
 enum HomepageSlotKey {
@@ -72,6 +79,8 @@ enum HomepageSlotKey {
   EVENTS
   CONFERENCE
   LOCATION
+  EXPLORE_HERO_DESKTOP
+  EXPLORE_HERO_MOBILE
 }
 
 enum StockLocationKind {
@@ -304,14 +313,18 @@ model Media {
   /// Filename at upload time, for search and to trace seeded photos.
   originalFilename   String?
   blurDataUrl        String?
+  /// Stand-in or rights-unconfirmed image: badge in dev, hidden everywhere in production until cleared in Media.
+  isPlaceholder      Boolean  @default(false)
+  placeholderNote    String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  roomTypes     RoomTypeMedia[]
-  galleryItems  GalleryItem[]
-  homepageSlots HomepageSlot[]
-  activities    Activity[]
-  eventTypes    EventType[]
+  roomTypes      RoomTypeMedia[]
+  galleryItems   GalleryItem[]
+  homepageSlots  HomepageSlot[]
+  activities     Activity[]
+  eventTypes     EventType[]
+  activityPhotos ActivityMedia[]
 
   @@map("media")
 }
@@ -387,8 +400,8 @@ model BusinessInfo {
 }
 
 model Activity {
-  id                String   @id @default(cuid())
-  slug              String   @unique
+  id                String        @id @default(cuid())
+  slug              String        @unique
   title             String
   /// One short line for cards.
   summary           String?
@@ -396,17 +409,44 @@ model Activity {
   duration          String?
   bestTime          String?
   whatToExpect      String?
+  group             ActivityGroup @default(AT_BAGAICHA)
+  category          String?
+  season            String?
+  bestFor           String[]      @default([])
+  /// "What you might see"
+  highlights        String[]      @default([])
+  howWeHelp         String?
+  tip               String?
+  /// Where it is, for the distance shown on the page.
+  destinationId     String?
   coverMediaId      String?
-  sortOrder         Int      @default(0)
-  isActive          Boolean  @default(true)
+  sortOrder         Int           @default(0)
+  isActive          Boolean       @default(true)
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
-  placeholderFields String[] @default([])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  placeholderFields String[]      @default([])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  coverMedia Media? @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  coverMedia  Media?             @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  destination NearbyDestination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  photos      ActivityMedia[]
 
   @@map("activities")
+}
+
+/// Extra photos for an activity (the cover photo is the primary one).
+model ActivityMedia {
+  id         String @id @default(cuid())
+  activityId String
+  mediaId    String
+  sortOrder  Int    @default(0)
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  media    Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, mediaId])
+  @@index([activityId, sortOrder])
+  @@map("activity_media")
 }
 
 model DiningSection {
@@ -509,6 +549,8 @@ model NearbyDestination {
   placeholderFields String[] @default([])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  activities Activity[]
 
   @@map("nearby_destinations")
 }

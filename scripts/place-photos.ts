@@ -20,8 +20,7 @@ const apply = process.argv.includes("--apply");
 const id = (name: string) => `bagaicha/seed/${name}`;
 
 const HOMEPAGE: { slot: HomepageSlotKey; photos: string[]; single: boolean }[] = [
-  { slot: "HERO_DESKTOP", photos: ["hero"], single: true },
-  { slot: "HERO_MOBILE", photos: ["hero-2"], single: true },
+  // The main hero was placed once and is now managed in Media → Homepage, so it is not touched here.
   // Section photos (add-only). Order matters: the first photo leads its section.
   { slot: "ABOUT", photos: ["garden", "cottages", "hero-2"], single: false },
   { slot: "STAY", photos: ["room"], single: false },
@@ -31,7 +30,25 @@ const HOMEPAGE: { slot: HomepageSlotKey; photos: string[]; single: boolean }[] =
   { slot: "EVENTS", photos: ["wedding-mock", "lawn"], single: false },
   { slot: "CONFERENCE", photos: ["conference-room"], single: false },
   { slot: "LOCATION", photos: ["bagaicha-map"], single: false },
+  // Explore page hero (single photos, replaced if a different one is placed).
+  { slot: "EXPLORE_HERO_DESKTOP", photos: ["explore-jungle-walk"], single: true },
+  { slot: "EXPLORE_HERO_MOBILE", photos: ["explore-hero-vertical"], single: true },
 ];
+
+/** Primary photo (cover) and extras per activity. Village Walks has no photo yet. Images flagged in Media are hidden on the live site. */
+const ACTIVITY_PHOTOS: Record<string, { cover: string; extras?: string[] }> = {
+  "krishnasaar-blackbuck-visit": { cover: "explore-krishnasaar" },
+  "tharu-village-visit": { cover: "explore-tharu-village" },
+  "bardiya-jeep-safari": {
+    cover: "explore-bardiya-elephants",
+    extras: ["explore-jeep-safari", "explore-bardiya-tiger", "explore-bardiya-rhino", "explore-bardiya-np-gate"],
+  },
+  "bardiya-jungle-walk": { cover: "explore-jungle-walk" },
+  "karnali-river": { cover: "explore-karnali" },
+  birdwatching: { cover: "explore-birdwatching" },
+  pickleball: { cover: "explore-pickleball" },
+  "chill-pool": { cover: "chill-pool" },
+};
 const ROOM_TYPES: Record<string, string[]> = {
   "family-room": ["family-room-1", "family-room-2", "bed-close-up"],
   "deluxe-room": ["room", "curtains", "towel"],
@@ -41,9 +58,28 @@ const GALLERY: Record<GalleryCategory, string[]> = {
   ROOMS: ["room", "curtains", "towel", "bed-close-up", "family-room-1", "family-room-2"],
   DINING: ["food", "restaurant"],
   EVENTS: ["conference-room"],
-  ACTIVITIES: [],
+  // Activity primary photos. The wedding mockup, QR code and map are never placed here.
+  ACTIVITIES: [
+    "explore-krishnasaar",
+    "explore-tharu-village",
+    "explore-bardiya-elephants",
+    "explore-jungle-walk",
+    "explore-karnali",
+    "explore-birdwatching",
+    "explore-pickleball",
+    "chill-pool",
+  ],
+  // Bardiya landscapes and wildlife that are not the property. (The Malteser van is left out.)
+  SURROUNDINGS: [
+    "explore-bardiya-red-sunset-vertical",
+    "explore-mustard-plan-vertical",
+    "explore-bardiya-tiger",
+    "explore-bardiya-rhino",
+    "explore-bardiya-elephants",
+    "explore-bardiya-crocodile",
+  ],
 };
-const NEVER_IN_GALLERY = ["wedding-mock", "location-qr-code", "bagaicha-map"];
+const NEVER_IN_GALLERY = ["wedding-mock", "location-qr-code", "bagaicha-map", "explore-bardiya-caravan"];
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -100,6 +136,42 @@ async function main() {
         ops.push(() => db.roomTypeMedia.create({ data: { roomTypeId: roomType.id, mediaId: m.id, sortOrder: order } }));
         writes++;
       });
+    }
+
+    console.log("\nActivities (primary photo, then extras)");
+    for (const [slug, { cover, extras = [] }] of Object.entries(ACTIVITY_PHOTOS)) {
+      const activity = await db.activity.findUnique({
+        where: { slug },
+        select: { id: true, coverMediaId: true, photos: { select: { mediaId: true, sortOrder: true } } },
+      });
+      if (!activity) {
+        console.log(`  ${slug}: activity does not exist, skipped (run seed:content first?)`);
+        continue;
+      }
+      const coverMedia = lookup(cover);
+      if (coverMedia) {
+        if (activity.coverMediaId === coverMedia.id) console.log(`  ${slug}: primary ${cover} already placed`);
+        else if (activity.coverMediaId) console.log(`  ${slug}: has a different primary photo, left alone`);
+        else {
+          console.log(`  ${slug}: primary ${cover}`);
+          ops.push(() => db.activity.update({ where: { id: activity.id }, data: { coverMediaId: coverMedia.id } }));
+          writes++;
+        }
+      }
+      const have = new Set(activity.photos.map((p) => p.mediaId));
+      let order = activity.photos.length ? Math.max(...activity.photos.map((p) => p.sortOrder)) + 1 : 0;
+      for (const name of extras) {
+        const m = lookup(name);
+        if (!m) continue;
+        if (have.has(m.id)) {
+          console.log(`  ${slug}: extra ${name} already placed`);
+          continue;
+        }
+        const sortOrder = order++;
+        console.log(`  ${slug}: extra ${name}`);
+        ops.push(() => db.activityMedia.create({ data: { activityId: activity.id, mediaId: m.id, sortOrder } }));
+        writes++;
+      }
     }
 
     console.log("\nGallery");

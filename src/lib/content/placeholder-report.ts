@@ -1,6 +1,5 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { isMockupPhoto } from "./placeholder";
 
 export type PlaceholderEntry = { section: string; title: string; fields: string[]; href: string };
 
@@ -8,7 +7,7 @@ const flagged = { NOT: { placeholderFields: { isEmpty: true } } } as const;
 
 /** Everything on the site that still holds placeholder text. Launch blockers (Phase 6). */
 export async function listPlaceholders(): Promise<PlaceholderEntry[]> {
-  const [business, activities, dining, items, events, faqs, policies, nearby, rooms, mockups] = await Promise.all([
+  const [business, activities, dining, items, events, faqs, policies, nearby, rooms, flaggedPhotos] = await Promise.all([
     db.businessInfo.findMany({ where: flagged }),
     db.activity.findMany({ where: flagged, orderBy: { sortOrder: "asc" } }),
     db.diningSection.findMany({ where: flagged, orderBy: { sortOrder: "asc" } }),
@@ -18,7 +17,7 @@ export async function listPlaceholders(): Promise<PlaceholderEntry[]> {
     db.policy.findMany({ where: flagged, orderBy: { sortOrder: "asc" } }),
     db.nearbyDestination.findMany({ where: flagged, orderBy: { sortOrder: "asc" } }),
     db.roomType.findMany({ where: flagged, orderBy: { sortOrder: "asc" } }),
-    db.homepageSlot.findMany({ include: { media: { select: { originalFilename: true, altText: true } } } }),
+    db.media.findMany({ where: { isPlaceholder: true }, select: { originalFilename: true, placeholderNote: true }, orderBy: { originalFilename: "asc" } }),
   ]);
   const out: PlaceholderEntry[] = [];
   const add = (section: string, href: string, rows: { title: string; placeholderFields: string[] }[]) => {
@@ -33,9 +32,12 @@ export async function listPlaceholders(): Promise<PlaceholderEntry[]> {
   add("FAQs", "/admin/content/faqs", faqs.map((r) => ({ title: r.question, placeholderFields: r.placeholderFields })));
   add("Policies", "/admin/content/policies", policies.map((r) => ({ title: r.title, placeholderFields: r.placeholderFields })));
   add("Nearby", "/admin/content/nearby", nearby.map((r) => ({ title: r.name, placeholderFields: r.placeholderFields })));
-  for (const slot of mockups) {
-    if (isMockupPhoto(slot.media.originalFilename))
-      out.push({ section: "Photos", title: `${slot.media.originalFilename} (homepage: ${slot.slot})`, fields: ["mockup image"], href: "/admin/media/homepage" });
-  }
+  for (const photo of flaggedPhotos)
+    out.push({
+      section: "Photos",
+      title: photo.originalFilename ?? "Untitled image",
+      fields: [photo.placeholderNote ?? "placeholder / rights unconfirmed"],
+      href: "/admin/media?show=placeholder",
+    });
   return out;
 }

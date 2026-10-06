@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { COLLECTIONS, type CollectionKey } from "@/lib/content/collections";
 import { ContentForm, type ContentRow, type Option } from "../content-form";
+import { PlacementManager } from "@/components/media/placement-manager";
+import { loadPickerLibrary, placementKey, pickerMediaSelect, toPlacements } from "@/lib/media-queries";
 import { loadMediaOptions, toContentRow } from "../rows";
 
 const SECTIONS: Record<string, { title: string; intro: string; collections: readonly CollectionKey[] }> = {
@@ -44,6 +46,19 @@ export default async function ContentSectionPage({ params }: { params: Promise<{
     ? await db.diningSection.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, title: true } })
     : [];
   const sectionOptions: Option[] = sections.map((s) => ({ value: s.id, label: s.title }));
+  const needsDestinations = keys.includes("activities");
+  const destinations = needsDestinations
+    ? await db.nearbyDestination.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } })
+    : [];
+  const destinationOptions: Option[] = destinations.map((d) => ({ value: d.id, label: d.name }));
+  // Extra photos per activity (the primary photo is the form's "Primary photo" field).
+  const library = needsDestinations ? await loadPickerLibrary() : [];
+  const extras = needsDestinations
+    ? await db.activityMedia.findMany({
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, activityId: true, media: { select: pickerMediaSelect } },
+      })
+    : [];
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -77,7 +92,30 @@ export default async function ContentSectionPage({ params }: { params: Promise<{
                           )}
                         </summary>
                         <div className="border-t border-forest/10 p-4">
-                          <ContentForm collection={key} row={row} mediaOptions={mediaOptions} sectionOptions={sectionOptions} />
+                          <ContentForm
+                            collection={key}
+                            row={row}
+                            mediaOptions={mediaOptions}
+                            sectionOptions={sectionOptions}
+                            destinationOptions={destinationOptions}
+                          />
+                          {key === "activities" && row.id && (
+                            <div className="mt-6 border-t border-forest/10 pt-4">
+                              {(() => {
+                                const placements = toPlacements(extras.filter((e) => e.activityId === row.id));
+                                return (
+                                  <PlacementManager
+                                    key={`${row.id}:${placementKey(placements)}`}
+                                    target={{ kind: "activity", activityId: row.id }}
+                                    title="More photos"
+                                    description="Shown after the primary photo, in this order. Upload new photos in Media → Library."
+                                    placements={placements}
+                                    library={library}
+                                  />
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
                       </details>
                     </li>
@@ -90,7 +128,7 @@ export default async function ContentSectionPage({ params }: { params: Promise<{
                   Add {collection.singular}
                 </summary>
                 <div className="border-t border-forest/10 p-4">
-                  <ContentForm collection={key} mediaOptions={mediaOptions} sectionOptions={sectionOptions} />
+                  <ContentForm collection={key} mediaOptions={mediaOptions} sectionOptions={sectionOptions} destinationOptions={destinationOptions} />
                 </div>
               </details>
             </section>

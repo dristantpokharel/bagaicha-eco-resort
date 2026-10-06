@@ -6,7 +6,7 @@ import type { MediaImageData } from "@/components/media/media-image";
 import { CONTENT_TAG } from "./revalidate";
 import { loadStayTerms } from "./stay-terms";
 import { fillTokens, type TokenContext } from "./tokens";
-import { hasPlaceholderIn, isMockupPhoto, liveValue, showPlaceholders } from "./placeholder";
+import { hasPlaceholderIn, liveValue, showPlaceholders } from "./placeholder";
 
 /**
  * Every public page reads content through here: one cached read per kind, all
@@ -17,10 +17,33 @@ import { hasPlaceholderIn, isMockupPhoto, liveValue, showPlaceholders } from "./
 const cached = <A extends unknown[], R>(fn: (...args: A) => Promise<R>, key: string) =>
   unstable_cache(fn, ["site", key], { tags: [CONTENT_TAG], revalidate: 3600 });
 
-const mediaSelect = { url: true, altText: true, width: true, height: true, blurDataUrl: true } as const;
+const mediaSelect = {
+  url: true,
+  altText: true,
+  width: true,
+  height: true,
+  blurDataUrl: true,
+  isPlaceholder: true,
+  placeholderNote: true,
+} as const;
 
-/** `isPlaceholder`: a mockup standing in for real photography (dev only). */
-export type PublicMedia = MediaImageData & { isPlaceholder?: boolean };
+type MediaRow = { url: string; altText: string; width: number; height: number; blurDataUrl: string | null; isPlaceholder: boolean; placeholderNote: string | null };
+
+/** Flagged images (stand-ins, rights unconfirmed) show with a badge in dev and are hidden everywhere in production. */
+const isShown = (m: { isPlaceholder: boolean }) => showPlaceholders || !m.isPlaceholder;
+const toPublicMedia = (m: MediaRow): PublicMedia => ({
+  url: m.url,
+  altText: m.altText,
+  width: m.width,
+  height: m.height,
+  blurDataUrl: m.blurDataUrl,
+  isPlaceholder: m.isPlaceholder,
+  placeholderNote: m.placeholderNote,
+});
+const shownMedia = (rows: MediaRow[]): PublicMedia[] => rows.filter(isShown).map(toPublicMedia);
+
+/** `isPlaceholder`: a stand-in or rights-unconfirmed image; only ever present in development. */
+export type PublicMedia = MediaImageData & { isPlaceholder?: boolean; placeholderNote?: string | null };
 
 // ─── Business ────────────────────────────────────────────────────────────────
 
@@ -73,15 +96,30 @@ export const getStayTerms = cached(loadStayTerms, "stay-terms");
 
 // ─── Activities, events, dining, FAQs, policies, nearby ─────────────────────
 
+export type ActivityGroupKey = "AT_BAGAICHA" | "CLOSE_BY" | "DAY_TRIP";
+
 export type PublicActivity = {
   id: string;
   slug: string;
   title: string;
+  group: ActivityGroupKey;
+  category: string | null;
   summary: string | null;
   overview: string | null;
   duration: string | null;
+  season: string | null;
   bestTime: string | null;
+  bestFor: string[];
+  /** "What you might see" */
+  highlights: string[];
   whatToExpect: string | null;
+  howWeHelp: string | null;
+  tip: string | null;
+  /** Distance and travel time come only from the linked nearby destination. */
+  destination: { name: string; distance: string | null; travelTime: string | null } | null;
+  /** Primary photo first, then the extras in order (flagged images are already filtered out). */
+  photos: PublicMedia[];
+  /** The primary photo, for compact views. */
   cover: PublicMedia | null;
   placeholderFields: string[];
 };
@@ -90,22 +128,42 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
   const rows = await db.activity.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-    include: { coverMedia: { select: mediaSelect } },
+    include: {
+      coverMedia: { select: mediaSelect },
+      photos: { orderBy: { sortOrder: "asc" }, include: { media: { select: mediaSelect } } },
+      destination: true,
+    },
   });
   return rows
     .filter((r) => !hasPlaceholderIn(r, ["title"]) || showPlaceholders)
-    .map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      summary: liveValue<string>(r, "summary"),
-      overview: liveValue<string>(r, "overview"),
-      duration: liveValue<string>(r, "duration"),
-      bestTime: liveValue<string>(r, "bestTime"),
-      whatToExpect: liveValue<string>(r, "whatToExpect"),
-      cover: r.coverMedia,
-      placeholderFields: showPlaceholders ? r.placeholderFields : [],
-    }));
+    .map((r) => {
+      const list = (field: "bestFor" | "highlights") => (r.placeholderFields.includes(field) && !showPlaceholders ? [] : r[field]);
+      const photos = shownMedia([...(r.coverMedia ? [r.coverMedia] : []), ...r.photos.map((p) => p.media)]);
+      const d = r.destination;
+      return {
+        id: r.id,
+        slug: r.slug,
+        title: r.title,
+        group: r.group,
+        category: liveValue<string>(r, "category"),
+        summary: liveValue<string>(r, "summary"),
+        overview: liveValue<string>(r, "overview"),
+        duration: liveValue<string>(r, "duration"),
+        season: liveValue<string>(r, "season"),
+        bestTime: liveValue<string>(r, "bestTime"),
+        bestFor: list("bestFor"),
+        highlights: list("highlights"),
+        whatToExpect: liveValue<string>(r, "whatToExpect"),
+        howWeHelp: liveValue<string>(r, "howWeHelp"),
+        tip: liveValue<string>(r, "tip"),
+        destination: d
+          ? { name: d.name, distance: liveValue<string>(d, "distance"), travelTime: liveValue<string>(d, "travelTime") }
+          : null,
+        photos,
+        cover: photos[0] ?? null,
+        placeholderFields: showPlaceholders ? r.placeholderFields : [],
+      };
+    });
 }, "activities");
 
 export type PublicEventType = {
@@ -134,7 +192,7 @@ export const getEventTypes = cached(async (): Promise<PublicEventType[]> => {
       summary: liveValue<string>(r, "summary"),
       description: liveValue<string>(r, "description"),
       highlights: r.placeholderFields.includes("highlights") && !showPlaceholders ? [] : r.highlights,
-      cover: r.coverMedia,
+      cover: r.coverMedia && isShown(r.coverMedia) ? toPublicMedia(r.coverMedia) : null,
       placeholderFields: showPlaceholders ? r.placeholderFields : [],
     }));
 }, "event-types");
@@ -229,7 +287,8 @@ export type PublicNearby = { id: string; name: string; distance: string | null; 
 export const getNearby = cached(async (): Promise<PublicNearby[]> => {
   const rows = await db.nearbyDestination.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   return rows
-    .filter((r) => showPlaceholders || !hasPlaceholderIn(r, ["name"]))
+    // A destination without a confirmed distance isn't listed on the live site.
+    .filter((r) => showPlaceholders || !hasPlaceholderIn(r, ["name", "distance"]))
     .map((r) => ({
       id: r.id,
       name: r.name,
@@ -269,7 +328,7 @@ export const getRoomTypes = cached(async (): Promise<PublicRoomType[]> => {
     childPricePerNightNpr: r.childPricePerNightNpr,
     maxGuests: r.maxGuests,
     amenities: r.placeholderFields.includes("amenities") && !showPlaceholders ? [] : r.amenities,
-    photos: r.media.map((m) => m.media),
+    photos: shownMedia(r.media.map((m) => m.media)),
     placeholderFields: showPlaceholders ? r.placeholderFields : [],
   }));
 }, "rooms");
@@ -281,15 +340,12 @@ export type HomepageSlots = Partial<Record<HomepageSlotKey, PublicMedia[]>>;
 export const getHomepageSlots = cached(async (): Promise<HomepageSlots> => {
   const rows = await db.homepageSlot.findMany({
     orderBy: [{ slot: "asc" }, { sortOrder: "asc" }],
-    include: { media: { select: { ...mediaSelect, originalFilename: true } } },
+    include: { media: { select: mediaSelect } },
   });
   const out: HomepageSlots = {};
   for (const row of rows) {
-    // Mockups are stand-ins for real photography: dev only, with a badge.
-    const mockup = isMockupPhoto(row.media.originalFilename);
-    if (mockup && !showPlaceholders) continue;
-    const { url, altText, width, height, blurDataUrl } = row.media;
-    (out[row.slot] ??= []).push({ url, altText, width, height, blurDataUrl, isPlaceholder: mockup });
+    if (!isShown(row.media)) continue;
+    (out[row.slot] ??= []).push(toPublicMedia(row.media));
   }
   return out;
 }, "homepage-slots");
@@ -301,5 +357,5 @@ export const getGallery = cached(async (): Promise<PublicGalleryItem[]> => {
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
     include: { media: { select: mediaSelect } },
   });
-  return rows.map((r) => ({ ...r.media, id: r.id, category: r.category }));
+  return rows.filter((r) => isShown(r.media)).map((r) => ({ ...toPublicMedia(r.media), id: r.id, category: r.category }));
 }, "gallery");

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/form";
 import { MediaImage, type MediaImageData } from "@/components/media/media-image";
 import { formatBytes } from "@/lib/media";
 import type { ActionResult } from "@/lib/actions";
-import { deleteMedia, updateAltText } from "./actions";
+import { deleteMedia, setMediaPlaceholder, updateAltText } from "./actions";
 
 export type LibraryItem = MediaImageData & {
   id: string;
@@ -15,11 +15,14 @@ export type LibraryItem = MediaImageData & {
   format: string | null;
   bytes: number | null;
   originalFilename: string | null;
+  isPlaceholder: boolean;
+  placeholderNote: string | null;
   usage: string[];
 };
 
 export function MediaCard({ item }: { item: LibraryItem }) {
   const [altResult, altAction, altPending] = useActionState<ActionResult | null, FormData>(updateAltText, null);
+  const [flagResult, flagAction, flagPending] = useActionState<ActionResult | null, FormData>(setMediaPlaceholder, null);
   const [deleteResult, deleteAction, deletePending] = useActionState<ActionResult | null, FormData>(deleteMedia, null);
   const altError = altResult && !altResult.ok ? altResult.fieldErrors?.altText : undefined;
   const inUse = item.usage.length > 0;
@@ -35,11 +38,14 @@ export function MediaCard({ item }: { item: LibraryItem }) {
           sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"
           className="object-cover"
         />
-        {item.altNeedsReview && (
-          <span className="absolute top-2 left-2 rounded-sm bg-warning px-2 py-0.5 text-xs font-medium text-white">
-            Alt text needs review
-          </span>
-        )}
+        <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+          {item.isPlaceholder && (
+            <span className="rounded-sm bg-error px-2 py-0.5 text-xs font-medium text-white">Placeholder / rights unconfirmed</span>
+          )}
+          {item.altNeedsReview && (
+            <span className="rounded-sm bg-warning px-2 py-0.5 text-xs font-medium text-white">Alt text needs review</span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4 text-sm">
@@ -78,6 +84,33 @@ export function MediaCard({ item }: { item: LibraryItem }) {
             {altPending ? "Saving…" : item.altNeedsReview ? "Save and mark reviewed" : "Save alt text"}
           </Button>
           {!altError && <ActionMessage result={altResult} />}
+        </form>
+
+        <form action={flagAction} className="space-y-2 border-t border-forest/10 pt-3" noValidate>
+          <input type="hidden" name="mediaId" value={item.id} />
+          {item.isPlaceholder ? (
+            <>
+              <p className="text-xs text-charcoal-light">{item.placeholderNote ?? "Placeholder / rights unconfirmed"}. Hidden on the live site.</p>
+              <input type="hidden" name="flag" value="clear" />
+              <label className="flex items-start gap-2 text-xs text-charcoal">
+                <input type="checkbox" required name="confirm" className="mt-0.5 size-4 accent-forest" />
+                <span>
+                  <strong>Rights confirmed / final.</strong> This is a real photo we may publish.
+                </span>
+              </label>
+              <Button type="submit" variant="secondary" size="sm" disabled={flagPending}>
+                {flagPending ? "Saving…" : "Clear placeholder flag"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="flag" value="set" />
+              <Button type="submit" variant="ghost" size="sm" disabled={flagPending}>
+                {flagPending ? "Saving…" : "Mark as placeholder"}
+              </Button>
+            </>
+          )}
+          <ActionMessage result={flagResult} />
         </form>
 
         <div className="mt-auto space-y-2 border-t border-forest/10 pt-3">

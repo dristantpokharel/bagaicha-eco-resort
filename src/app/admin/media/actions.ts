@@ -163,6 +163,52 @@ export async function updateAltText(_prev: ActionResult | null, formData: FormDa
   });
 }
 
+// ─── Placeholder / rights flag ───────────────────────────────────────────────
+
+const placeholderSchema = z.object({
+  mediaId: z.string().trim().min(1).max(64),
+  flag: z.enum(["set", "clear"]),
+  note: z.string().trim().max(200).optional().default(""),
+  confirm: z.string().optional(),
+});
+
+/**
+ * "Rights confirmed / final" clears the flag; "Mark as placeholder" sets it. A flagged image shows
+ * a badge in development and is hidden everywhere on the live site.
+ */
+export async function setMediaPlaceholder(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("media.manage");
+    const input = parseForm(placeholderSchema, formData);
+    const setting = input.flag === "set";
+    if (!setting && input.confirm !== "on")
+      throw new ActionError("Tick the box to confirm the rights and that this photo is final.");
+
+    await db.$transaction(async (tx) => {
+      const media = await tx.media.findUnique({ where: { id: input.mediaId }, select: { id: true } });
+      if (!media) throw new ActionError("That image no longer exists.");
+      await tx.media.update({
+        where: { id: input.mediaId },
+        data: {
+          isPlaceholder: setting,
+          placeholderNote: setting ? input.note || "Placeholder / rights unconfirmed" : null,
+        },
+      });
+      await logActivity(tx, {
+        userId: actor.id,
+        action: setting ? "media.marked_placeholder" : "media.placeholder_cleared",
+        entityType: "Media",
+        entityId: input.mediaId,
+      });
+    });
+
+    revalidatePath(MEDIA_PATH, "layout");
+    revalidatePath("/admin");
+    revalidatePublicSite();
+    return { ok: true, message: setting ? "Marked as a placeholder. It is hidden on the live site." : "Marked as final. It can show on the live site." };
+  });
+}
+
 // ─── Delete ──────────────────────────────────────────────────────────────────
 
 const deleteSchema = z.object({ mediaId: z.string().trim().min(1).max(64) });

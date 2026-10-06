@@ -61,7 +61,7 @@ export function PlacementManager({
   const [result, setResult] = useState<ActionResult | null>(null);
   const [pending, startTransition] = useTransition();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const headingId = `placement-${target.kind}-${"slot" in target ? target.slot : "category" in target ? target.category : target.roomTypeId}`;
+  const headingId = `placement-${target.kind}-${"slot" in target ? target.slot : "category" in target ? target.category : "activityId" in target ? target.activityId : target.roomTypeId}`;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),

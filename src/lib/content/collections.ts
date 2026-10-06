@@ -7,7 +7,7 @@ import { TOKEN_HELP } from "./tokens";
  * validation schema and the save action, so a field is declared exactly once.
  */
 
-export type FieldKind = "text" | "textarea" | "lines" | "url" | "int" | "float" | "select" | "media" | "section";
+export type FieldKind = "text" | "textarea" | "lines" | "url" | "int" | "float" | "select" | "media" | "section" | "destination";
 
 export type Field = {
   name: string;
@@ -55,11 +55,18 @@ const URL_HINT = "Full address starting with https://";
 const phoneLine = (line: string) => (/^\+?[0-9][0-9 ()-]{5,19}$/.test(line) ? null : `"${line}" is not a phone number.`);
 const emailLine = (line: string) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line) ? null : `"${line}" is not an email address.`);
 
+export const ACTIVITY_GROUP_OPTIONS = [
+  { value: "AT_BAGAICHA", label: "At Bagaicha" },
+  { value: "CLOSE_BY", label: "Close by" },
+  { value: "DAY_TRIP", label: "Day trip (we can help arrange)" },
+] as const;
+
 export const ICON_OPTIONS: readonly { value: IconName; label: string }[] = [
   { value: "plane", label: "Plane (airport / city)" },
   { value: "conservation", label: "Trees (conservation area)" },
   { value: "park", label: "Mountain (national park)" },
   { value: "bridge", label: "Bridge" },
+  { value: "people", label: "People (village, culture)" },
   { value: "leaf", label: "Leaf" },
   { value: "food", label: "Food" },
   { value: "waves", label: "Water" },
@@ -101,12 +108,32 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
     requiredLive: ["title"],
     fields: [
       { name: "title", label: "Name", kind: "text", required: true, max: 80 },
+      {
+        name: "group",
+        label: "Group on the Explore page",
+        kind: "select",
+        required: true,
+        options: ACTIVITY_GROUP_OPTIONS,
+        hint: "At Bagaicha, close by, or a day trip.",
+      },
+      { name: "category", label: "Category", kind: "text", max: 40, hint: "e.g. Wildlife, Culture, Nature, Relax." },
       { name: "summary", label: "Short line", kind: "text", max: 200, hint: "One sentence shown on cards." },
       { name: "overview", label: "Overview", kind: "textarea", max: 1500, rows: 4 },
       { name: "duration", label: "Duration", kind: "text", max: 120 },
-      { name: "bestTime", label: "Best time", kind: "text", max: 200 },
+      { name: "season", label: "Best season", kind: "text", max: 120 },
+      { name: "bestTime", label: "Best time of day", kind: "text", max: 200 },
+      { name: "bestFor", label: "Best for", kind: "lines", max: 6, hint: "One per line, e.g. Families." },
+      { name: "highlights", label: "What you might see", kind: "lines", max: 10, hint: "One per line. Only things you are confident about." },
       { name: "whatToExpect", label: "What to expect", kind: "textarea", max: 1500, rows: 4 },
-      { name: "coverMediaId", label: "Cover photo", kind: "media" },
+      { name: "howWeHelp", label: "How we help", kind: "textarea", max: 800, rows: 3, hint: 'Use "we can help arrange…" unless the resort really does it.' },
+      { name: "tip", label: "Tip", kind: "textarea", max: 400, rows: 2 },
+      {
+        name: "destinationId",
+        label: "Where it is (nearby place)",
+        kind: "destination",
+        hint: "Its distance and travel time come from Content → Nearby, so they are never typed twice.",
+      },
+      { name: "coverMediaId", label: "Primary photo", kind: "media", hint: "More photos can be added below once saved." },
     ],
   },
   diningSections: {
@@ -241,12 +268,17 @@ function fieldSchema(field: Field): z.ZodType {
     }
     case "select": {
       const allowed = (field.options ?? []).map((o) => o.value);
-      return z.preprocess(emptyToNull, z.string().refine((v) => allowed.includes(v), { error: "Choose one." }).nullable());
+      const choice = z.string().refine((v) => allowed.includes(v), { error: "Choose one." });
+      return field.required ? choice : z.preprocess(emptyToNull, choice.nullable());
     }
     case "media":
     case "section": {
       const id = z.string().trim().min(1).max(64);
       return field.required ? id : z.preprocess(emptyToNull, id.nullable());
+    }
+    case "destination": {
+      const id = z.string().trim().min(1).max(64);
+      return z.preprocess(emptyToNull, id.nullable());
     }
   }
 }

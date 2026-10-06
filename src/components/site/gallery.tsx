@@ -13,8 +13,9 @@ const LABELS: Record<Category, string> = {
   ACTIVITIES: "Activities",
   EVENTS: "Events",
   PROPERTY: "Property",
+  SURROUNDINGS: "Surroundings",
 };
-const ORDER: Category[] = ["ROOMS", "DINING", "ACTIVITIES", "EVENTS", "PROPERTY"];
+const ORDER: Category[] = ["ROOMS", "DINING", "ACTIVITIES", "EVENTS", "PROPERTY", "SURROUNDINGS"];
 
 /** Masonry grid with category filters and a keyboard-accessible lightbox (a native modal dialog). */
 export function Gallery({ items }: { items: PublicGalleryItem[] }) {
@@ -92,6 +93,11 @@ export function Gallery({ items }: { items: PublicGalleryItem[] }) {
               className="group relative block w-full overflow-hidden bg-sage focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
               aria-label={`Open larger photo: ${item.altText || `photo ${i + 1}`}`}
             >
+              {item.isPlaceholder && (
+                <span className="absolute top-2 left-2 z-10 bg-cream px-2 py-1 font-label text-[0.6875rem] font-medium text-warning">
+                  DEV PLACEHOLDER: {item.placeholderNote ?? "rights unconfirmed"}
+                </span>
+              )}
               <MediaImage
                 media={{ ...item, altText: "" }}
                 fill={false}

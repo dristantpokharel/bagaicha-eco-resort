@@ -125,6 +125,111 @@ const POLICIES = [
   },
 ];
 
+/**
+ * Explore page (docs: plan approved in the Phase 5 explore thread). Only durable facts are written as
+ * facts; everything else is a flagged placeholder. Distances are never typed here: activities link to a
+ * NearbyDestination row and the page reads the distance from it.
+ */
+const PH_FIELDS = ["duration", "season", "bestTime", "bestFor", "whatToExpect", "howWeHelp"] as const;
+const exploreDetails = (what: string) => ({
+  duration: ph(`${what} duration`),
+  season: ph(`best season for ${what}`),
+  bestTime: ph(`best time of day for ${what}`),
+  bestFor: [ph(`who ${what} suits`)],
+  whatToExpect: ph(`what to expect on ${what}`),
+  howWeHelp: `We can help arrange this visit. Placeholder: owner to confirm exactly what the resort arranges.`,
+});
+
+const NEW_NEARBY = [
+  {
+    name: "Tharu village",
+    distance: ph("distance to the Tharu village"),
+    travelTime: ph("travel time to the Tharu village"),
+    icon: "people",
+    flags: ["distance", "travelTime"],
+  },
+];
+
+type ExploreActivity = {
+  slug: string;
+  title: string;
+  group: "AT_BAGAICHA" | "CLOSE_BY" | "DAY_TRIP";
+  category: string;
+  summary: string;
+  overview: string;
+  highlights: string[];
+  /** NearbyDestination name this activity links to. */
+  nearby: string | null;
+  sortOrder: number;
+};
+
+const EXPLORE_ACTIVITIES: ExploreActivity[] = [
+  {
+    slug: "krishnasaar-blackbuck-visit",
+    title: "Krishnasaar blackbuck visit",
+    group: "CLOSE_BY",
+    category: "Wildlife",
+    summary: "Visit the Krishnasaar Conservation Area, Nepal’s only blackbuck habitat.",
+    overview: "The Krishnasaar Conservation Area is the only place in Nepal where blackbuck live, on open grassland close to Bagaicha.",
+    highlights: ["Blackbuck"],
+    nearby: "Blackbuck / Krishnasaar Conservation Area",
+    sortOrder: 10,
+  },
+  {
+    slug: "tharu-village-visit",
+    title: "Tharu village visit",
+    group: "CLOSE_BY",
+    category: "Culture",
+    summary: "Learn about Tharu culture and village life.",
+    overview: "The Tharu are the indigenous people of the Bardiya region, with a distinctive culture and village way of life.",
+    highlights: [],
+    nearby: "Tharu village",
+    sortOrder: 11,
+  },
+  {
+    slug: "bardiya-jeep-safari",
+    title: "Bardiya National Park jeep safari",
+    group: "DAY_TRIP",
+    category: "Safari",
+    summary: "Explore Bardiya National Park by jeep.",
+    overview: "Bardiya National Park is home to tigers, rhinos and elephants.",
+    highlights: ["Tigers", "Rhinos", "Elephants"],
+    nearby: "Bardiya National Park / Thakurdwara",
+    sortOrder: 20,
+  },
+  {
+    slug: "bardiya-jungle-walk",
+    title: "Bardiya National Park jungle walk",
+    group: "DAY_TRIP",
+    category: "Safari",
+    summary: "Explore Bardiya National Park on foot.",
+    overview: "Bardiya National Park is home to tigers, rhinos and elephants.",
+    highlights: ["Tigers", "Rhinos", "Elephants"],
+    nearby: "Bardiya National Park / Thakurdwara",
+    sortOrder: 21,
+  },
+  {
+    slug: "karnali-river",
+    title: "Karnali river",
+    group: "DAY_TRIP",
+    category: "Nature",
+    summary: "Spend time by the Karnali river.",
+    overview: "The Karnali river is home to river dolphins and crocodiles.",
+    highlights: ["River dolphins", "Crocodiles"],
+    nearby: "Karnali Bridge",
+    sortOrder: 22,
+  },
+];
+
+/** Category for the activities that already exist (fill-only). */
+const EXISTING_CATEGORY: Record<string, string> = {
+  "village-walks": "Walks",
+  birdwatching: "Nature",
+  pickleball: "Games",
+  "chill-pool": "Relax",
+  "outdoor-relaxation": "Relax",
+};
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
@@ -206,6 +311,63 @@ async function main() {
             data: { body: p.body, placeholderFields: existing.placeholderFields.filter((f) => f !== "body") },
           });
       }
+    }
+
+    // ── Explore page ──
+    for (const [i, n] of NEW_NEARBY.entries()) {
+      if (await db.nearbyDestination.findFirst({ where: { name: n.name } })) continue;
+      note(`nearby: ${n.name} (distance is a placeholder)`);
+      if (apply)
+        await db.nearbyDestination.create({
+          data: { name: n.name, distance: n.distance, travelTime: n.travelTime, icon: n.icon, placeholderFields: n.flags, sortOrder: 10 + i },
+        });
+    }
+    const destId = async (name: string | null) =>
+      name ? ((await db.nearbyDestination.findFirst({ where: { name }, select: { id: true } }))?.id ?? null) : null;
+
+    for (const a of EXPLORE_ACTIVITIES) {
+      if (await db.activity.findUnique({ where: { slug: a.slug } })) continue;
+      note(`activity: ${a.title} (${a.group})`);
+      if (apply) {
+        const { nearby, ...fields } = a;
+        await db.activity.create({
+          data: {
+            ...fields,
+            ...exploreDetails(a.title.toLowerCase()),
+            destinationId: await destId(nearby),
+            placeholderFields: [...PH_FIELDS],
+          },
+        });
+      }
+    }
+
+    // Existing activities: only empty new fields are filled.
+    for (const [slug, category] of Object.entries(EXISTING_CATEGORY)) {
+      const row = await db.activity.findUnique({ where: { slug } });
+      if (row && !row.category) {
+        note(`activity category: ${slug} = ${category}`);
+        if (apply) await db.activity.update({ where: { slug }, data: { category } });
+      }
+    }
+
+    // Merge Chill Pool and Outdoor Relaxation (owner-approved): one row, the old one hidden, not deleted.
+    const pool = await db.activity.findUnique({ where: { slug: "chill-pool" } });
+    const relax = await db.activity.findUnique({ where: { slug: "outdoor-relaxation" } });
+    if (pool && pool.title === "Chill Pool") {
+      note("merge: Chill Pool becomes “Chill Pool & outdoor relaxation”");
+      if (apply)
+        await db.activity.update({
+          where: { slug: "chill-pool" },
+          data: {
+            title: "Chill Pool & outdoor relaxation",
+            summary: `${pool.summary ?? ""} Slow down and explore the outdoors.`.trim(),
+            sortOrder: 3,
+          },
+        });
+    }
+    if (relax && relax.isActive) {
+      note("merge: Outdoor Relaxation hidden (kept, not deleted)");
+      if (apply) await db.activity.update({ where: { slug: "outdoor-relaxation" }, data: { isActive: false } });
     }
 
     console.log(`${created} row(s) ${apply ? "created" : "would be created"}.`);
