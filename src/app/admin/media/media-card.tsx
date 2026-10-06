@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
+import { Textarea } from "@/components/ui/form";
 import { MediaImage, type MediaImageData } from "@/components/media/media-image";
 import { formatBytes } from "@/lib/media";
 import type { ActionResult } from "@/lib/actions";
@@ -58,7 +59,7 @@ export function MediaCard({ item }: { item: LibraryItem }) {
           <label htmlFor={`alt-${item.id}`} className="block text-xs font-medium text-charcoal">
             Alt text{item.altNeedsReview ? " (draft, please check)" : ""}
           </label>
-          <textarea
+          <Textarea
             id={`alt-${item.id}`}
             name="altText"
             rows={2}
@@ -67,7 +68,6 @@ export function MediaCard({ item }: { item: LibraryItem }) {
             placeholder="Describe what the photo shows"
             aria-invalid={altError ? true : undefined}
             aria-describedby={altError ? `alt-${item.id}-error` : undefined}
-            className="block w-full rounded-md border border-charcoal/25 bg-white px-3 py-2 text-sm text-charcoal focus-visible:border-forest focus-visible:outline-2 focus-visible:outline-forest/40 aria-[invalid=true]:border-error"
           />
           {altError && (
             <p id={`alt-${item.id}-error`} className="text-xs text-error">
