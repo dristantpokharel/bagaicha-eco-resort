@@ -148,6 +148,8 @@ model RoomType {
   amenities             String[]
   isActive              Boolean  @default(true)
   sortOrder             Int      @default(0)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields     String[] @default([])
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -357,31 +359,47 @@ model HomepageSlot {
 
 /// Single row (id = 1, enforced by a CHECK constraint).
 model BusinessInfo {
-  id            Int      @id @default(1)
-  name          String
-  tagline       String?
-  address       String?
-  phone         String?
-  email         String?
-  instagramUrl  String?
-  facebookUrl   String?
-  googleMapsUrl String?
-  updatedAt     DateTime @updatedAt
+  id                Int      @id @default(1)
+  name              String
+  tagline           String?
+  /// Short line under the hero and default meta description.
+  intro             String?
+  address           String?
+  /// Main number first.
+  phones            String[] @default([])
+  /// Digits with country code, e.g. 9779851081502 (used for wa.me links).
+  whatsapp          String?
+  emails            String[] @default([])
+  instagramUrl      String?
+  facebookUrl       String?
+  googleMapsUrl     String?
+  directionsUrl     String?
+  latitude          Float?
+  longitude         Float?
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  updatedAt         DateTime @updatedAt
 
   @@map("business_info")
 }
 
 model Activity {
-  id           String   @id @default(cuid())
-  slug         String   @unique
-  title        String
-  summary      String?
-  description  String?
-  coverMediaId String?
-  sortOrder    Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  title             String
+  /// One short line for cards.
+  summary           String?
+  overview          String?
+  duration          String?
+  bestTime          String?
+  whatToExpect      String?
+  coverMediaId      String?
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   coverMedia Media? @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
 
@@ -389,13 +407,15 @@ model Activity {
 }
 
 model DiningSection {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   items DiningItem[]
 
@@ -403,15 +423,17 @@ model DiningSection {
 }
 
 model DiningItem {
-  id          String   @id @default(cuid())
-  sectionId   String
-  name        String
-  description String?
-  priceNpr    Int?
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  sectionId         String
+  name              String
+  description       String?
+  priceNpr          Int?
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   section DiningSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
@@ -420,16 +442,20 @@ model DiningItem {
 }
 
 model EventType {
-  id           String   @id @default(cuid())
-  slug         String   @unique
-  name         String
-  summary      String?
-  description  String?
-  coverMediaId String?
-  sortOrder    Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  name              String
+  summary           String?
+  description       String?
+  /// Short list shown with the event, e.g. Meetings, Trainings.
+  highlights        String[] @default([])
+  coverMediaId      String?
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   coverMedia Media? @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
 
@@ -437,28 +463,51 @@ model EventType {
 }
 
 model Faq {
-  id        String   @id @default(cuid())
-  question  String
-  answer    String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  question          String
+  answer            String
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("faqs")
 }
 
 model Policy {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  body      String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  title             String
+  body              String
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("policies")
+}
+
+model NearbyDestination {
+  id                String   @id @default(cuid())
+  name              String
+  /// Shown as written, e.g. "~40 km".
+  distance          String?
+  /// Shown as written, e.g. "53 mins".
+  travelTime        String?
+  /// Key into the site icon set (src/components/site/icons.tsx).
+  icon              String?
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("nearby_destinations")
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
