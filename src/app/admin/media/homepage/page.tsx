@@ -33,7 +33,7 @@ export default async function HomepageMediaPage() {
         const placements = toPlacements(slots.filter((row) => row.slot === slot));
         return (
           <PlacementManager
-            key={placementKey(placements)}
+            key={`${slot}:${placementKey(placements)}`}
             target={{ kind: "homepage", slot }}
             title={HOMEPAGE_SLOT_LABELS[slot]}
             description={SLOT_HINTS[slot]}

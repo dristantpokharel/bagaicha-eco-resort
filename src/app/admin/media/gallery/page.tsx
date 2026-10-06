@@ -27,7 +27,7 @@ export default async function GalleryPage() {
         const placements = toPlacements(items.filter((item) => item.category === category));
         return (
           <PlacementManager
-            key={placementKey(placements)}
+            key={`${category}:${placementKey(placements)}`}
             target={{ kind: "gallery", category }}
             title={GALLERY_LABELS[category]}
             placements={placements}
