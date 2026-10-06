@@ -262,6 +262,13 @@ model Media {
   width              Int
   height             Int
   altText            String   @default("")
+  /// True while alt text is missing or a generated draft; cleared when staff save alt text.
+  altNeedsReview     Boolean  @default(true)
+  /// Cloudinary-reported format (jpg, png, webp, heic) and size in bytes.
+  format             String?
+  bytes              Int?
+  /// Filename at upload time, for search and to trace seeded photos.
+  originalFilename   String?
   blurDataUrl        String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
