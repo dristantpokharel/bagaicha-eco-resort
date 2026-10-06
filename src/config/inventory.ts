@@ -2,11 +2,35 @@
  * Inventory vocabulary: the one place for units and category suggestions.
  * Items and stock levels live in the database.
  */
-export const INVENTORY_UNITS = ["pcs", "kg", "L", "box", "pack"] as const;
+export const INVENTORY_UNITS = [
+  "pcs",
+  "kg",
+  "L",
+  "box",
+  "pack",
+  "bottle",
+  "roll",
+  "pair",
+  "pad",
+  "ream",
+  "cartridge",
+  "book",
+] as const;
 export type InventoryUnit = (typeof INVENTORY_UNITS)[number];
 
 /** Units that can't be split: amounts must be whole numbers. */
-const WHOLE_UNITS: readonly InventoryUnit[] = ["pcs", "box", "pack"];
+const WHOLE_UNITS: readonly InventoryUnit[] = [
+  "pcs",
+  "box",
+  "pack",
+  "bottle",
+  "roll",
+  "pair",
+  "pad",
+  "ream",
+  "cartridge",
+  "book",
+];
 
 export function isWholeUnit(unit: string): boolean {
   return (WHOLE_UNITS as readonly string[]).includes(unit);
@@ -17,14 +41,13 @@ export function isWholeUnit(unit: string): boolean {
  * free text, so staff can still type their own; these only save typing.
  */
 export const SUGGESTED_CATEGORIES = [
-  "Linen & housekeeping",
-  "Guest toiletries",
-  "Kitchen & food",
-  "Beverages",
-  "Cleaning supplies",
-  "Maintenance",
-  "Pool",
-  "Office",
+  "Linens & Bedding",
+  "Bathroom Amenities",
+  "In-Room Supplies",
+  "Housekeeping & Cleaning",
+  "Room Service",
+  "Safety & Maintenance",
+  "Front Desk & Admin",
 ] as const;
 
 /** Number of decimal places stored for quantities. */

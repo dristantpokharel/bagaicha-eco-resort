@@ -15,7 +15,8 @@
     "db:seed": "prisma db seed",
     "db:generate": "prisma generate",
     "preview:photos": "sh scripts/preview-photos.sh",
-    "media:seed-photos": "tsx scripts/seed-photos.ts"
+    "media:seed-photos": "tsx scripts/seed-photos.ts",
+    "seed:inventory": "tsx prisma/seed-inventory.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -453,8 +453,10 @@ model InventoryItem {
   name              String   @unique
   /// Free text so staff can add categories without a migration.
   category          String
-  /// pcs, kg, L, box…
+  /// One of INVENTORY_UNITS in src/config/inventory.ts
   unit              String
+  /// Used up when handed out (soap, paper) vs. reusable (towels, kettles). Reorder alerts use lowStockThreshold either way.
+  isConsumable      Boolean  @default(true)
   /// Kept in sync with stock movements.
   quantity          Decimal  @default(0) @db.Decimal(10, 2)
   lowStockThreshold Decimal  @default(0) @db.Decimal(10, 2)
