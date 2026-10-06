@@ -22,6 +22,15 @@ const id = (name: string) => `bagaicha/seed/${name}`;
 const HOMEPAGE: { slot: HomepageSlotKey; photos: string[]; single: boolean }[] = [
   { slot: "HERO_DESKTOP", photos: ["hero"], single: true },
   { slot: "HERO_MOBILE", photos: ["hero-2"], single: true },
+  // Section photos (add-only). Order matters: the first photo leads its section.
+  { slot: "ABOUT", photos: ["garden", "cottages", "hero-2"], single: false },
+  { slot: "STAY", photos: ["room"], single: false },
+  { slot: "DINE", photos: ["food", "restaurant"], single: false },
+  { slot: "EXPLORE", photos: ["chill-pool"], single: false },
+  // The wedding mockup is a dev stand-in (hidden in production); the lawn is the real fallback.
+  { slot: "EVENTS", photos: ["wedding-mock", "lawn"], single: false },
+  { slot: "CONFERENCE", photos: ["conference-room"], single: false },
+  { slot: "LOCATION", photos: ["bagaicha-map"], single: false },
 ];
 const ROOM_TYPES: Record<string, string[]> = {
   "family-room": ["family-room-1", "family-room-2", "bed-close-up"],

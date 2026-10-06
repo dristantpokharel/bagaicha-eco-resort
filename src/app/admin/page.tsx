@@ -9,6 +9,7 @@ import { StockBadge } from "@/components/admin/stock-badge";
 import { buttonClasses } from "@/components/ui/button";
 import { listLowStockItems } from "@/lib/inventory/queries";
 import { formatQuantityWithUnit } from "@/lib/inventory/stock";
+import { listPlaceholders } from "@/lib/content/placeholder-report";
 
 export const metadata = { title: "Dashboard" };
 
@@ -38,6 +39,7 @@ export default async function AdminDashboardPage() {
   const today = todayInResort();
   const now = new Date();
   const lowStock = canInventory ? await listLowStockItems() : [];
+  const placeholders = can(user.role, "content.manage") ? await listPlaceholders() : null;
 
   const [arrivals, departures, pending, pendingCount, upcoming, newEnquiries] = canBookings
     ? await Promise.all([
@@ -124,6 +126,33 @@ export default async function AdminDashboardPage() {
                   <span className="whitespace-nowrap tabular-nums">
                     {formatQuantityWithUnit(item.quantity, item.unit)}
                   </span>
+                </span>
+              </li>
+            ))}
+          </Widget>
+        </div>
+      )}
+
+      {placeholders && (
+        <div className="mt-6">
+          <Widget
+            title="Placeholders (must be replaced before launch)"
+            count={placeholders.length}
+            empty="No placeholder content is left."
+            footer={
+              placeholders.length > 0
+                ? "Placeholders show with a badge while developing and are hidden on the live site."
+                : undefined
+            }
+          >
+            {placeholders.map((p, i) => (
+              <li key={`${p.section}-${p.title}-${i}`} className="py-2 text-sm">
+                <Link href={p.href} className="font-medium text-forest underline-offset-4 hover:underline">
+                  {p.title}
+                </Link>
+                <span className="text-charcoal-light">
+                  {" "}
+                  · {p.section} · {p.fields.join(", ")}
                 </span>
               </li>
             ))}
