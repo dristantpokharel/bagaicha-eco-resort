@@ -1,7 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Bagaicha Eco Resort — data model (docs/spec.md §3).
+//
+// Conventions
+// - Tables are snake_case plural (@@map); columns stay camelCase.
+// - Money is whole NPR in Int columns.
+// - Stay dates are date-only (@db.Date); "today" is computed in Asia/Kathmandu.
+// - Anything with history uses onDelete: Restrict; archive with isActive instead.
+//   Pure link rows (media placements) cascade, since they carry no history.
+// - Constraints Prisma can't express (booking overlap exclusion, date CHECKs,
+//   BusinessInfo single row) live in hand-written SQL in the migrations.
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +16,449 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  SUPERUSER
+  ADMIN
+  STAFF
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum BookingSource {
+  WEBSITE
+  PHONE
+  WALK_IN
+  OTHER
+}
+
+enum EnquiryType {
+  STAY
+  EVENT
+  CONFERENCE
+  OTHER
+}
+
+enum EnquiryStatus {
+  NEW
+  IN_PROGRESS
+  CLOSED
+}
+
+enum GalleryCategory {
+  ROOMS
+  DINING
+  ACTIVITIES
+  EVENTS
+  PROPERTY
+}
+
+enum HomepageSlotKey {
+  HERO_DESKTOP
+  HERO_MOBILE
+  ABOUT
+  STAY
+  DINE
+  EXPLORE
+  EVENTS
+  CONFERENCE
+  LOCATION
+}
+
+enum StockMovementType {
+  RECEIVED
+  USED
+  ADJUSTED
+}
+
+// ─── Users & audit ───────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  /// Always stored lowercased.
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(STAFF)
+  isActive     Boolean   @default(true)
+  /// Bumped on password reset / deactivation to invalidate existing sessions.
+  tokenVersion Int       @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  bookingsCreated Booking[]       @relation("BookingCreatedBy")
+  roomBlocks      RoomBlock[]
+  stockMovements  StockMovement[]
+  activityLogs    ActivityLog[]
+
+  @@map("users")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  /// Null for system actions (e.g. the seed script).
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("activity_logs")
+}
+
+// ─── Rooms ───────────────────────────────────────────────────────────────────
+
+model RoomType {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  description  String
+  basePriceNpr Int
+  maxGuests    Int
+  amenities    String[]
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rooms    Room[]
+  bookings Booking[]
+  media    RoomTypeMedia[]
+
+  @@map("room_types")
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  roomTypeId String
+  /// Room name or number as shown to staff.
+  name       String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  roomType RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+  blocks   RoomBlock[]
+
+  @@unique([roomTypeId, name])
+  @@map("rooms")
+}
+
+model RoomBlock {
+  id          String   @id @default(cuid())
+  roomId      String
+  /// Inclusive start, exclusive end (same convention as bookings).
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  reason      String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  room      Room @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([roomId, startDate])
+  @@map("room_blocks")
+}
+
+// ─── Guests & bookings ───────────────────────────────────────────────────────
+
+model Guest {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  country   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("guests")
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  /// e.g. BG-2026-000123
+  bookingNumber      String        @unique
+  guestId            String
+  roomTypeId         String
+  /// Assigned on confirm.
+  roomId             String?
+  checkIn            DateTime      @db.Date
+  checkOut           DateTime      @db.Date
+  adults             Int
+  children           Int           @default(0)
+  status             BookingStatus @default(PENDING)
+  source             BookingSource
+  /// Price snapshot at booking time, whole NPR.
+  pricePerNightNpr   Int
+  totalPriceNpr      Int
+  currency           String        @default("NPR")
+  specialRequests    String?
+  internalNotes      String?
+  createdById        String?
+  confirmedAt        DateTime?
+  checkedInAt        DateTime?
+  checkedOutAt       DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomType  RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  room      Room?    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  createdBy User?    @relation("BookingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([checkIn, checkOut])
+  @@index([roomId])
+  @@index([guestId])
+  @@map("bookings")
+}
+
+model Enquiry {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  type      EnquiryType
+  message   String
+  status    EnquiryStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@map("enquiries")
+}
+
+// ─── Media ───────────────────────────────────────────────────────────────────
+
+model Media {
+  id                 String   @id @default(cuid())
+  cloudinaryPublicId String   @unique
+  url                String
+  width              Int
+  height             Int
+  altText            String   @default("")
+  blurDataUrl        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  roomTypes     RoomTypeMedia[]
+  galleryItems  GalleryItem[]
+  homepageSlots HomepageSlot[]
+  activities    Activity[]
+  eventTypes    EventType[]
+
+  @@map("media")
+}
+
+model RoomTypeMedia {
+  id         String @id @default(cuid())
+  roomTypeId String
+  mediaId    String
+  sortOrder  Int    @default(0)
+
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  media    Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([roomTypeId, mediaId])
+  @@index([roomTypeId, sortOrder])
+  @@map("room_type_media")
+}
+
+model GalleryItem {
+  id        String          @id @default(cuid())
+  mediaId   String
+  category  GalleryCategory
+  sortOrder Int             @default(0)
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, category])
+  @@index([category, sortOrder])
+  @@map("gallery_items")
+}
+
+model HomepageSlot {
+  id        String          @id @default(cuid())
+  slot      HomepageSlotKey
+  mediaId   String
+  sortOrder Int             @default(0)
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([slot])
+  @@map("homepage_slots")
+}
+
+// ─── Content ─────────────────────────────────────────────────────────────────
+
+/// Single row (id = 1, enforced by a CHECK constraint).
+model BusinessInfo {
+  id            Int      @id @default(1)
+  name          String
+  tagline       String?
+  address       String?
+  phone         String?
+  email         String?
+  instagramUrl  String?
+  facebookUrl   String?
+  googleMapsUrl String?
+  updatedAt     DateTime @updatedAt
+
+  @@map("business_info")
+}
+
+model Activity {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  title        String
+  summary      String?
+  description  String?
+  coverMediaId String?
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  coverMedia Media? @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  @@map("activities")
+}
+
+model DiningSection {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items DiningItem[]
+
+  @@map("dining_sections")
+}
+
+model DiningItem {
+  id          String   @id @default(cuid())
+  sectionId   String
+  name        String
+  description String?
+  priceNpr    Int?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  section DiningSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId, sortOrder])
+  @@map("dining_items")
+}
+
+model EventType {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  summary      String?
+  description  String?
+  coverMediaId String?
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  coverMedia Media? @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  @@map("event_types")
+}
+
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+model Policy {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  body      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("policies")
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  /// Free text so staff can add categories without a migration.
+  category          String
+  /// pcs, kg, L, box…
+  unit              String
+  /// Kept in sync with stock movements.
+  quantity          Decimal  @default(0) @db.Decimal(10, 2)
+  lowStockThreshold Decimal  @default(0) @db.Decimal(10, 2)
+  unitCostNpr       Int?
+  supplier          String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  movements StockMovement[]
+
+  @@index([category])
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id        String            @id @default(cuid())
+  itemId    String
+  type      StockMovementType
+  /// Signed change applied to the item: RECEIVED > 0, USED < 0, ADJUSTED either.
+  quantity  Decimal           @db.Decimal(10, 2)
+  note      String?
+  userId    String
+  createdAt DateTime          @default(now())
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  user User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([itemId, createdAt])
+  @@map("stock_movements")
 }
