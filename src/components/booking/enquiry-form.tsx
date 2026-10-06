@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { TurnstileWidget } from "@/components/forms/turnstile-widget";
-import { submitEnquiry, type EnquiryState } from "@/app/enquiry/actions";
+import { submitEnquiry, type EnquiryState } from "@/app/(site)/enquiry/actions";
 import { ENQUIRY_TYPE_LABELS } from "@/lib/booking/labels";
 
 export function EnquiryForm({ defaultType, defaultCountryCode }: { defaultType: string; defaultCountryCode: string }) {

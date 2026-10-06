@@ -7,6 +7,5 @@ node_modules/
 src/generated/
 *.tsbuildinfo
 docs/photos/
-/public/preview/
 /docs/screenshots/
 !.env.example

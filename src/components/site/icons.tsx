@@ -108,3 +108,8 @@ export function Icon({ name, ...props }: IconProps & { name: IconName }) {
   const Component = icons[name];
   return <Component {...props} />;
 }
+
+/** True when `name` is a key of the icon set (database values are untrusted strings). */
+export function isIconName(name: string | null | undefined): name is IconName {
+  return !!name && name in icons;
+}

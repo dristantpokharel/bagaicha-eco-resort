@@ -6,7 +6,7 @@ import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import { TurnstileWidget } from "@/components/forms/turnstile-widget";
 import { Placeholder } from "@/components/site/placeholder";
 import { BOOKING } from "@/config/booking";
-import { submitBookingRequest, type BookingRequestState } from "@/app/book/actions";
+import { submitBookingRequest, type BookingRequestState } from "@/app/(site)/book/actions";
 
 type Props = {
   stay: { checkIn: string; checkOut: string; adults: number; children: number; roomTypeId: string };
