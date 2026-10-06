@@ -22,10 +22,38 @@ export async function lockItem(tx: Tx, itemId: string) {
  */
 export async function recordStockMovement(
   tx: Tx,
-  params: { itemId: string; userId: string; type: StockMovementType; amount: Quantity; note: string | null },
+  params: {
+    itemId: string;
+    userId: string;
+    type: StockMovementType;
+    amount: Quantity;
+    note: string | null;
+    /** A repeat of an already-saved submission returns that movement instead of adding another. */
+    submissionId?: string;
+  },
 ) {
-  const { itemId, userId, type, amount, note } = params;
+  const { itemId, userId, type, amount, note, submissionId } = params;
   await lockItem(tx, itemId);
+
+  if (submissionId) {
+    const prior = await tx.stockMovement.findUnique({
+      where: { submissionId },
+      include: { item: { select: { name: true, unit: true } } },
+    });
+    if (prior) {
+      if (prior.itemId !== itemId || prior.userId !== userId) {
+        throw new ActionError("That submission was already used. Reload the page and try again.");
+      }
+      return {
+        movement: prior,
+        itemName: prior.item.name,
+        unit: prior.item.unit,
+        balanceAfter: prior.balanceAfter,
+        duplicate: true,
+        summary: `Already saved. ${summarize(prior.type, prior.item.name, prior.item.unit, prior.quantity, prior.balanceAfter)}`,
+      };
+    }
+  }
 
   const item = await tx.inventoryItem.findUnique({
     where: { id: itemId },
@@ -38,7 +66,7 @@ export async function recordStockMovement(
 
   await tx.inventoryItem.update({ where: { id: itemId }, data: { quantity: balanceAfter } });
   const movement = await tx.stockMovement.create({
-    data: { itemId, type, quantity: delta, balanceAfter, note, userId },
+    data: { itemId, type, quantity: delta, balanceAfter, note, userId, submissionId },
   });
   await logActivity(tx, {
     userId,
@@ -60,6 +88,7 @@ export async function recordStockMovement(
     itemName: item.name,
     unit: item.unit,
     balanceAfter,
+    duplicate: false,
     summary: summarize(type, item.name, item.unit, delta, balanceAfter),
   };
 }

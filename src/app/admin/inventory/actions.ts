@@ -151,10 +151,10 @@ export async function setItemActive(_prev: ActionResult | null, formData: FormDa
 export async function recordMovement(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const actor = await requirePermission("inventory.recordMovements");
-    const { itemId, type, quantity, note } = parseForm(recordMovementSchema, formData);
+    const { itemId, type, quantity, note, submissionId } = parseForm(recordMovementSchema, formData);
 
     const { summary } = await db.$transaction(
-      (tx) => recordStockMovement(tx, { itemId, userId: actor.id, type, amount: quantity, note }),
+      (tx) => recordStockMovement(tx, { itemId, userId: actor.id, type, amount: quantity, note, submissionId }),
       BOOKING_TX_OPTIONS,
     );
 

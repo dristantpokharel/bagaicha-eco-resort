@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUBMISSION_ID_PATTERN } from "./submission-id";
 import { INVENTORY_UNITS, isWholeUnit, QUANTITY_DECIMALS } from "@/config/inventory";
 
 const id = z.string().trim().min(1).max(64);
@@ -88,6 +89,8 @@ export const MOVEMENT_TYPES = ["RECEIVED", "USED", "ADJUSTED"] as const;
 export const recordMovementSchema = z
   .object({
     itemId: id,
+    /** One per form attempt (see submission-id.ts); a repeat is recorded once. */
+    submissionId: z.string().regex(SUBMISSION_ID_PATTERN, { error: "Reload the page and try again." }),
     type: z.enum(MOVEMENT_TYPES, { error: "Choose what happened." }),
     /** RECEIVED / USED: the amount. ADJUSTED: the counted quantity. */
     quantity: quantityField,

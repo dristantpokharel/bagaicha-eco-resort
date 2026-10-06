@@ -479,6 +479,8 @@ model StockMovement {
   /// The item's quantity right after this movement was applied.
   balanceAfter Decimal           @db.Decimal(10, 2)
   note         String?
+  /// Client-generated token for one form attempt; a retry with the same token is a no-op.
+  submissionId String?           @unique
   userId       String
   createdAt    DateTime          @default(now())
 

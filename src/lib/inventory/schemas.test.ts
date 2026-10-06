@@ -47,7 +47,7 @@ describe("updateItemSchema", () => {
 });
 
 describe("recordMovementSchema", () => {
-  const base = { itemId: "abc", quantity: "2" };
+  const base = { itemId: "abc", quantity: "2", submissionId: "3f1c2d4e-9a7b-4c1d-8e2f-0a1b2c3d4e5f" };
   it("makes the note optional for USED and RECEIVED", () => {
     expect(recordMovementSchema.parse({ ...base, type: "USED" }).note).toBeNull();
     expect(recordMovementSchema.parse({ ...base, type: "RECEIVED", note: "Delivery" }).note).toBe("Delivery");
@@ -56,6 +56,13 @@ describe("recordMovementSchema", () => {
     expect(recordMovementSchema.safeParse({ ...base, type: "ADJUSTED" }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "ADJUSTED", note: "   " }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "ADJUSTED", note: "Broken jars" }).success).toBe(true);
+  });
+  it("requires a well-formed submission token", () => {
+    const { submissionId: _omit, ...without } = base;
+    expect(recordMovementSchema.safeParse({ ...without, type: "USED" }).success).toBe(false);
+    expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "short" }).success).toBe(false);
+    expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "x".repeat(65) }).success).toBe(false);
+    expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "has spaces in it, not ok!" }).success).toBe(false);
   });
   it("rejects unknown types and bad amounts", () => {
     expect(recordMovementSchema.safeParse({ ...base, type: "STOLEN" }).success).toBe(false);

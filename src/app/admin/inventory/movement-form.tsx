@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
 import { formatQuantityWithUnit } from "@/lib/inventory/format";
+import { newSubmissionId } from "@/lib/inventory/submission-id";
 import { MOVEMENT_LABELS } from "@/lib/inventory/labels";
 import { NOTE_MAX_LENGTH } from "@/lib/inventory/schemas";
 import type { StockMovementType } from "@/generated/prisma/enums";
@@ -42,9 +43,25 @@ export function MovementForm({
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
 
+  // One token per attempt. It is kept after a failure or a lost response, so tapping
+  // Record again can't save the same movement twice, and cleared once saved.
+  const submissionId = useRef<string | null>(null);
+
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(async (prev, formData) => {
-    const outcome = await recordMovement(prev, formData);
+    submissionId.current ??= newSubmissionId();
+    formData.set("submissionId", submissionId.current);
+    let outcome: ActionResult;
+    try {
+      outcome = await recordMovement(prev, formData);
+    } catch {
+      return {
+        ok: false,
+        error:
+          "Couldn't reach the server, so we can't tell if this was saved. Check your connection and tap Record again: it won't be saved twice.",
+      };
+    }
     if (outcome.ok) {
+      submissionId.current = null;
       // Ready for the next entry; the message above keeps the confirmation.
       setQuantity("");
       setNote("");

@@ -25,8 +25,13 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
     itemIds.push(item.id);
     return item.id;
   }
-  const move = (itemId: string, type: "RECEIVED" | "USED" | "ADJUSTED", amount: string, note: string | null = null) =>
-    db.$transaction((tx) => record(tx, { itemId, userId, type, amount, note }));
+  const move = (
+    itemId: string,
+    type: "RECEIVED" | "USED" | "ADJUSTED",
+    amount: string,
+    note: string | null = null,
+    submissionId?: string,
+  ) => db.$transaction((tx) => record(tx, { itemId, userId, type, amount, note, submissionId }));
 
   beforeAll(async () => {
     ({ db } = await import("@/lib/db"));
@@ -89,6 +94,34 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
     const item = await db.inventoryItem.findUniqueOrThrow({ where: { id } });
     const sum = await db.stockMovement.aggregate({ where: { itemId: id }, _sum: { quantity: true } });
     expect(item.quantity.toString()).toBe(sum._sum.quantity!.toString());
+  });
+
+  it("records a repeated submission once, even when the repeats arrive together", async () => {
+    const id = await makeItem("dedupe");
+    await move(id, "RECEIVED", "10");
+    const token = `${tag}-token-a`;
+    const first = await move(id, "USED", "2", null, token);
+    const again = await move(id, "USED", "2", null, token);
+    expect(first.duplicate).toBe(false);
+    expect(again.duplicate).toBe(true);
+    expect(again.summary).toMatch(/^Already saved\./);
+
+    const burst = await Promise.all([1, 2, 3].map(() => move(id, "USED", "1", null, `${tag}-token-b`)));
+    expect(burst.filter((r) => !r.duplicate)).toHaveLength(1);
+
+    expect((await db.inventoryItem.findUniqueOrThrow({ where: { id } })).quantity.toString()).toBe("7");
+    expect(await db.stockMovement.count({ where: { itemId: id } })).toBe(3);
+    expect(await db.activityLog.count({ where: { entityId: id, action: "stock.used" } })).toBe(2);
+    // A new token is a new movement.
+    expect((await move(id, "USED", "2", null, `${tag}-token-c`)).duplicate).toBe(false);
+  });
+
+  it("refuses a token that was already used for another item", async () => {
+    const a = await makeItem("tok-a", "kg", "5");
+    const b = await makeItem("tok-b", "kg", "5");
+    const token = `${tag}-token-d`;
+    await move(a, "USED", "1", null, token);
+    await expect(move(b, "USED", "1", null, token)).rejects.toThrow(/already used/);
   });
 
   it("rejects movements on archived items", async () => {

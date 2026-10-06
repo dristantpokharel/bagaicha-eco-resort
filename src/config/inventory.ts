@@ -13,16 +13,18 @@ export function isWholeUnit(unit: string): boolean {
 }
 
 /**
- * Suggestions offered in the category field. Categories are free text, so staff
- * can add their own; these only save typing. Owner to confirm or replace.
+ * Suggestions offered in the category field (set by the owner). Categories are
+ * free text, so staff can still type their own; these only save typing.
  */
 export const SUGGESTED_CATEGORIES = [
-  "Housekeeping",
-  "Kitchen",
+  "Linen & housekeeping",
+  "Guest toiletries",
+  "Kitchen & food",
   "Beverages",
-  "Toiletries",
-  "Linen",
+  "Cleaning supplies",
   "Maintenance",
+  "Pool",
+  "Office",
 ] as const;
 
 /** Number of decimal places stored for quantities. */
