@@ -1,0 +1,5 @@
+_legacy/
+.env*
+node_modules/
+.next/
+.DS_Store
