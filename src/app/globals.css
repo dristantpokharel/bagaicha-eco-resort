@@ -1,57 +1,211 @@
 @import "tailwindcss";
 
-/* ─── Bagaicha Eco Resort — Design Tokens (Tailwind v4) ─── */
+/* ─── Bagaicha Eco Resort — Design Tokens (Tailwind v4) ───
+   Source of truth: docs/design-tokens.md (sampled from docs/Brochure.pdf). */
 
 @theme {
-  /* Brand colors — from brochure */
-  --color-cream: #FAF7F2;
-  --color-cream-dark: #F0EBE3;
-  --color-forest: #2D4A3E;
-  --color-forest-dark: #1E3329;
-  --color-sage: #8BA888;
-  --color-sage-light: #B8D4B0;
-  --color-earth: #A67C52;
-  --color-earth-light: #C4A77D;
-  --color-charcoal: #333333;
-  --color-charcoal-light: #666666;
+  /* Brand palette — sampled from the brochure */
+  --color-cream: #F7F3E5;
+  --color-cream-dark: #EDE8D6;
+  --color-forest: #283327;
+  --color-forest-dark: #1E3228;
+  --color-olive: #5A6248;
+  --color-leaf: #505E3E;
+  --color-sage: #D9DFC5;
+  --color-sage-muted: #ACB299;
+  --color-ink: #3F4430;
+  --color-ink-heading: #454C31;
+  --color-ink-muted: #6B7058;
+  --color-icon: #2B3A2B;
 
-  /* Semantic */
-  /* Darker shades so text meets WCAG AA on white and cream */
+  /* Admin aliases — kept so existing admin classes keep working */
+  --color-charcoal: var(--color-ink);
+  --color-charcoal-light: var(--color-ink-muted);
+
+  /* Semantic (admin) — darker shades so text meets WCAG AA on white and cream */
   --color-success: #15803D;
   --color-warning: #B45309;
   --color-error: #B91C1C;
 
-  /* Typography */
-  /* --font-playfair / --font-inter are set by next/font in the root layout */
-  --font-serif: var(--font-playfair), Georgia, serif;
-  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  /* Typography — the font variables are set by next/font in the root layout.
+     Brochure: titles = Seravek (stand-in below), body = Red Hat Display, labels = Montserrat. */
+  --font-display: var(--font-title), system-ui, sans-serif;
+  --font-sans: var(--font-red-hat), system-ui, -apple-system, sans-serif;
+  --font-label: var(--font-montserrat), system-ui, sans-serif;
 
-  /* Spacing scale */
+  /* Spacing */
   --spacing-section: 6rem;
   --spacing-section-sm: 4rem;
+  --spacing-gutter: 1rem;
 
-  /* Radius */
+  /* Radius — public site: square photos, one organic corner, pills */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+  --radius-organic: 4rem;
 
-  /* Shadows */
+  /* Shadows — admin only; the public site uses none */
   --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.12);
 
-  /* Transitions */
+  /* Motion */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ─── Base styles ─── */
 
+html {
+  scroll-behavior: smooth;
+}
+
+/* Anchor targets clear the fixed site header */
+section[id] {
+  scroll-margin-top: 5rem;
+}
+
 body {
   font-family: var(--font-sans);
-  color: var(--color-charcoal);
+  color: var(--color-ink);
   background-color: var(--color-cream);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Shared text styles (docs/design-tokens.md §3) ─── */
+
+@utility container-page {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: 2rem;
+  }
+  @media (width >= 80rem) {
+    padding-inline: 4rem;
+  }
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: clamp(2.75rem, 6vw, 5rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+/* Two-weight heading pair: bold italic line, then a light italic line */
+@utility text-heading-strong {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.1;
+}
+
+@utility text-heading-soft {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+@utility text-quote {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+@utility text-title {
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-size: 1.375rem;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@utility text-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.9;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@utility text-label {
+  font-family: var(--font-label);
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+@utility text-body {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+/* Short rule under headings and kicker lists */
+@utility rule-short {
+  display: block;
+  width: 4.5rem;
+  height: 1.5px;
+  background-color: currentColor;
+}
+
+/* ─── Motion — calm fade-up, disabled for reduced motion ─── */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(1.25rem);
+  transition:
+    opacity 900ms var(--ease-calm),
+    transform 900ms var(--ease-calm);
+}
+
+.reveal[data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.animate-fade-up {
+  animation: fade-up 1100ms var(--ease-calm) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .animate-fade-up {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 /* ─── Admin-specific overrides ─── */

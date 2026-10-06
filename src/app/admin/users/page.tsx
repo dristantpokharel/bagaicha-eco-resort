@@ -24,14 +24,14 @@ export default async function UsersPage() {
       <PageHeader title="Users" description="Create staff accounts, change roles and manage access." />
 
       <section aria-labelledby="add-user" className="mb-8 rounded-lg border border-forest/10 bg-white p-6">
-        <h2 id="add-user" className="mb-4 font-serif text-lg text-forest">
+        <h2 id="add-user" className="mb-4 font-display text-lg text-forest">
           Add a user
         </h2>
         <CreateUserForm />
       </section>
 
       <section aria-labelledby="all-users" className="rounded-lg border border-forest/10 bg-white">
-        <h2 id="all-users" className="px-6 pt-6 font-serif text-lg text-forest">
+        <h2 id="all-users" className="px-6 pt-6 font-display text-lg text-forest">
           All users
         </h2>
         {/* relative: keeps the sr-only labels inside the scroll area on narrow screens */}

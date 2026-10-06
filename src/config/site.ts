@@ -6,4 +6,6 @@
 export const SITE = {
   name: "Bagaicha Eco Resort",
   tagline: "Where nature meets comfort",
+  /** Intro line under the hero and default meta description (from the brochure). */
+  description: "A perfect escape in the heart of Bardiya",
 } as const;

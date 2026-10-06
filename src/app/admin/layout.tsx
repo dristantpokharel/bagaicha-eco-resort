@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="admin-shell flex min-h-full flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-forest/10 bg-white px-4 py-3 md:px-6">
-        <Link href="/admin" className="font-serif text-lg text-forest">
+        <Link href="/admin" className="font-display text-lg text-forest">
           {SITE.name}
         </Link>
         <div className="flex items-center gap-3">
