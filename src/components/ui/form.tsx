@@ -1,7 +1,8 @@
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
+// 16px on phones: smaller text makes iOS zoom the page when a field is focused.
 const control =
-  "block w-full rounded-md border border-charcoal/25 bg-white px-3 text-sm text-charcoal " +
+  "block w-full rounded-md border border-charcoal/25 bg-white px-3 text-base text-charcoal sm:text-sm " +
   "placeholder:text-charcoal-light focus-visible:border-forest focus-visible:outline-2 " +
   "focus-visible:outline-offset-0 focus-visible:outline-forest/40 " +
   "aria-[invalid=true]:border-error";

@@ -19,10 +19,10 @@ export type BookingEmailKind = "received" | "confirmed" | "cancelled";
 
 /** What happened, for the caller to report. Emails never roll back the booking. */
 export type NotifyOutcome = {
-  /** True when at least one email that should have gone out failed. */
-  failed: boolean;
-  /** True when the guest has no email address, so their email was skipped. */
-  guestSkipped: boolean;
+  /** The guest's email: "skipped" when they have no email address. */
+  guest: "sent" | "failed" | "skipped";
+  /** The alert to the resort team ("n/a" for kinds that don't send one). */
+  resort: "sent" | "failed" | "n/a";
 };
 
 export async function loadBookingEmailData(bookingId: string): Promise<BookingEmailData | null> {
@@ -91,17 +91,15 @@ async function deliver(
  */
 export async function notifyBooking(kind: BookingEmailKind, bookingId: string): Promise<NotifyOutcome> {
   const data = await loadBookingEmailData(bookingId);
-  if (!data) return { failed: true, guestSkipped: false };
+  if (!data) return { guest: "failed", resort: kind === "received" ? "failed" : "n/a" };
 
-  let failed = false;
-  const guestSkipped = !data.guestEmail;
-
+  let guest: NotifyOutcome["guest"] = "skipped";
   if (data.guestEmail) {
     const render = { received: requestReceivedEmail, confirmed: bookingConfirmedEmail, cancelled: bookingCancelledEmail }[kind];
-    const ok = await deliver(data.guestEmail, render(data), "Booking", bookingId, `guest.${kind}`);
-    failed ||= !ok;
+    guest = (await deliver(data.guestEmail, render(data), "Booking", bookingId, `guest.${kind}`)) ? "sent" : "failed";
   }
 
+  let resort: NotifyOutcome["resort"] = "n/a";
   if (kind === "received") {
     const alertTo = process.env.BOOKING_ALERT_TO?.trim();
     if (alertTo) {
@@ -112,13 +110,13 @@ export async function notifyBooking(kind: BookingEmailKind, bookingId: string): 
         bookingId,
         "resort.newRequest",
       );
-      failed ||= !ok;
+      resort = ok ? "sent" : "failed";
     } else {
       await logFailure("Booking", bookingId, "resort.newRequest", { ok: false, reason: "not-configured" });
-      failed = true;
+      resort = "failed";
     }
   }
-  return { failed, guestSkipped };
+  return { guest, resort };
 }
 
 export async function notifyNewEnquiry(enquiryId: string): Promise<boolean> {
