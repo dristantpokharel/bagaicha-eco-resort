@@ -32,26 +32,49 @@ Branch: `phase-4-inventory`. Not merged, pushed or deployed.
 An item is low when it is active, its threshold is above 0, and quantity is at or below the threshold. A threshold of 0 never alerts. "Out of stock" is a low item at exactly 0.
 
 ### Activity log entries
-`inventoryItem.created`, `.updated` (with from/to per changed field), `.archived`, `.activated`; `stock.received`, `stock.used`, `stock.adjusted` (item name, change, before, after, note). The Activity log *page* is still the Phase 1 stub, so these are in the database but not yet viewable in the admin.
+`inventoryItem.created`, `.updated` (with from/to per changed field), `.archived`, `.activated`; `stock.received`, `stock.used`, `stock.adjusted` (item name, change, before, after, note). Repeats of an already-saved submission are not logged twice.
+
+### Double-submit protection (de-duplication token)
+- Each record form attempt carries a random token (`submissionId`, unique in the database). The server checks it under the same row lock: a repeat returns "Already saved. Used 2 kg of Rice…" and adds **no** movement and **no** log entry.
+- The token is kept after a failure or a lost response, and cleared after a success, so the next entry is new.
+- If the request itself fails (flaky connection), the form shows "Couldn't reach the server, so we can't tell if this was saved… tap Record again: it won't be saved twice" instead of crashing.
+- A token already used for a different item or user is refused.
+- Opening stock on the create form doesn't use a token (an Admin creating an item once).
+
+### Activity log page (`/admin/activity`, Admin and Superuser)
+- Newest first, 50 per page, with the total.
+- Filters: **user** (including "System / website visitors"), **action**, **from** and **to** dates. The filters are in the URL, and dates use the resort's timezone (Asia/Kathmandu) with the "to" day included.
+- Columns: when, who, what, related item, details.
+- **Related to** links to the booking, inventory item, guest or room type. Rooms, blocks, enquiries and media link to their list pages. Users link to the Users page, only for Superusers. Removed or deleted things have no link.
+- **Guest contact details stay out:**
+  - the log never wrote them before (guest updates log field names only);
+  - this phase also stops booking edits from logging the text of special requests and internal notes; they now log only that the field was "edited";
+  - the page itself never shows keys such as email, phone, WhatsApp, password, token, special requests or internal notes, and replaces any value that looks like an email address or a phone number with `[hidden]`. This also covers entries written before the change.
+- Staff emails recorded when a user account is created or changed are hidden too, for the same reason.
 
 ### Database
-Migration `phase4_inventory_integrity`:
+Two migrations, both additive. Applied to the dev database.
+
+`phase4_inventory_integrity`:
 - `stock_movements.balanceAfter` (new, required; the table was empty).
 - CHECKs: quantity and threshold ≥ 0, unit cost ≥ 0, movement quantity never 0, `RECEIVED` > 0, `USED` < 0, balance ≥ 0.
 - Unique index on `lower(name)`.
 
-Applied to the dev database with `migrate dev`. No seed data: no fake items and no seeded categories.
+`phase4_movement_submission_id`: `stock_movements.submissionId` (nullable, unique) for the de-duplication token. `migrate dev` refused to run non-interactively in this session, so I wrote this small migration by hand and applied it with `migrate deploy`; `prisma migrate diff` then reported no difference between the database and the schema.
+
+No seed data: no fake items and no seeded categories. The category field suggests: Linen & housekeeping, Guest toiletries, Kitchen & food, Beverages, Cleaning supplies, Maintenance, Pool, Office (`src/config/inventory.ts`). It's still free text, so staff can type any other category.
 
 ## What I tested
 - `npm run typecheck`, `npm run lint`, `npm run build`: pass.
-- `npm test`: 82 pass (25 new: movement rules, decimals, whole-number units, low-stock boundaries, quantity formatting, item and movement schemas).
-- `npm run test:db` (opt-in, uses the dev database, removes only the rows it created): 8 pass.
+- `npm test`: 99 pass. New: movement rules, decimals, whole-number units, low-stock boundaries, quantity formatting, item and movement schemas (including the token), and for the Activity log the filters (Kathmandu day boundaries), contact hiding, labels and links.
+- `npm run test:db` (opt-in, uses the dev database, removes only the rows it created): 10 pass.
   - quantity, movement and activity entry are written together;
   - a failed `USED` leaves nothing behind;
   - two simultaneous uses of stock that covers one: exactly one succeeds;
   - quantity equals the sum of movements after a mix of concurrent operations;
   - archived items refuse movements, whole-number units refuse fractions;
-  - the CHECK constraints and the case-insensitive name index reject bad rows.
+  - the CHECK constraints and the case-insensitive name index reject bad rows;
+  - a repeated token is recorded once, even when three repeats arrive at the same moment, with one log entry; a token reused for another item is refused.
 - **Not tested by me:** the signed-in screens in a browser. I don't have your login, so the checklist below is yours to run.
 
 ## Signed-in checklist
@@ -74,11 +97,23 @@ Applied to the dev database with `migrate dev`. No seed data: no fake items and 
 3. **Record usage** on your phone (or a 390 px window): the fields don't zoom on focus, and tapping an item row selects it. Record Used 1, then Received 3, back to back.
 4. On an item page, record an **Adjusted** count with a note.
 
+### Activity log (Admin or Superuser)
+1. Open **Activity log**. After the inventory steps above you should see "Stock used", "Stock adjusted", "Inventory item created" and so on, newest first, each linking to its item.
+2. Filter by your own user, then by the action "Stock used", then by today's date. "Clear" resets them.
+3. Find a booking you edited earlier: special requests and internal notes show `[hidden]` or just "edited", and no email or phone number appears anywhere on the page.
+4. As Staff, open `/admin/activity` directly: you are sent to the forbidden page, and the nav has no Activity log item.
+
+### Double submit (any role, phone if you can)
+1. On the quick form, enter an amount, then switch your phone to flight mode and tap **Record**. You should see the "Couldn't reach the server…" message, not a crash.
+2. Turn the connection back on and tap **Record** again. It saves once. Check the item's history for a single row.
+3. Tap the button twice quickly: still one row.
+
 ### Anyone
 - Open the same item in two browser windows and record a use in both at once, for more than half the stock: one succeeds and the other is refused with the stock message.
 
 ## Placeholders and open questions
-- **Category suggestions** (Housekeeping, Kitchen, Beverages, Toiletries, Linen, Maintenance) in `src/config/inventory.ts` are dev suggestions for the category field, not data. Confirm or replace them.
-- **Double taps:** the Record button is disabled while saving, but there is no idempotency key. A flaky connection plus a second manual submit could log a movement twice. History shows it, and an `ADJUSTED` count fixes it. Say if you want a de-duplication token.
-- The Activity log page (to view these entries) is still a stub.
+- No dev placeholders remain in inventory: the category suggestions are the owner's list.
+- The token stops a *repeat of the same attempt*. If someone deliberately records the same usage twice (two separate form submissions), that is two movements, as it should be.
+- The Activity log hides values that merely look like phone numbers (9 or more digits). A long product code typed into a note could be shown as `[hidden]`. That errs on the safe side.
+- Entries made before this phase for booking edits may still hold the old free-text values in the database. The page never shows them. Tell me if you want them scrubbed, which would need a one-off migration.
 - `balanceAfter` is stored per movement, so history stays readable even if an old movement were ever corrected.
