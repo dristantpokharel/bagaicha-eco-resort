@@ -12,8 +12,8 @@ export type AdminSection = {
 /** Admin sections in nav order. Pages read their permission from here too. */
 export const ADMIN_SECTIONS = {
   dashboard: { href: "/admin", label: "Dashboard" },
-  bookings: { href: "/admin/bookings", label: "Bookings", permission: "bookings.manage", phase: 3 },
-  guests: { href: "/admin/guests", label: "Guests", permission: "bookings.manage", phase: 3 },
+  bookings: { href: "/admin/bookings", label: "Bookings", permission: "bookings.manage" },
+  guests: { href: "/admin/guests", label: "Guests", permission: "bookings.manage" },
   enquiries: { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries.manage" },
   rooms: { href: "/admin/rooms", label: "Rooms", permission: "rooms.manage", phase: 2 },
   media: { href: "/admin/media", label: "Media", permission: "media.manage", phase: 2 },
