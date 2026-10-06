@@ -5,8 +5,8 @@ const parse = (key: keyof typeof COLLECTIONS, data: Record<string, string>) => b
 
 describe("content schemas", () => {
   it("requires the title of an activity and turns blank optional fields into null", () => {
-    expect(parse("activities", { title: "" }).success).toBe(false);
-    const ok = parse("activities", { title: "Birdwatching", summary: "  ", duration: "" });
+    expect(parse("activities", { title: "", group: "AT_BAGAICHA" }).success).toBe(false);
+    const ok = parse("activities", { title: "Birdwatching", group: "AT_BAGAICHA", summary: "  ", duration: "" });
     expect(ok.success).toBe(true);
     if (ok.success) expect(ok.data).toMatchObject({ title: "Birdwatching", summary: null, duration: null, isActive: false });
   });
@@ -43,5 +43,25 @@ describe("content schemas", () => {
     const ok = parse("diningItems", { sectionId: "s1", name: "Thali", priceNpr: "1,200" });
     expect(ok.success && ok.data.priceNpr).toBe(1200);
     expect(parse("diningItems", { sectionId: "s1", name: "Thali", priceNpr: "-5" }).success).toBe(false);
+  });
+
+  it("activities need a group, split best-for and highlights into lists, and link a destination", () => {
+    expect(parse("activities", { title: "Jeep safari", group: "SPACE" }).success).toBe(false);
+    expect(parse("activities", { title: "Jeep safari" }).success).toBe(false);
+    const ok = parse("activities", {
+      title: "Jeep safari",
+      group: "DAY_TRIP",
+      bestFor: "Families\nBirders",
+      highlights: "Tigers\n\nRhinos",
+      destinationId: "abc123",
+      tip: "",
+    });
+    expect(ok.success).toBe(true);
+    if (ok.success) expect(ok.data).toMatchObject({ group: "DAY_TRIP", bestFor: ["Families", "Birders"], highlights: ["Tigers", "Rhinos"], destinationId: "abc123", tip: null });
+  });
+
+  it("allows an activity with no linked destination", () => {
+    const ok = parse("activities", { title: "Pickleball", group: "AT_BAGAICHA", destinationId: "" });
+    expect(ok.success && ok.data.destinationId).toBeNull();
   });
 });

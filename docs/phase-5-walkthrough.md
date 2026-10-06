@@ -114,6 +114,33 @@ Typecheck, lint, 124 tests (new: contact links, sitemap, robots, header/footer l
 - Until the FAQs are reviewed, `/faq` shows "will be added soon" in production.
 - Turnstile shows its widget on `/enquiry` and `/book` in development (existing behaviour).
 
+## Explore page rebuild
+Structure ported from the legacy experiences page; facts are not. Screenshots: `explore-desktop.jpg`, `explore-phone.jpg` (closed) and `explore-open-desktop.jpg`, `explore-open-phone.jpg` (every panel open) in `docs/phase-5-screenshots/`. Admin: `admin-media-flagged.jpg`, `admin-content-explore-activity.jpg`, `admin-dashboard-explore.jpg`.
+
+**Page:** a hero (landscape photo on desktop, portrait on phones, from Media), then three groups: **At Bagaicha** (Village Walks, Birdwatching, Pickleball, Chill Pool & outdoor relaxation), **Close by** (Krishnasaar blackbuck visit, Tharu village visit) and **Day trips, we can help arrange** (Bardiya National Park jeep safari and jungle walk, Karnali river). Each item is an accessible disclosure panel with photos, distance, duration, season, best time, best for, "what you might see", what to expect, how we help, tip and an "Ask us to arrange" button (to `/enquiry?type=STAY`, which starts the message with the activity name). The home page now lists only the At Bagaicha group, with a link to all experiences.
+
+**Content rules applied:** only durable facts (Krishnasaar as Nepal's only blackbuck habitat; tigers, rhinos and elephants in Bardiya National Park; river dolphins and crocodiles in the Karnali; Tharu culture). No counts, areas, years, "named after", "homestay", certified guides or included meals. Distances come only from the linked Nearby row (Krishnasaar ~5 km, Bardiya NP ~30 km, Karnali Bridge ~53 km). A new "Tharu village" Nearby row has a placeholder distance, and a nearby place without a confirmed distance is hidden on the live site. Everything uncertain (duration, season, best time, best for, what to expect, how we help) is a flagged placeholder.
+
+**Data (migration `explore_activity_details`):** Activity gains group, category, season, best for, "what you might see", how we help, tip, a nearby-destination link and an extra-photos table. Also a `SURROUNDINGS` gallery category, two Explore hero slots, and the Media flag below. All of it is editable in Content → Activities (extra photos use the same drag-to-reorder picker as rooms). "Chill Pool" and "Outdoor Relaxation" are merged into "Chill Pool & outdoor relaxation"; the old row is hidden, not deleted.
+
+**Media placeholder / rights flag:** any image can be flagged. Flagged images show a **DEV PLACEHOLDER** badge in development and are **hidden everywhere in production**: pages, galleries, the hero, Open Graph, structured data and every photo picker on the live site (the sitemap lists pages only). The Media library has a "Placeholder / rights unconfirmed" filter, a **Rights confirmed / final** tick-box that clears the flag (the box is required), and a "Mark as placeholder" button. All flagged images are listed on the dashboard Placeholders panel. The old filename-based mockup rule is gone; the wedding mockup is now an ordinary flagged image. Tested live: clearing without the tick is refused, clearing with it works, re-flagging works.
+
+**Photos uploaded and flagged:**
+- Placeholders: Tharu village (Adobe Stock watermark, not licensed), jeep safari (looks like a stock or edited image, likely not Bardiya), pickleball (looks AI-generated; confirm it is your court).
+- Rights unconfirmed: tiger, elephants, NP gate, Krishnasaar, jungle walk, birdwatching.
+- Left out: the caravan (shows another organisation's van). The NP gate file was really a WebP, handled automatically.
+- Alt text was written from viewing each image and is flagged for your review. The rhino and crocodile alt text says what is visible (a rhino beside a fence; a crocodile in a concrete enclosure), and the crocodile is only in the Surroundings gallery, not attached to the Karnali panel.
+
+**Placements applied (`place:photos`, dry run shown first):** Explore hero desktop = jungle walk, mobile = hero-vertical; each activity's primary photo; jeep safari extras (jeep, tiger, rhino, NP gate); Activities gallery gets the activity photos; Surroundings gets sunset, mustard field, tiger, rhino, elephants, crocodile. The script no longer touches the main homepage hero, because your own Media choice (garden) would have been replaced.
+
+**What the live site shows today:** most explore photos are flagged, so until you confirm them the live Explore page shows only the Karnali, rhino, chill pool and mobile hero photos (the desktop hero falls back to a plain forest band). Clearing flags in Media brings the rest back immediately.
+
+## Launch blockers (Phase 6)
+- Everything on the dashboard Placeholders panel, now including the flagged photos, the six Explore activity detail fields per activity, the Tharu distance, and the FAQs awaiting your review.
+- Confirm the Karnali panel's distance: it is linked to the "Karnali Bridge" row, which is the nearest listed place, not necessarily the river access point.
+- Village Walks still has no photo.
+- Photo alt text (you).
+
 ## Notes
 - Scripts that write straight to the database (`place:photos`, `seed:content`) don't refresh the website cache; it catches up within the hour, or immediately on any admin save.
 - Screenshots of every page, desktop and phone, are in `docs/phase-5-screenshots/` (JPEG, downscaled).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasPlaceholderIn, isPlaceholder, remainingPlaceholders } from "./placeholder";
+import { hasPlaceholderIn, isPlaceholder, mediaVisible, remainingPlaceholders } from "./placeholder";
 
 describe("placeholder flags", () => {
   const row = { placeholderFields: ["overview", "duration"] };
@@ -33,5 +33,11 @@ describe("placeholder flags", () => {
 
   it("flags nothing on create", () => {
     expect(remainingPlaceholders(null, { a: 1 }, ["a"])).toEqual([]);
+  });
+
+  it("hides flagged images in production but shows them in development", () => {
+    expect(mediaVisible({ isPlaceholder: true }, false)).toBe(false);
+    expect(mediaVisible({ isPlaceholder: true }, true)).toBe(true);
+    expect(mediaVisible({ isPlaceholder: false }, false)).toBe(true);
   });
 });

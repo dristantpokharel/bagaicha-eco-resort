@@ -41,6 +41,7 @@ export function MediaPhoto({
   className = "",
   imgClassName = "",
   preload = false,
+  compact = false,
   children,
 }: {
   media: MediaImageData & { isPlaceholder?: boolean; placeholderNote?: string | null };
@@ -48,12 +49,19 @@ export function MediaPhoto({
   className?: string;
   imgClassName?: string;
   preload?: boolean;
+  /** Small thumbnails: a short badge instead of the full note. */
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
   return (
     <div className={`${frame} ${className}`}>
       <MediaImage media={media} sizes={sizes} preload={preload} className={`object-cover ${imgClassName}`} />
-      {media.isPlaceholder && (
+      {media.isPlaceholder && compact && (
+        <span className="absolute top-1 left-1 bg-cream px-1.5 py-0.5 font-label text-[0.625rem] font-semibold text-warning uppercase">
+          Placeholder
+        </span>
+      )}
+      {media.isPlaceholder && !compact && (
         <Placeholder className="absolute top-3 right-3 left-3 sm:right-auto">
           {media.placeholderNote ?? "Placeholder / rights unconfirmed"}. Hidden on the live site.
         </Placeholder>

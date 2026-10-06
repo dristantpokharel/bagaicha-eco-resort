@@ -142,7 +142,7 @@ export function PlacementManager({
           {library.length === 0 ? "Upload images in the Library first." : "No images yet."}
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext id={headingId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={order.map((p) => p.placementId)} strategy={rectSortingStrategy}>
             <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-busy={pending}>
               {order.map((placement, index) => (

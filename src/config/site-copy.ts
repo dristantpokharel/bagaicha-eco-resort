@@ -100,6 +100,15 @@ export const PAGES = {
     description: "Local flavours, garden dining and warm hospitality at Bagaicha Eco Resort in Bardiya.",
   },
   explore: {
+    groups: {
+      AT_BAGAICHA: { heading: "At Bagaicha", line: "Things to enjoy without leaving the resort." },
+      CLOSE_BY: { heading: "Close by", line: "Short visits near the resort." },
+      DAY_TRIP: { heading: "Day trips", line: "We can help arrange these." },
+    },
+    planning: {
+      heading: "Tell us your dates and interests.",
+      line: "Tell us when you are coming and what you would like to see, and we will help you plan.",
+    },
     title: "Explore",
     heading: { strong: "Slow down,", soft: "explore the outdoors" },
     line: "Village walks, birdwatching, pickleball and more.",

@@ -6,7 +6,7 @@ import type { MediaImageData } from "@/components/media/media-image";
 import { CONTENT_TAG } from "./revalidate";
 import { loadStayTerms } from "./stay-terms";
 import { fillTokens, type TokenContext } from "./tokens";
-import { hasPlaceholderIn, liveValue, showPlaceholders } from "./placeholder";
+import { hasPlaceholderIn, liveValue, mediaVisible, showPlaceholders } from "./placeholder";
 
 /**
  * Every public page reads content through here: one cached read per kind, all
@@ -30,7 +30,7 @@ const mediaSelect = {
 type MediaRow = { url: string; altText: string; width: number; height: number; blurDataUrl: string | null; isPlaceholder: boolean; placeholderNote: string | null };
 
 /** Flagged images (stand-ins, rights unconfirmed) show with a badge in dev and are hidden everywhere in production. */
-const isShown = (m: { isPlaceholder: boolean }) => showPlaceholders || !m.isPlaceholder;
+const isShown = (m: { isPlaceholder: boolean }) => mediaVisible(m);
 const toPublicMedia = (m: MediaRow): PublicMedia => ({
   url: m.url,
   altText: m.altText,
@@ -116,7 +116,7 @@ export type PublicActivity = {
   howWeHelp: string | null;
   tip: string | null;
   /** Distance and travel time come only from the linked nearby destination. */
-  destination: { name: string; distance: string | null; travelTime: string | null } | null;
+  destination: { name: string; distance: string | null; travelTime: string | null; placeholder: boolean } | null;
   /** Primary photo first, then the extras in order (flagged images are already filtered out). */
   photos: PublicMedia[];
   /** The primary photo, for compact views. */
@@ -157,7 +157,12 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
         howWeHelp: liveValue<string>(r, "howWeHelp"),
         tip: liveValue<string>(r, "tip"),
         destination: d
-          ? { name: d.name, distance: liveValue<string>(d, "distance"), travelTime: liveValue<string>(d, "travelTime") }
+          ? {
+              name: d.name,
+              distance: liveValue<string>(d, "distance"),
+              travelTime: liveValue<string>(d, "travelTime"),
+              placeholder: showPlaceholders && (d.placeholderFields.includes("distance") || d.placeholderFields.includes("travelTime")),
+            }
           : null,
         photos,
         cover: photos[0] ?? null,

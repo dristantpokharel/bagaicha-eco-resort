@@ -8,7 +8,16 @@ import { TurnstileWidget } from "@/components/forms/turnstile-widget";
 import { submitEnquiry, type EnquiryState } from "@/app/(site)/enquiry/actions";
 import { ENQUIRY_TYPE_LABELS } from "@/lib/booking/labels";
 
-export function EnquiryForm({ defaultType, defaultCountryCode }: { defaultType: string; defaultCountryCode: string }) {
+export function EnquiryForm({
+  defaultType,
+  defaultCountryCode,
+  defaultMessage = "",
+}: {
+  defaultType: string;
+  defaultCountryCode: string;
+  /** Optional starting text, e.g. which activity the visitor asked about. */
+  defaultMessage?: string;
+}) {
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [state, action, pending] = useActionState<EnquiryState, FormData>(async (prev, formData) => {
@@ -74,7 +83,7 @@ export function EnquiryForm({ defaultType, defaultCountryCode }: { defaultType: 
         </Select>
       </Field>
       <Field id="message" label="Your message" error={errors?.message}>
-        <Textarea id="message" name="message" rows={6} required maxLength={3000} defaultValue={values?.message} className="text-base" {...a11y("message")} />
+        <Textarea id="message" name="message" rows={6} required maxLength={3000} defaultValue={values?.message ?? defaultMessage} className="text-base" {...a11y("message")} />
       </Field>
 
       <TurnstileWidget action="enquiry" resetKey={attempt} onReadyChange={setReady} />

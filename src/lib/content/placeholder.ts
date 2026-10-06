@@ -39,3 +39,8 @@ export function remainingPlaceholders(
   if (!previous) return [];
   return flagged.filter((field) => same(previous[field], next[field]));
 }
+
+/** Flagged images (stand-ins, rights unconfirmed) show in development only; production hides them everywhere. */
+export function mediaVisible(media: { isPlaceholder: boolean }, show: boolean = showPlaceholders): boolean {
+  return show || !media.isPlaceholder;
+}
