@@ -9,7 +9,7 @@ const DUMMY_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 afterEach(() => vi.unstubAllGlobals());
 
 function stubFetch(impl: () => Promise<Response>) {
-  const fn = vi.fn((...args: [string, RequestInit?]) => (args, impl()));
+  const fn = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(() => impl());
   vi.stubGlobal("fetch", fn);
   return fn;
 }
