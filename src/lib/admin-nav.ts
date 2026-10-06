@@ -18,7 +18,7 @@ export const ADMIN_SECTIONS = {
   rooms: { href: "/admin/rooms", label: "Rooms", permission: "rooms.manage", phase: 2 },
   media: { href: "/admin/media", label: "Media", permission: "media.manage", phase: 2 },
   content: { href: "/admin/content", label: "Content", permission: "content.manage", phase: 5 },
-  inventory: { href: "/admin/inventory", label: "Inventory", permission: "inventory.recordMovements", phase: 4 },
+  inventory: { href: "/admin/inventory", label: "Inventory", permission: "inventory.recordMovements" },
   activityLog: { href: "/admin/activity", label: "Activity log", permission: "activityLog.view" },
   users: { href: "/admin/users", label: "Users", permission: "users.manage" },
   profile: { href: "/admin/profile", label: "Your profile" },

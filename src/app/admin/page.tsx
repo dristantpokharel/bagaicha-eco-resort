@@ -5,11 +5,15 @@ import { addDays, formatStayDate, nightsBetween } from "@/lib/booking/dates";
 import { todayInResort } from "@/lib/dates";
 import { PageHeader } from "@/components/admin/page-header";
 import { ContactPhone } from "@/components/admin/contact-phone";
+import { StockBadge } from "@/components/admin/stock-badge";
 import { buttonClasses } from "@/components/ui/button";
+import { listLowStockItems } from "@/lib/inventory/queries";
+import { formatQuantityWithUnit } from "@/lib/inventory/stock";
 
 export const metadata = { title: "Dashboard" };
 
 const UPCOMING_DAYS = 14;
+const LOW_STOCK_SHOWN = 10;
 
 const guestSelect = { select: { id: true, name: true, phone: true } } as const;
 const stayInclude = {
@@ -30,8 +34,10 @@ export default async function AdminDashboardPage() {
   const user = await requirePageUser();
   const canBookings = can(user.role, "bookings.manage");
   const canEnquiries = can(user.role, "enquiries.manage");
+  const canInventory = can(user.role, "inventory.recordMovements");
   const today = todayInResort();
   const now = new Date();
+  const lowStock = canInventory ? await listLowStockItems() : [];
 
   const [arrivals, departures, pending, pendingCount, upcoming, newEnquiries] = canBookings
     ? await Promise.all([
@@ -96,6 +102,35 @@ export default async function AdminDashboardPage() {
         </div>
       ) : null}
 
+      {canInventory && (
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Widget
+            title="Low stock"
+            count={lowStock.length}
+            empty="Nothing is running low."
+            footer={
+              <Link href="/admin/inventory?low=1" className="text-forest underline underline-offset-4">
+                {lowStock.length > LOW_STOCK_SHOWN ? `See all ${lowStock.length} low-stock items` : "Open inventory"}
+              </Link>
+            }
+          >
+            {lowStock.slice(0, LOW_STOCK_SHOWN).map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <Link href={`/admin/inventory/${item.id}`} className="font-medium text-forest underline-offset-4 hover:underline">
+                  {item.name}
+                </Link>
+                <span className="flex items-center gap-2">
+                  <StockBadge item={item} />
+                  <span className="whitespace-nowrap tabular-nums">
+                    {formatQuantityWithUnit(item.quantity, item.unit)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </Widget>
+        </div>
+      )}
+
       <div className="mt-6 flex flex-wrap gap-3">
         {canBookings && (
           <>
@@ -107,13 +142,17 @@ export default async function AdminDashboardPage() {
             </Link>
           </>
         )}
+        {canInventory && (
+          <Link href="/admin/inventory/record" className={buttonClasses({ variant: "secondary" })}>
+            Record stock
+          </Link>
+        )}
         {canEnquiries && (
           <Link href="/admin/enquiries?status=NEW" className={buttonClasses({ variant: "secondary" })}>
             New enquiries ({newEnquiries})
           </Link>
         )}
       </div>
-      <p className="mt-6 text-sm text-charcoal-light">Low-stock items will appear here in Phase 4.</p>
     </>
   );
 }
