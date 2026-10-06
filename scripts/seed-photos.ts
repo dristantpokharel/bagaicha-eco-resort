@@ -46,6 +46,11 @@ const SKIP: Record<string, string> = {
 /** Illustrations stay PNG (sharp edges, text); everything else becomes JPEG. */
 const KEEP_PNG = new Set(["Bagaicha-MAP.png", "location-QR-code.png"]);
 
+/** Fixed alt text instead of the filename draft. The mockup must never pass as a real event photo. */
+const ALT_OVERRIDES: Record<string, string> = {
+  "wedding-mock.png": "Placeholder – wedding mockup",
+};
+
 const dryRun = process.argv.includes("--dry-run");
 
 type Prepared = {
@@ -116,7 +121,7 @@ async function prepare(file: string, workDir: string): Promise<Prepared> {
   return {
     file,
     publicId: `${MEDIA_FOLDER}/seed/${slug(basename(file, extname(file)))}`,
-    altDraft: altFromFilename(file),
+    altDraft: ALT_OVERRIDES[file] ?? altFromFilename(file),
     buffer: result.data,
     format,
     width: result.info.width,

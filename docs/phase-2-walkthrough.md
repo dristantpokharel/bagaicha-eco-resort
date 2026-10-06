@@ -53,7 +53,7 @@ Branch: `phase-2-rooms-media`, created from `phase-1.5-design` because Phase 1.5
   - sharp then applies EXIF rotation, fits each photo within 2560 px, and strips all metadata, including any GPS location.
   - Maps and the QR code stay PNG; photos become JPEG.
 - Alt text is a draft made from the filename (for example "Family room 1") and is flagged for review.
-- Skipped: `night-farmhouse.jpg` (your request) and `brochure-front-page-vertical.png` (you said it's a brochure reference, not a website photo). `wedding-mock.png` **is** included, with draft alt "Wedding mock", so review it and keep it out of real event placements. Edit the `SKIP` list at the top of the script to change this.
+- Skipped: `night-farmhouse.jpg` (your request) and `brochure-front-page-vertical.png` (you said it's a brochure reference, not a website photo). `wedding-mock.png` **is** included, with fixed alt text "Placeholder – wedding mockup" so it's never mistaken for a real photo. Edit the `SKIP` list at the top of the script to change this.
 
 ### Infrastructure
 - Migration `media_alt_review` (applied to the dev database) adds `altNeedsReview`, `format`, `bytes` and `originalFilename` to `media`. Existing images with alt text are marked reviewed.
@@ -115,10 +115,10 @@ Branch: `phase-2-rooms-media`, created from `phase-1.5-design` because Phase 1.5
 
 ## Notes and limits
 - The library and the picker load every image, with no pagination. That's fine for hundreds of photos; we can add paging if the library grows much larger.
-- Homepage slots don't limit how many photos each slot holds. Phase 5 decides how each slot uses them (for example, the hero uses the first).
+- Homepage slots hold several photos; Phase 5 uses the first in each slot.
 - Phase 3: confirming a booking must also check the room is still active, because archiving a room and confirming a booking could happen at the same time. Login rate limiting is also planned for Phase 3; the password-change form doesn't have its own rate limit yet.
 - The public pages don't use any of this data yet (Phase 5).
 
-## Open questions
-1. OK to skip `brochure-front-page-vertical.png` in the seed and include `wedding-mock.png` (flagged)?
-2. Should a homepage slot be limited to one photo (for example, the hero), or allow several?
+## Decisions (owner)
+1. The seed skips `brochure-front-page-vertical.png` and keeps `wedding-mock.png` with alt text "Placeholder – wedding mockup".
+2. Homepage slots allow several photos; Phase 5 uses the first. Reordering swaps the hero.
