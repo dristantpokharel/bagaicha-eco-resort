@@ -195,11 +195,13 @@ export async function updateBooking(_prev: ActionResult | null, formData: FormDa
         } satisfies Prisma.BookingUncheckedUpdateInput;
 
         const serialize = (v: unknown) => (v instanceof Date ? toDateOnlyString(v) : v);
-        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        // Free text typed about a guest: the log records that it changed, never the text.
+        const FREE_TEXT: readonly string[] = ["specialRequests", "internalNotes"];
+        const changes: Record<string, { from: unknown; to: unknown } | "edited"> = {};
         for (const key of Object.keys(next) as (keyof typeof next)[]) {
           const from = serialize(before[key]);
           const to = serialize(next[key]);
-          if (from !== to) changes[key] = { from, to };
+          if (from !== to) changes[key] = FREE_TEXT.includes(key) ? "edited" : { from, to };
         }
         if (Object.keys(changes).length === 0) {
           message = "No changes to save.";

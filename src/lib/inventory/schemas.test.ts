@@ -58,8 +58,7 @@ describe("recordMovementSchema", () => {
     expect(recordMovementSchema.safeParse({ ...base, type: "ADJUSTED", note: "Broken jars" }).success).toBe(true);
   });
   it("requires a well-formed submission token", () => {
-    const { submissionId: _omit, ...without } = base;
-    expect(recordMovementSchema.safeParse({ ...without, type: "USED" }).success).toBe(false);
+    expect(recordMovementSchema.safeParse({ itemId: "abc", quantity: "2", type: "USED" }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "short" }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "x".repeat(65) }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "USED", submissionId: "has spaces in it, not ok!" }).success).toBe(false);
