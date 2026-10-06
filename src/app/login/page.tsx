@@ -32,6 +32,9 @@ export default async function LoginPage({
           {reason === "session-ended" && (
             <FormMessage type="error">Your session has ended. Please sign in again.</FormMessage>
           )}
+          {reason === "password-changed" && (
+            <FormMessage type="success">Password changed. Please sign in with your new password.</FormMessage>
+          )}
           <LoginForm callbackUrl={target} />
         </div>
       </div>

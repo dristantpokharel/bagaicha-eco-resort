@@ -8,11 +8,11 @@ import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/schemas";
 import type { ActionResult } from "@/lib/actions";
 import type { Role } from "@/generated/prisma/enums";
-import { changeRole, resetPassword, setActive } from "./actions";
+import { changeRole, resetPassword, setActive, updateUserDetails } from "./actions";
 import { ASSIGNABLE_ROLES } from "./schemas";
 
 type Props = {
-  user: { id: string; name: string; role: Role; isActive: boolean };
+  user: { id: string; name: string; email: string; role: Role; isActive: boolean };
   isSelf: boolean;
 };
 
@@ -21,6 +21,11 @@ export function UserRowActions({ user, isSelf }: Props) {
   const [activeResult, activeAction, activePending] = useActionState<ActionResult | null, FormData>(setActive, null);
   const [resetResult, resetAction, resetPending] = useActionState<ActionResult | null, FormData>(resetPassword, null);
   const resetError = resetResult && !resetResult.ok ? resetResult.fieldErrors?.password : undefined;
+  const [detailsResult, detailsAction, detailsPending] = useActionState<ActionResult | null, FormData>(
+    updateUserDetails,
+    null,
+  );
+  const detailsErrors = detailsResult && !detailsResult.ok ? detailsResult.fieldErrors : undefined;
 
   return (
     <div className="space-y-2">
@@ -55,6 +60,49 @@ export function UserRowActions({ user, isSelf }: Props) {
         )}
       </div>
 
+      {!isSelf && (
+        <details className="group">
+          <summary className="cursor-pointer text-sm text-forest underline-offset-2 hover:underline">
+            Edit name &amp; email
+          </summary>
+          <form action={detailsAction} className="mt-2 flex flex-wrap items-start gap-2" noValidate>
+            <input type="hidden" name="userId" value={user.id} />
+            <div>
+              <label htmlFor={`details-name-${user.id}`} className="sr-only">
+                Name for {user.name}
+              </label>
+              <Input
+                id={`details-name-${user.id}`}
+                name="name"
+                defaultValue={user.name}
+                maxLength={100}
+                className="h-8 w-44"
+                aria-invalid={detailsErrors?.name ? true : undefined}
+              />
+              {detailsErrors?.name && <p className="mt-1 text-xs text-error">{detailsErrors.name}</p>}
+            </div>
+            <div>
+              <label htmlFor={`details-email-${user.id}`} className="sr-only">
+                Email for {user.name}
+              </label>
+              <Input
+                id={`details-email-${user.id}`}
+                name="email"
+                type="email"
+                defaultValue={user.email}
+                autoComplete="off"
+                className="h-8 w-56"
+                aria-invalid={detailsErrors?.email ? true : undefined}
+              />
+              {detailsErrors?.email && <p className="mt-1 text-xs text-error">{detailsErrors.email}</p>}
+            </div>
+            <Button type="submit" variant="secondary" size="sm" disabled={detailsPending}>
+              {detailsPending ? "Saving…" : "Save details"}
+            </Button>
+          </form>
+        </details>
+      )}
+
       <details className="group">
         <summary className="cursor-pointer text-sm text-forest underline-offset-2 hover:underline">
           Reset password
@@ -82,6 +130,7 @@ export function UserRowActions({ user, isSelf }: Props) {
         {resetError && <p className="mt-1 text-xs text-error">{resetError}</p>}
       </details>
 
+      <ActionMessage result={detailsResult} />
       <ActionMessage result={roleResult} />
       <ActionMessage result={activeResult} />
       {!resetError && <ActionMessage result={resetResult} />}

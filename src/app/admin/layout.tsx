@@ -25,10 +25,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {SITE.name}
         </Link>
         <div className="flex items-center gap-3">
-          <div className="text-right text-sm leading-tight">
-            <p className="font-medium text-charcoal">{user.name}</p>
-            <p className="text-xs text-charcoal-light">{ROLE_LABELS[user.role]}</p>
-          </div>
+          <Link
+            href="/admin/profile"
+            className="rounded-sm text-right text-sm leading-tight focus-visible:outline-2 focus-visible:outline-forest"
+          >
+            <span className="block font-medium text-charcoal underline-offset-2 hover:underline">{user.name}</span>
+            <span className="block text-xs text-charcoal-light">{ROLE_LABELS[user.role]}</span>
+          </Link>
           <form action={signOutAction}>
             <Button type="submit" variant="secondary" size="sm">
               Sign out

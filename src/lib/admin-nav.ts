@@ -21,6 +21,7 @@ export const ADMIN_SECTIONS = {
   inventory: { href: "/admin/inventory", label: "Inventory", permission: "inventory.recordMovements", phase: 4 },
   activityLog: { href: "/admin/activity", label: "Activity log", permission: "activityLog.view" },
   users: { href: "/admin/users", label: "Users", permission: "users.manage" },
+  profile: { href: "/admin/profile", label: "Your profile" },
 } as const satisfies Record<string, AdminSection>;
 
 export type AdminSectionKey = keyof typeof ADMIN_SECTIONS;

@@ -7,7 +7,13 @@ import { requirePermission } from "@/lib/auth";
 import { hashPassword } from "@/lib/auth/password";
 import { logActivity } from "@/lib/activity-log";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
-import { changeRoleSchema, createUserSchema, resetPasswordSchema, setActiveSchema } from "./schemas";
+import {
+  changeRoleSchema,
+  createUserSchema,
+  resetPasswordSchema,
+  setActiveSchema,
+  updateDetailsSchema,
+} from "./schemas";
 
 const USERS_PATH = "/admin/users";
 
@@ -136,5 +142,42 @@ export async function resetPassword(_prev: ActionResult | null, formData: FormDa
 
     revalidatePath(USERS_PATH);
     return { ok: true, message: "Password reset. Existing sessions for this user were signed out." };
+  });
+}
+
+/** Superusers can correct another user's name and email. Own details are edited on the profile page. */
+export async function updateUserDetails(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("users.manage");
+    const input = parseForm(updateDetailsSchema, formData);
+    if (input.userId === actor.id) throw new ActionError("Edit your own name on your profile page.");
+
+    try {
+      const changed = await db.$transaction(async (tx) => {
+        const target = await findTarget(tx, input.userId);
+        const details: Record<string, { from: string; to: string }> = {};
+        if (target.name !== input.name) details.name = { from: target.name, to: input.name };
+        if (target.email !== input.email) details.email = { from: target.email, to: input.email };
+        if (Object.keys(details).length === 0) return false;
+
+        await tx.user.update({ where: { id: target.id }, data: { name: input.name, email: input.email } });
+        await logActivity(tx, {
+          userId: actor.id,
+          action: "user.details_changed",
+          entityType: "User",
+          entityId: target.id,
+          details,
+        });
+        return true;
+      });
+
+      revalidatePath(USERS_PATH);
+      return { ok: true, message: changed ? "Details saved." : "Nothing changed." };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ActionError("Another user already has this email.", { email: "Already in use." });
+      }
+      throw error;
+    }
   });
 }

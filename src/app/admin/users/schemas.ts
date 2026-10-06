@@ -27,3 +27,9 @@ export const resetPasswordSchema = z.object({
   userId,
   password: newPasswordSchema,
 });
+
+export const updateDetailsSchema = z.object({
+  userId,
+  name: z.string().trim().min(1, { error: "Enter a name." }).max(100),
+  email: emailSchema,
+});

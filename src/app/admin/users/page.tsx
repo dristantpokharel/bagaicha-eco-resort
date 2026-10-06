@@ -39,11 +39,21 @@ export default async function UsersPage() {
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-forest/10 text-xs uppercase tracking-wide text-charcoal-light">
               <tr>
-                <th scope="col" className="py-2 pr-4 font-medium">User</th>
-                <th scope="col" className="py-2 pr-4 font-medium">Role</th>
-                <th scope="col" className="py-2 pr-4 font-medium">Status</th>
-                <th scope="col" className="py-2 pr-4 font-medium">Last sign-in</th>
-                <th scope="col" className="py-2 font-medium">Actions</th>
+                <th scope="col" className="py-2 pr-4 font-medium">
+                  User
+                </th>
+                <th scope="col" className="py-2 pr-4 font-medium">
+                  Role
+                </th>
+                <th scope="col" className="py-2 pr-4 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="py-2 pr-4 font-medium">
+                  Last sign-in
+                </th>
+                <th scope="col" className="py-2 font-medium">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-forest/10">
@@ -69,7 +79,14 @@ export default async function UsersPage() {
                     </td>
                     <td className="py-3">
                       <UserRowActions
-                        user={{ id: user.id, name: user.name, role: user.role, isActive: user.isActive }}
+                        key={`${user.name}:${user.email}`}
+                        user={{
+                          id: user.id,
+                          name: user.name,
+                          email: user.email,
+                          role: user.role,
+                          isActive: user.isActive,
+                        }}
                         isSelf={isSelf}
                       />
                     </td>
