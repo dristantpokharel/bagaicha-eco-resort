@@ -471,14 +471,16 @@ model InventoryItem {
 }
 
 model StockMovement {
-  id        String            @id @default(cuid())
-  itemId    String
-  type      StockMovementType
+  id           String            @id @default(cuid())
+  itemId       String
+  type         StockMovementType
   /// Signed change applied to the item: RECEIVED > 0, USED < 0, ADJUSTED either.
-  quantity  Decimal           @db.Decimal(10, 2)
-  note      String?
-  userId    String
-  createdAt DateTime          @default(now())
+  quantity     Decimal           @db.Decimal(10, 2)
+  /// The item's quantity right after this movement was applied.
+  balanceAfter Decimal           @db.Decimal(10, 2)
+  note         String?
+  userId       String
+  createdAt    DateTime          @default(now())
 
   item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
   user User          @relation(fields: [userId], references: [id], onDelete: Restrict)
