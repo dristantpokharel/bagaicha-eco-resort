@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createItemSchema, recordMovementSchema, updateItemSchema } from "./schemas";
+import { createItemSchema, recordMovementSchema, transferStockSchema, updateItemSchema, writeOffStockSchema } from "./schemas";
 
 const item = { name: "Basmati rice", category: "Kitchen", unit: "kg" };
 
@@ -67,5 +67,48 @@ describe("recordMovementSchema", () => {
     expect(recordMovementSchema.safeParse({ ...base, type: "STOLEN" }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "USED", quantity: "" }).success).toBe(false);
     expect(recordMovementSchema.safeParse({ ...base, type: "USED", quantity: "-1" }).success).toBe(false);
+  });
+});
+
+describe("item usage flags", () => {
+  it("reads ticked checkboxes as true and missing ones as false", () => {
+    expect(createItemSchema.parse({ ...item }).isConsumable).toBe(false);
+    expect(createItemSchema.parse({ ...item, isConsumable: "on", isFixedInRoom: "on" })).toMatchObject({
+      isConsumable: true,
+      isFixedInRoom: true,
+    });
+  });
+});
+
+const token = "0123456789abcdef-token";
+
+describe("transferStockSchema", () => {
+  const base = { itemId: "i1", submissionId: token, fromLocationId: "a", toLocationId: "b", quantity: "2" };
+
+  it("accepts a move and defaults a blank note to null", () => {
+    expect(transferStockSchema.parse({ ...base, note: "" })).toMatchObject({ quantity: "2", note: null });
+  });
+
+  it("needs both places and a sensible amount", () => {
+    expect(transferStockSchema.safeParse({ ...base, toLocationId: "" }).success).toBe(false);
+    expect(transferStockSchema.safeParse({ ...base, fromLocationId: "" }).success).toBe(false);
+    expect(transferStockSchema.safeParse({ ...base, quantity: "-1" }).success).toBe(false);
+    expect(transferStockSchema.safeParse({ ...base, quantity: "1.234" }).success).toBe(false);
+    expect(transferStockSchema.safeParse({ ...base, submissionId: "x" }).success).toBe(false);
+  });
+});
+
+describe("writeOffStockSchema", () => {
+  const base = { itemId: "i1", submissionId: token, kind: "LOST", fromLocationId: "a", quantity: "1", note: "Guest took it" };
+
+  it("accepts lost or damaged with a note", () => {
+    expect(writeOffStockSchema.parse(base).kind).toBe("LOST");
+    expect(writeOffStockSchema.parse({ ...base, kind: "DAMAGED" }).kind).toBe("DAMAGED");
+  });
+
+  it("requires a note and a valid kind", () => {
+    expect(writeOffStockSchema.safeParse({ ...base, note: "" }).success).toBe(false);
+    expect(writeOffStockSchema.safeParse({ ...base, note: "   " }).success).toBe(false);
+    expect(writeOffStockSchema.safeParse({ ...base, kind: "STOLEN" }).success).toBe(false);
   });
 });

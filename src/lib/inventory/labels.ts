@@ -4,4 +4,7 @@ export const MOVEMENT_LABELS: Record<StockMovementType, string> = {
   RECEIVED: "Received",
   USED: "Used",
   ADJUSTED: "Adjusted",
+  TRANSFERRED: "Moved",
+  LOST: "Lost",
+  DAMAGED: "Damaged",
 };

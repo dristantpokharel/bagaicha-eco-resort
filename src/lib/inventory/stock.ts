@@ -68,6 +68,9 @@ export function applyMovement(params: {
       if (delta.isZero()) fail(`The count matches the current stock (${formatQuantityWithUnit(current, unit)}). Nothing to adjust.`);
       return { delta, balanceAfter: amount };
     }
+    default:
+      // Moves and write-offs have their own functions (transferStock, writeOffStock).
+      throw new Error(`applyMovement does not handle ${type}`);
   }
 }
 

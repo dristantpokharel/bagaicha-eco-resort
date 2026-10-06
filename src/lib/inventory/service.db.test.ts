@@ -15,6 +15,10 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
   const tag = `zz-test-${Date.now().toString(36)}`;
   let db: typeof import("@/lib/db").db;
   let record: typeof import("./service").recordStockMovement;
+  let transfer: typeof import("./service").transferStock;
+  let writeOff: typeof import("./service").writeOffStock;
+  let storeId: string;
+  let laundryId: string;
   let userId: string;
   const itemIds: string[] = [];
 
@@ -35,7 +39,9 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
 
   beforeAll(async () => {
     ({ db } = await import("@/lib/db"));
-    ({ recordStockMovement: record } = await import("./service"));
+    ({ recordStockMovement: record, transferStock: transfer, writeOffStock: writeOff } = await import("./service"));
+    storeId = (await db.stockLocation.findFirstOrThrow({ where: { kind: "STORE" } })).id;
+    laundryId = (await db.stockLocation.findFirstOrThrow({ where: { kind: "LAUNDRY" } })).id;
     const user = await db.user.create({
       data: { name: "Inventory test", email: `${tag}@example.test`, passwordHash: "x", role: "STAFF" },
     });
@@ -46,6 +52,7 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
     if (!db) return;
     await db.activityLog.deleteMany({ where: { OR: [{ userId }, { entityId: { in: itemIds } }] } });
     await db.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } });
+    await db.stockBalance.deleteMany({ where: { itemId: { in: itemIds } } });
     await db.inventoryItem.deleteMany({ where: { id: { in: itemIds } } });
     await db.user.delete({ where: { id: userId } });
     await db.$disconnect();
@@ -154,5 +161,150 @@ describe.skipIf(!enabled)("stock movements against the database", { timeout: 60_
     await expect(
       db.inventoryItem.create({ data: { name: `${tag}-DUP`, category: "Test", unit: "kg" } }),
     ).rejects.toThrow();
+  });
+
+  describe("reusable items by location", () => {
+    async function makeReusable(suffix: string, stock = "10") {
+      const item = await db.inventoryItem.create({
+        data: { name: `${tag}-r-${suffix}`, category: "Test", unit: "pcs", isConsumable: false },
+      });
+      itemIds.push(item.id);
+      if (Number(stock) > 0) await move(item.id, "RECEIVED", stock);
+      return item.id;
+    }
+    const send = (itemId: string, from: string, to: string, amount: string, submissionId?: string) =>
+      db.$transaction((tx) =>
+        transfer(tx, { itemId, userId, fromLocationId: from, toLocationId: to, amount, note: null, submissionId }),
+      );
+    const lose = (itemId: string, kind: "LOST" | "DAMAGED", from: string, amount: string, note: string | null) =>
+      db.$transaction((tx) => writeOff(tx, { itemId, userId, kind, fromLocationId: from, amount, note }));
+    const balances = async (itemId: string) =>
+      Object.fromEntries(
+        (await db.stockBalance.findMany({ where: { itemId } })).map((b) => [b.locationId, b.quantity.toString()]),
+      );
+    const total = async (itemId: string) => (await db.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantity.toString();
+
+    it("puts deliveries in the Store and keeps the total equal to the balances", async () => {
+      const id = await makeReusable("recv", "10");
+      expect(await balances(id)).toEqual({ [storeId]: "10" });
+      expect(await total(id)).toBe("10");
+    });
+
+    it("moves stock between places without changing the total", async () => {
+      const id = await makeReusable("move", "10");
+      await send(id, storeId, laundryId, "4");
+      expect(await balances(id)).toEqual({ [storeId]: "6", [laundryId]: "4" });
+      expect(await total(id)).toBe("10");
+
+      const moved = await db.stockMovement.findFirstOrThrow({ where: { itemId: id, type: "TRANSFERRED" } });
+      expect(moved.quantity.toString()).toBe("4");
+      expect(moved.balanceAfter.toString()).toBe("10");
+      expect(moved.fromLocationId).toBe(storeId);
+      expect(moved.toLocationId).toBe(laundryId);
+
+      // The total is the sum of every movement except moves.
+      const sum = await db.stockMovement.aggregate({ where: { itemId: id, type: { not: "TRANSFERRED" } }, _sum: { quantity: true } });
+      expect(sum._sum.quantity!.toString()).toBe("10");
+    });
+
+    it("refuses to move more than a place holds, or to the same place, and changes nothing", async () => {
+      const id = await makeReusable("short", "3");
+      await expect(send(id, storeId, laundryId, "3.5")).rejects.toThrow();
+      await expect(send(id, storeId, laundryId, "4")).rejects.toThrow(/Only 3 pcs at Store/);
+      await expect(send(id, laundryId, storeId, "1")).rejects.toThrow(/Only 0 pcs at Laundry/);
+      await expect(send(id, storeId, storeId, "1")).rejects.toThrow(/two different places/);
+      expect(await balances(id)).toEqual({ [storeId]: "3" });
+      expect(await db.stockMovement.count({ where: { itemId: id, type: "TRANSFERRED" } })).toBe(0);
+    });
+
+    it("lets only one of two simultaneous moves win when stock covers one", async () => {
+      const id = await makeReusable("race", "5");
+      const results = await Promise.allSettled([send(id, storeId, laundryId, "4"), send(id, storeId, laundryId, "4")]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect(await balances(id)).toEqual({ [storeId]: "1", [laundryId]: "4" });
+      expect(await total(id)).toBe("5");
+    });
+
+    it("writes off lost or damaged stock from one place and lowers the total", async () => {
+      const id = await makeReusable("lost", "10");
+      await send(id, storeId, laundryId, "3");
+      await lose(id, "DAMAGED", laundryId, "1", "Torn in the wash");
+      await lose(id, "LOST", storeId, "2", "Guest took it");
+      expect(await balances(id)).toEqual({ [storeId]: "5", [laundryId]: "2" });
+      expect(await total(id)).toBe("7");
+
+      const damaged = await db.stockMovement.findFirstOrThrow({ where: { itemId: id, type: "DAMAGED" } });
+      expect(damaged.quantity.toString()).toBe("-1");
+      expect(damaged.balanceAfter.toString()).toBe("9");
+      expect(damaged.note).toBe("Torn in the wash");
+      const sum = await db.stockMovement.aggregate({ where: { itemId: id, type: { not: "TRANSFERRED" } }, _sum: { quantity: true } });
+      expect(sum._sum.quantity!.toString()).toBe("7");
+    });
+
+    it("needs a note and enough stock to write off", async () => {
+      const id = await makeReusable("lost-rules", "2");
+      await expect(lose(id, "LOST", storeId, "1", null)).rejects.toThrow(/Say what happened/);
+      await expect(lose(id, "LOST", storeId, "1", "   ")).rejects.toThrow(/Say what happened/);
+      await expect(lose(id, "LOST", storeId, "3", "Gone")).rejects.toThrow(/Only 2 pcs at Store/);
+      expect(await total(id)).toBe("2");
+    });
+
+    it("counts one place at a time and adjusts the total by the difference", async () => {
+      const id = await makeReusable("count", "10");
+      await send(id, storeId, laundryId, "4");
+      await db.$transaction((tx) =>
+        record(tx, { itemId: id, userId, type: "ADJUSTED", amount: "3", note: "Recount", locationId: laundryId }),
+      );
+      expect(await balances(id)).toEqual({ [storeId]: "6", [laundryId]: "3" });
+      expect(await total(id)).toBe("9");
+      // Counting with no place means the Store.
+      await move(id, "ADJUSTED", "8", "Recount");
+      expect(await balances(id)).toEqual({ [storeId]: "8", [laundryId]: "3" });
+      expect(await total(id)).toBe("11");
+    });
+
+    it("keeps reusable and consumable rules apart", async () => {
+      const reusable = await makeReusable("rules", "5");
+      await expect(move(reusable, "USED", "1")).rejects.toThrow(/reusable/);
+      const consumable = await makeItem("r-rules-cons", "pcs", "5");
+      await expect(send(consumable, storeId, laundryId, "1")).rejects.toThrow(/consumable/);
+      await expect(lose(consumable, "LOST", storeId, "1", "x")).rejects.toThrow(/consumable/);
+    });
+
+    it("records a repeated move once", async () => {
+      const id = await makeReusable("dedupe", "10");
+      const token = `${tag}-move-token`;
+      const first = await send(id, storeId, laundryId, "2", token);
+      const again = await send(id, storeId, laundryId, "2", token);
+      expect(first.duplicate).toBe(false);
+      expect(again.duplicate).toBe(true);
+      expect(await balances(id)).toEqual({ [storeId]: "8", [laundryId]: "2" });
+    });
+
+    it("has CHECK constraints behind the location rules", async () => {
+      const id = await makeReusable("loc-checks", "5");
+      await expect(db.stockBalance.update({ where: { itemId_locationId: { itemId: id, locationId: storeId } }, data: { quantity: "-1" } })).rejects.toThrow();
+      const base = { itemId: id, userId, balanceAfter: "5" };
+      await expect(db.stockMovement.create({ data: { ...base, type: "TRANSFERRED", quantity: "1" } })).rejects.toThrow();
+      await expect(
+        db.stockMovement.create({ data: { ...base, type: "TRANSFERRED", quantity: "1", fromLocationId: storeId, toLocationId: storeId } }),
+      ).rejects.toThrow();
+      await expect(db.stockMovement.create({ data: { ...base, type: "LOST", quantity: "-1" } })).rejects.toThrow();
+      await expect(
+        db.stockMovement.create({ data: { ...base, type: "DAMAGED", quantity: "1", fromLocationId: storeId } }),
+      ).rejects.toThrow();
+      // Only one Store and one Laundry may exist, and a room location needs a room.
+      await expect(db.stockLocation.create({ data: { kind: "STORE" } })).rejects.toThrow();
+      await expect(db.stockLocation.create({ data: { kind: "ROOM" } })).rejects.toThrow();
+    });
+
+    it("never leaves a reusable item whose total differs from its balances", async () => {
+      const { findBalanceMismatches } = await import("./queries");
+      const id = await makeReusable("sum-check", "12");
+      await send(id, storeId, laundryId, "5");
+      await lose(id, "LOST", laundryId, "1", "Gone");
+      await db.$transaction((tx) => record(tx, { itemId: id, userId, type: "ADJUSTED", amount: "3", note: "Recount", locationId: laundryId }));
+      expect((await findBalanceMismatches()).filter((row) => row.id === id)).toEqual([]);
+    });
   });
 });

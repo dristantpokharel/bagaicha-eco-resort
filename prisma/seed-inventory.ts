@@ -22,6 +22,13 @@ function group(category: string, consumable: boolean, items: [string, InventoryU
 
 const pcs = (names: string[]) => names.map((n): [string, InventoryUnit] => [n, "pcs"]);
 
+/** Reusable items that stay in the room at checkout (the owner's list); every other reusable goes to laundry. */
+const FIXED_IN_ROOM = new Set(
+  ["Electric kettle", "Drinking glass", "Mug", "Water jug", "Rechargeable lamp", "Flashlight", "Hanger", "Mosquito net", "Pillow", "Blanket/Quilt"].map(
+    (name) => name.toLowerCase(),
+  ),
+);
+
 const CATALOG = [
   ...group(
     "Linens & Bedding",
@@ -159,6 +166,7 @@ async function main() {
             category: row.category,
             unit: row.unit,
             isConsumable: row.consumable,
+            isFixedInRoom: !row.consumable && FIXED_IN_ROOM.has(row.name.toLowerCase()),
             quantity: 0,
             lowStockThreshold: 0,
           })),

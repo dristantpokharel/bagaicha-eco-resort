@@ -45,6 +45,12 @@ const optionalCost = z.preprocess(
     .transform((value) => value ?? null),
 );
 
+/** Checkbox: present ("on") when ticked, absent when not. */
+const checkbox = z
+  .string()
+  .optional()
+  .transform((value) => value === "on" || value === "true");
+
 const itemFields = z.object({
   name: z.string().trim().min(2, { error: "Enter a name." }).max(80, { error: "At most 80 characters." }),
   category: z
@@ -56,6 +62,8 @@ const itemFields = z.object({
   lowStockThreshold: quantityOrZero,
   unitCostNpr: optionalCost,
   supplier: optionalText(80),
+  isConsumable: checkbox,
+  isFixedInRoom: checkbox,
 });
 
 /** Whole-number units can't have fractional thresholds or opening stock. */
@@ -95,11 +103,35 @@ export const recordMovementSchema = z
     /** RECEIVED / USED: the amount. ADJUSTED: the counted quantity. */
     quantity: quantityField,
     note: optionalText(500),
+    /** Reusable items only: where an ADJUSTED count was taken (blank = Store). */
+    locationId: optionalText(64),
   })
   .superRefine((input, ctx) => {
     if (input.type === "ADJUSTED" && !input.note) {
       ctx.addIssue({ code: "custom", path: ["note"], message: "Say why the count changed (for example: damaged, miscounted)." });
     }
   });
+
+const requiredLocation = id.refine(Boolean, { error: "Choose a place." });
+
+export const transferStockSchema = z.object({
+  itemId: id,
+  submissionId: z.string().regex(SUBMISSION_ID_PATTERN, { error: "Reload the page and try again." }),
+  fromLocationId: requiredLocation,
+  toLocationId: requiredLocation,
+  quantity: quantityField,
+  note: optionalText(500),
+});
+
+export const WRITE_OFF_KINDS = ["LOST", "DAMAGED"] as const;
+
+export const writeOffStockSchema = z.object({
+  itemId: id,
+  submissionId: z.string().regex(SUBMISSION_ID_PATTERN, { error: "Reload the page and try again." }),
+  kind: z.enum(WRITE_OFF_KINDS, { error: "Choose lost or damaged." }),
+  fromLocationId: requiredLocation,
+  quantity: quantityField,
+  note: optionalText(500).refine(Boolean, { error: "Say what happened (for example: broken glass, guest took it)." }),
+});
 
 export const NOTE_MAX_LENGTH = 500;
