@@ -4,7 +4,7 @@ Source: `docs/Brochure.pdf` (4 A4 pages: cover, Stay, Dine/Explore/Conferences, 
 Colors were sampled from the rendered PDF pages (averaged pixel patches), not estimated by eye.
 Font names come from the fonts embedded in the PDF and from visual comparison where text was outlined.
 
-Status: **approved** (Phase 1.5). Implemented in `src/app/globals.css`; title font still being chosen.
+Status: **approved** (Phase 1.5). Implemented in `src/app/globals.css` and `src/app/layout.tsx`.
 
 ---
 
@@ -59,7 +59,7 @@ Confirmed by the owner: **titles = Seravek, body = Red Hat Display, icon labels 
 
 | Role | Brochure font | Web font (Google Fonts) |
 |---|---|---|
-| Titles / display | Seravek (Light Italic → Bold Italic) | **To choose:** Seravek isn't licensed for web. Candidates below |
+| Titles / display | Seravek (Light Italic → Bold Italic) | **Source Sans 3** (chosen; Seravek isn't licensed for web) |
 | Body, kickers, italic panel titles | Red Hat Display | **Red Hat Display** (exact) |
 | Icon labels, nav, contact strip | Montserrat | **Montserrat** (exact) |
 | Logo script "Bagaicha" | lettering in the logo artwork | none, the logo is always the image file |
@@ -74,7 +74,7 @@ Seravek is a humanist sans: open counters, single-storey italic `a`, plain `l`, 
 | **Fira Sans** | Humanist, warm italic, full weight range with italics | `l` has a tail and the overall feel is more technical |
 | **Alegreya Sans** | The most calligraphic and warm italic, very "editorial" | Smaller x-height, so it reads less like Seravek at large sizes |
 
-All three will be shown side by side in the preview (a dev-only switcher on the homepage, so each can be judged on real headings). The chosen one becomes `--font-display`. My pick is Source Sans 3.
+**Decision:** Source Sans 3, chosen after a side-by-side comparison in the Phase 1.5 preview. It's the only title font loaded (`--font-title` → `--font-display`).
 
 All families load through `next/font/google` (self-hosted, no layout shift).
 
@@ -166,7 +166,7 @@ Existing token **names** used by the admin (`cream`, `forest`, `forest-dark`, `s
 --color-sage-muted:   #ACB299
 --color-charcoal → alias of ink   (admin text)
 --color-earth*  → removed after checking nothing uses them
---font-display: <chosen title font> · --font-sans: Red Hat Display · --font-label: Montserrat
+--font-display: Source Sans 3 · --font-sans: Red Hat Display · --font-label: Montserrat
 --radius-organic: 4rem (one corner only) · --radius-pill: 9999px
 ```
 
@@ -184,13 +184,12 @@ Admin shadows and radii stay as they are; the public site doesn't use them.
 | WhatsApp | +977 9851081502 as a WhatsApp chat button (`wa.me` link) |
 | Weddings subheading and copy | design.md's version; the brochure's "or gathering together" typo isn't carried over |
 | Wedding photo | `wedding-mock.png` is a mockup, shown only with a placeholder badge |
-| Nearby distances | **Open.** Nepalgunj (list ~41 km vs map ~40 km) and Krishnasaar (list 10 mins vs map 10–15 min) are shown as marked placeholders until confirmed. Thakurdwara (~30 km, 50 mins) and Karnali Bridge (~53 km, 75 mins) agree in both places |
-| Directions link | **Open.** The brochure QR code points to the `qr.codes/3pb4MX` short link; a direct Google Maps link is needed |
+| Nearby distances | Nepalgunj ~40 km (53 mins), Krishnasaar ~5 km (10–15 mins), Thakurdwara ~30 km (50 mins), Karnali Bridge ~53 km (75 mins), matching the brochure map |
+| Maps | Map link `maps.app.goo.gl/hK9US5mdfKxnD9Rr9`; "Get Directions" uses a Google Maps directions URL to the resort coordinates 28.229779, 81.332061 |
+| Domain | `bagaichaecoresort.com`, set only through `NEXT_PUBLIC_SITE_URL` (`.env.example`) |
 
 ---
 
 ## 9. Open questions
 
-1. Which title font: Source Sans 3 (recommended), Fira Sans or Alegreya Sans? Compare them on `/preview`.
-2. Nepalgunj and Krishnasaar distances (section 8).
-3. Direct Google Maps link for "Get Directions".
+None for the design tokens.
