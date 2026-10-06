@@ -71,7 +71,7 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
 
           <nav aria-label="Footer">
             <h2 className="text-label text-sage">Explore</h2>
-            <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-1">
+            <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2">
               {nav.map((item) => (
                 <li key={item.href}>
                   <Link href={item.href} className={linkClass}>

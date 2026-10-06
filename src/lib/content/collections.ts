@@ -187,7 +187,7 @@ export function isCollectionKey(value: unknown): value is CollectionKey {
   return typeof value === "string" && value in COLLECTIONS;
 }
 
-const emptyToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
+const emptyToNull = (value: unknown) => (value == null || (typeof value === "string" && value.trim() === "") ? null : value);
 
 function httpsUrl(max = 500) {
   return z

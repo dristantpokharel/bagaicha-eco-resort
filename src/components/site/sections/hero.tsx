@@ -36,7 +36,6 @@ export function Hero({
       {desktopPhoto && mobilePhoto && (
         <picture>
           <source media="(min-width: 768px)" srcSet={props(desktopPhoto).srcSet} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img {...props(mobilePhoto)} alt={mobilePhoto.altText} className="object-cover" />
         </picture>
       )}

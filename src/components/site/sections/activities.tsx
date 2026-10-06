@@ -59,6 +59,7 @@ export function ExperienceList({ activities }: { activities: PublicActivity[] })
 /** Home activities band: photo + label beside the accordion. */
 export function ActivitiesSection({ activities, photo }: { activities: PublicActivity[]; photo?: PublicMedia }) {
   const copy = HOME.explore;
+  const caption = activities.find((a) => a.slug === "chill-pool")?.title;
   return (
     <section aria-labelledby="explore-heading" className="py-section-sm md:py-section">
       <div className="container-page grid gap-12 md:grid-cols-12 md:gap-16">
@@ -66,12 +67,14 @@ export function ActivitiesSection({ activities, photo }: { activities: PublicAct
           <div className="md:col-span-5">
             <div className="md:sticky md:top-28">
               <MediaPhoto media={photo} sizes="(min-width: 768px) 40vw, 100vw" className="aspect-[4/5]" />
-              <div className="flex items-center gap-5 bg-sage px-6 py-5">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.5px] border-icon text-icon">
-                  <Icon name="waves" size={24} />
-                </span>
-                <p className="text-title text-ink-heading">Chill Pool</p>
-              </div>
+              {caption && (
+                <div className="flex items-center gap-5 bg-sage px-6 py-5">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.5px] border-icon text-icon">
+                    <Icon name="waves" size={24} />
+                  </span>
+                  <p className="text-title text-ink-heading">{caption}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

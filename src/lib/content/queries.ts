@@ -245,8 +245,8 @@ export const getHomepageSlots = cached(async (): Promise<HomepageSlots> => {
     // Mockups are stand-ins for real photography: dev only, with a badge.
     const mockup = isMockupPhoto(row.media.originalFilename);
     if (mockup && !showPlaceholders) continue;
-    const { originalFilename: _omit, ...media } = row.media;
-    (out[row.slot] ??= []).push({ ...media, isPlaceholder: mockup });
+    const { url, altText, width, height, blurDataUrl } = row.media;
+    (out[row.slot] ??= []).push({ url, altText, width, height, blurDataUrl, isPlaceholder: mockup });
   }
   return out;
 }, "homepage-slots");
