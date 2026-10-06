@@ -74,10 +74,22 @@ enum HomepageSlotKey {
   LOCATION
 }
 
+enum StockLocationKind {
+  STORE
+  LAUNDRY
+  ROOM
+}
+
 enum StockMovementType {
   RECEIVED
   USED
   ADJUSTED
+  /// Reusable stock moved between locations; the item total does not change.
+  TRANSFERRED
+  /// Reusable stock written off because it went missing; lowers the total.
+  LOST
+  /// Reusable stock written off because it broke; lowers the total.
+  DAMAGED
 }
 
 // ─── Users & audit ───────────────────────────────────────────────────────────
@@ -155,9 +167,10 @@ model Room {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  roomType RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  bookings Booking[]
-  blocks   RoomBlock[]
+  roomType      RoomType       @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings      Booking[]
+  blocks        RoomBlock[]
+  stockLocation StockLocation?
 
   @@unique([roomTypeId, name])
   @@map("rooms")
@@ -234,6 +247,8 @@ model Booking {
   roomType  RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
   room      Room?    @relation(fields: [roomId], references: [id], onDelete: Restrict)
   createdBy User?    @relation("BookingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  stockMovements StockMovement[]
 
   @@index([status])
   @@index([checkIn, checkOut])
@@ -457,7 +472,10 @@ model InventoryItem {
   unit              String
   /// Used up when handed out (soap, paper) vs. reusable (towels, kettles). Reorder alerts use lowStockThreshold either way.
   isConsumable      Boolean  @default(true)
-  /// Kept in sync with stock movements.
+  /// Reusable items that stay in the room at checkout (kettle, glasses). Others go to the laundry.
+  isFixedInRoom     Boolean  @default(false)
+  /// Total on the property, kept in sync with stock movements. For reusable items
+  /// it always equals the sum of its StockBalance rows.
   quantity          Decimal  @default(0) @db.Decimal(10, 2)
   lowStockThreshold Decimal  @default(0) @db.Decimal(10, 2)
   unitCostNpr       Int?
@@ -467,28 +485,73 @@ model InventoryItem {
   updatedAt         DateTime @updatedAt
 
   movements StockMovement[]
+  balances  StockBalance[]
 
   @@index([category])
   @@map("inventory_items")
 }
 
 model StockMovement {
-  id           String            @id @default(cuid())
-  itemId       String
-  type         StockMovementType
+  id             String            @id @default(cuid())
+  itemId         String
+  type           StockMovementType
   /// Signed change applied to the item: RECEIVED > 0, USED < 0, ADJUSTED either.
-  quantity     Decimal           @db.Decimal(10, 2)
+  quantity       Decimal           @db.Decimal(10, 2)
   /// The item's quantity right after this movement was applied.
-  balanceAfter Decimal           @db.Decimal(10, 2)
-  note         String?
+  balanceAfter   Decimal           @db.Decimal(10, 2)
+  note           String?
   /// Client-generated token for one form attempt; a retry with the same token is a no-op.
-  submissionId String?           @unique
-  userId       String
-  createdAt    DateTime          @default(now())
+  submissionId   String?           @unique
+  /// Where reusable stock left (TRANSFERRED, LOST, DAMAGED, or a downward count).
+  fromLocationId String?
+  /// Where reusable stock arrived (TRANSFERRED, RECEIVED, or an upward count).
+  toLocationId   String?
+  /// The stay this movement belongs to (room prep, checkout losses).
+  bookingId      String?
+  userId         String
+  createdAt      DateTime          @default(now())
 
-  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  user User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  item         InventoryItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  fromLocation StockLocation? @relation("MovementFrom", fields: [fromLocationId], references: [id], onDelete: Restrict)
+  toLocation   StockLocation? @relation("MovementTo", fields: [toLocationId], references: [id], onDelete: Restrict)
+  booking      Booking?       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 
   @@index([itemId, createdAt])
+  @@index([bookingId])
   @@map("stock_movements")
+}
+
+/// A place reusable stock can sit: the store, the laundry, or one room.
+/// There is exactly one STORE and one LAUNDRY; every room has one ROOM location.
+model StockLocation {
+  id        String            @id @default(cuid())
+  kind      StockLocationKind
+  /// Set exactly when kind is ROOM. The label and active state come from the room.
+  roomId    String?           @unique
+  createdAt DateTime          @default(now())
+
+  room      Room?           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  balances  StockBalance[]
+  movesFrom StockMovement[] @relation("MovementFrom")
+  movesTo   StockMovement[] @relation("MovementTo")
+
+  @@map("stock_locations")
+}
+
+/// How much of a reusable item sits at one location. Rows are created on first
+/// use; a missing row means 0. Only recordStockMovement / transferStock /
+/// writeOffStock change these (docs: stock movement rules).
+model StockBalance {
+  itemId     String
+  locationId String
+  quantity   Decimal  @db.Decimal(10, 2)
+  updatedAt  DateTime @updatedAt
+
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location StockLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@id([itemId, locationId])
+  @@index([locationId])
+  @@map("stock_balances")
 }
