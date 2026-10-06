@@ -1,7 +1,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import type { StockMovementType } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/actions";
-import { isWholeUnit, QUANTITY_DECIMALS } from "@/config/inventory";
+import { isWholeUnit } from "@/config/inventory";
+import { formatQuantity, formatQuantityWithUnit } from "./format";
+
+export { formatQuantity, formatQuantityWithUnit };
 
 type Decimal = Prisma.Decimal;
 const Decimal = Prisma.Decimal;
@@ -10,18 +13,6 @@ export type Quantity = Decimal | string | number;
 
 export function toDecimal(value: Quantity): Decimal {
   return new Decimal(value);
-}
-
-/** "12", "8.5", "1,250.25": no trailing zeros, thousands separators. */
-export function formatQuantity(value: Quantity): string {
-  const fixed = toDecimal(value).toFixed(QUANTITY_DECIMALS).replace(/\.?0+$/, "");
-  const [whole, fraction] = fixed.split(".");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return fraction ? `${grouped}.${fraction}` : grouped;
-}
-
-export function formatQuantityWithUnit(value: Quantity, unit: string): string {
-  return `${formatQuantity(value)} ${unit}`;
 }
 
 /** Throws a field-level ActionError when a fractional amount is used with a whole-number unit. */

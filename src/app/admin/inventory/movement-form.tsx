@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
-import { formatQuantityWithUnit } from "@/lib/inventory/stock";
+import { formatQuantityWithUnit } from "@/lib/inventory/format";
 import { MOVEMENT_LABELS } from "@/lib/inventory/labels";
 import { NOTE_MAX_LENGTH } from "@/lib/inventory/schemas";
 import type { StockMovementType } from "@/generated/prisma/enums";
