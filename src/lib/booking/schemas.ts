@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { emailSchema } from "@/lib/auth/schemas";
+import { BOOKING } from "@/config/booking";
 import { normalizePhone } from "./phone";
 
 const PHONE_ERROR = "Enter a valid phone number, for example +977 98XXXXXXXX.";
@@ -12,12 +13,15 @@ export const requiredPhone = z
   .refine((v) => normalizePhone(v) !== null, { error: PHONE_ERROR })
   .transform((v) => normalizePhone(v)!);
 
-/** Optional phone: blank → undefined, otherwise validated and normalized. */
+/** The field is prefilled with the country code, so a bare code means "left empty". */
+const isBareCountryCode = (v: string) => v.replace(/\D/g, "") === BOOKING.defaultCountryCode.replace(/\D/g, "");
+
+/** Optional phone: blank (or just the prefilled +977) → undefined, otherwise validated and normalized. */
 export const optionalPhone = z
   .string()
   .trim()
   .optional()
-  .transform((v) => (v ? v : undefined))
+  .transform((v) => (v && !isBareCountryCode(v) ? v : undefined))
   .refine((v) => v === undefined || normalizePhone(v) !== null, { error: PHONE_ERROR })
   .transform((v) => (v ? normalizePhone(v)! : undefined));
 
