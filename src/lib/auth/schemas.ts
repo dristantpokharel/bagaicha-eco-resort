@@ -26,3 +26,13 @@ export const loginSchema = z.object({
   // No policy on login, just sane bounds.
   password: z.string().min(1).max(256),
 });
+
+/**
+ * Only same-site relative paths are allowed as post-login redirects,
+ * to avoid open redirects (e.g. "//evil.example" or "/\evil.example").
+ */
+export function safeCallbackUrl(value: unknown, fallback = "/admin"): string {
+  if (typeof value !== "string" || !value.startsWith("/")) return fallback;
+  if (value.startsWith("//") || value.startsWith("/\\")) return fallback;
+  return value;
+}

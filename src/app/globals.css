@@ -16,13 +16,15 @@
   --color-charcoal-light: #666666;
 
   /* Semantic */
-  --color-success: #22C55E;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
+  /* Darker shades so text meets WCAG AA on white and cream */
+  --color-success: #15803D;
+  --color-warning: #B45309;
+  --color-error: #B91C1C;
 
   /* Typography */
-  --font-serif: "Playfair Display", Georgia, serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  /* --font-playfair / --font-inter are set by next/font in the root layout */
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
 
   /* Spacing scale */
   --spacing-section: 6rem;
