@@ -9,14 +9,15 @@ import { sendEmail, type EmailMessage, type SendResult } from "./send";
 import {
   bookingCancelledEmail,
   bookingConfirmedEmail,
+  bookingPartiallyConfirmedEmail,
   newEnquiryAlertEmail,
   newRequestAlertEmail,
   requestReceivedEmail,
-  type BookingEmailData,
   type RenderedEmail,
+  type ReservationEmailData,
 } from "./templates";
 
-export type BookingEmailKind = "received" | "confirmed" | "cancelled";
+export type ReservationEmailKind = "received" | "confirmed" | "partial" | "cancelled";
 
 /** What happened, for the caller to report. Emails never roll back the booking. */
 export type NotifyOutcome = {
@@ -26,32 +27,43 @@ export type NotifyOutcome = {
   resort: "sent" | "failed" | "n/a";
 };
 
-export async function loadBookingEmailData(bookingId: string): Promise<BookingEmailData | null> {
-  const b = await db.booking.findUnique({
-    where: { id: bookingId },
-    include: { guest: true, roomType: { select: { name: true } }, room: { select: { name: true } } },
+export async function loadReservationEmailData(reservationId: string): Promise<ReservationEmailData | null> {
+  const r = await db.reservation.findUnique({
+    where: { id: reservationId },
+    include: {
+      guest: true,
+      bookings: {
+        include: { roomType: { select: { name: true } }, room: { select: { name: true } } },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      },
+    },
   });
-  if (!b) return null;
+  if (!r) return null;
+  const nights = nightsBetween(r.checkIn, r.checkOut);
   return {
-    id: b.id,
-    bookingNumber: b.bookingNumber,
-    guestName: b.guest.name,
-    guestEmail: b.guest.email,
-    guestPhone: b.guest.phone,
-    checkIn: b.checkIn,
-    checkOut: b.checkOut,
-    adults: b.adults,
-    children: b.children,
-    roomTypeName: b.roomType.name,
-    roomName: b.room?.name ?? null,
-    quote: computeQuote({
-      nights: nightsBetween(b.checkIn, b.checkOut),
-      pricePerNightNpr: b.pricePerNightNpr,
-      childPricePerNightNpr: b.childPricePerNightNpr,
+    id: r.id,
+    reference: r.reference,
+    guestName: r.guest.name,
+    guestEmail: r.guest.email,
+    guestPhone: r.guest.phone,
+    checkIn: r.checkIn,
+    checkOut: r.checkOut,
+    nights,
+    specialRequests: r.specialRequests,
+    lines: r.bookings.map((b) => ({
+      roomTypeName: b.roomType.name,
+      roomName: b.room?.name ?? null,
+      adults: b.adults,
       children: b.children,
-    }),
-    specialRequests: b.specialRequests,
-    cancellationReason: b.cancellationReason,
+      status: b.status,
+      cancellationReason: b.cancellationReason,
+      quote: computeQuote({
+        nights,
+        pricePerNightNpr: b.pricePerNightNpr,
+        childPricePerNightNpr: b.childPricePerNightNpr,
+        children: b.children,
+      }),
+    })),
     terms: await loadStayTerms(),
   };
 }
@@ -88,17 +100,22 @@ async function deliver(
 }
 
 /**
- * Sends the emails for a booking event, after the change is committed.
- * received → guest receipt + resort alert; confirmed / cancelled → guest only.
+ * Sends the emails for a reservation event, after the change is committed.
+ * received → guest receipt + resort alert; confirmed / partial / cancelled → guest only.
  */
-export async function notifyBooking(kind: BookingEmailKind, bookingId: string): Promise<NotifyOutcome> {
-  const data = await loadBookingEmailData(bookingId);
+export async function notifyReservation(kind: ReservationEmailKind, reservationId: string): Promise<NotifyOutcome> {
+  const data = await loadReservationEmailData(reservationId);
   if (!data) return { guest: "failed", resort: kind === "received" ? "failed" : "n/a" };
 
   let guest: NotifyOutcome["guest"] = "skipped";
   if (data.guestEmail) {
-    const render = { received: requestReceivedEmail, confirmed: bookingConfirmedEmail, cancelled: bookingCancelledEmail }[kind];
-    guest = (await deliver(data.guestEmail, render(data), "Booking", bookingId, `guest.${kind}`)) ? "sent" : "failed";
+    const render = {
+      received: requestReceivedEmail,
+      confirmed: bookingConfirmedEmail,
+      partial: bookingPartiallyConfirmedEmail,
+      cancelled: bookingCancelledEmail,
+    }[kind];
+    guest = (await deliver(data.guestEmail, render(data), "Reservation", reservationId, `guest.${kind}`)) ? "sent" : "failed";
   }
 
   let resort: NotifyOutcome["resort"] = "n/a";
@@ -107,14 +124,14 @@ export async function notifyBooking(kind: BookingEmailKind, bookingId: string): 
     if (alertTo) {
       const ok = await deliver(
         alertTo,
-        newRequestAlertEmail(data, adminUrl(`/admin/bookings/${bookingId}`)),
-        "Booking",
-        bookingId,
+        newRequestAlertEmail(data, adminUrl(`/admin/bookings/${reservationId}`)),
+        "Reservation",
+        reservationId,
         "resort.newRequest",
       );
       resort = ok ? "sent" : "failed";
     } else {
-      await logFailure("Booking", bookingId, "resort.newRequest", { ok: false, reason: "not-configured" });
+      await logFailure("Reservation", reservationId, "resort.newRequest", { ok: false, reason: "not-configured" });
       resort = "failed";
     }
   }

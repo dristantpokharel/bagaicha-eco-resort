@@ -20,3 +20,16 @@ export function deriveReservationStatus(lines: readonly { status: BookingStatus 
   const unresolved = active.some((l) => l.status === "PENDING");
   return unresolved || active.length < lines.length ? "PARTIALLY_CONFIRMED" : "CONFIRMED";
 }
+
+export type ResolutionEmail = "confirmed" | "partial" | "cancelled";
+
+/**
+ * Which email the guest gets once every room has been decided; null while any line is still pending.
+ * All kept and none cancelled → confirmed; everything cancelled → cancelled; otherwise → partly confirmed.
+ */
+export function resolutionEmail(lines: readonly { status: BookingStatus }[]): ResolutionEmail | null {
+  if (lines.length === 0 || lines.some((l) => l.status === "PENDING")) return null;
+  const cancelled = lines.filter((l) => l.status === "CANCELLED").length;
+  if (cancelled === lines.length) return "cancelled";
+  return cancelled === 0 ? "confirmed" : "partial";
+}

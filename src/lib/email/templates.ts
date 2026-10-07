@@ -1,3 +1,4 @@
+import type { BookingStatus } from "@/generated/prisma/enums";
 import type { StayTerms } from "@/lib/content/stay-terms";
 import { SITE } from "@/config/site";
 import { formatShortDate, formatStayDate } from "@/lib/booking/dates";
@@ -6,23 +7,30 @@ import { formatNpr } from "@/lib/money";
 import { escapeHtml as esc, singleLine } from "./escape";
 import { emailLogoUrl, EMAIL_LOGO_WIDTH } from "./logo";
 
-/** Everything a booking email shows. Built from the booking's own snapshots. */
-export type BookingEmailData = {
+/** One room line in an email, built from the line's own snapshots. */
+export type EmailLine = {
+  roomTypeName: string;
+  /** Assigned room; null until confirmed. */
+  roomName: string | null;
+  adults: number;
+  children: number;
+  status: BookingStatus;
+  quote: Quote;
+  cancellationReason: string | null;
+};
+
+/** Everything a reservation email shows: every room with its guests and price. */
+export type ReservationEmailData = {
   id: string;
-  bookingNumber: string;
+  reference: string;
   guestName: string;
   guestEmail: string | null;
   guestPhone: string | null;
   checkIn: Date;
   checkOut: Date;
-  adults: number;
-  children: number;
-  roomTypeName: string;
-  /** Assigned room; null until confirmed. */
-  roomName: string | null;
-  quote: Quote;
+  nights: number;
+  lines: EmailLine[];
   specialRequests: string | null;
-  cancellationReason: string | null;
   /** Times and cancellation wording from the database (BusinessInfo, Policies). */
   terms: StayTerms;
 };
@@ -31,33 +39,61 @@ export type RenderedEmail = { subject: string; html: string; text: string };
 
 const COLORS = { cream: "#F7F3E5", forest: "#283327", ink: "#2B2B2B", muted: "#5C6358", line: "#D9D4BF" };
 
-function guestsLabel(b: BookingEmailData) {
-  const adults = `${b.adults} adult${b.adults === 1 ? "" : "s"}`;
-  return b.children > 0 ? `${adults}, ${b.children} child${b.children === 1 ? "" : "ren"} under ${b.terms.childUnderAge}` : adults;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+function guestsLabel(l: EmailLine, childUnderAge: number) {
+  const adults = plural(l.adults, "adult", "adults");
+  return l.children > 0 ? `${adults}, ${plural(l.children, "child", "children")} under ${childUnderAge}` : adults;
 }
 
 type Row = [label: string, value: string];
 
-function bookingRows(b: BookingEmailData): Row[] {
+/** The lines of one room: type (and room), guests, then the price breakdown. */
+function lineText(l: EmailLine, terms: StayTerms, options: { price: boolean }): string {
+  const name = l.roomName ? `${l.roomTypeName} (${l.roomName})` : l.roomTypeName;
+  const rows = [name, guestsLabel(l, terms.childUnderAge)];
+  if (options.price) rows.push(...quoteLines(l.quote, formatNpr), `Room total: ${formatNpr(l.quote.totalPriceNpr)}`);
+  if (l.cancellationReason) rows.push(`Reason: ${l.cancellationReason}`);
+  return rows.join("\n");
+}
+
+const totalOf = (lines: EmailLine[]) => lines.reduce((n, l) => n + l.quote.totalPriceNpr, 0);
+
+type Section = { heading: string | null; lines: EmailLine[]; price: boolean; unassigned?: string };
+
+/** The stay facts that don't depend on the rooms. */
+function stayRows(b: ReservationEmailData): Row[] {
   const rows: Row[] = [
-    ["Booking number", b.bookingNumber],
+    ["Reference", b.reference],
     ["Check-in", `${formatStayDate(b.checkIn)}${b.terms.checkInTime ? `, from ${b.terms.checkInTime}` : ""}`],
     ["Check-out", `${formatStayDate(b.checkOut)}${b.terms.checkOutTime ? `, by ${b.terms.checkOutTime}` : ""}`],
-    ["Nights", String(b.quote.nights)],
-    ["Room", b.roomName ? `${b.roomTypeName} (${b.roomName})` : `${b.roomTypeName} (room assigned on confirmation)`],
-    ["Guests", guestsLabel(b)],
+    ["Nights", String(b.nights)],
   ];
   if (b.specialRequests) rows.push(["Special requests", b.specialRequests]);
   return rows;
 }
 
-function priceBlock(b: BookingEmailData) {
-  const lines = quoteLines(b.quote, formatNpr);
-  const html =
-    lines.map((l) => `<div style="color:${COLORS.muted}">${esc(l)}</div>`).join("") +
-    `<div style="margin-top:6px;font-weight:bold">Total: ${esc(formatNpr(b.quote.totalPriceNpr))}</div>`;
-  const text = [...lines, `Total: ${formatNpr(b.quote.totalPriceNpr)}`].join("\n");
-  return { html, text };
+function roomsHtml(b: ReservationEmailData, sections: Section[]): string {
+  return sections
+    .map((section) => {
+      const rows: Row[] = section.lines.map((l, i) => [
+        `Room ${i + 1}`,
+        lineText(l, b.terms, { price: section.price }) + (!l.roomName && section.unassigned ? `\n${section.unassigned}` : ""),
+      ]);
+      return `${section.heading ? `<h2 style="font-size:16px;color:${COLORS.forest};margin:20px 0 4px">${esc(section.heading)}</h2>` : ""}${table(rows)}`;
+    })
+    .join("");
+}
+
+function roomsText(b: ReservationEmailData, sections: Section[]): string[] {
+  return sections.flatMap((section) => [
+    ...(section.heading ? ["", section.heading] : []),
+    ...section.lines.flatMap((l, i) => {
+      const body = lineText(l, b.terms, { price: section.price }) + (!l.roomName && section.unassigned ? `\n${section.unassigned}` : "");
+      const [first, ...rest] = body.split("\n");
+      return [`Room ${i + 1}: ${first}`, ...rest.map((r) => `  ${r}`)];
+    }),
+  ]);
 }
 
 /** Logo image (PNG; mail apps drop SVG) or, when Cloudinary isn't configured, the plain name. */
@@ -87,7 +123,7 @@ function table(rows: Row[]): string {
     .join("")}</table>`;
 }
 
-function policyBlock(b: BookingEmailData) {
+function policyBlock(b: ReservationEmailData) {
   const text = b.terms.cancellationPolicy;
   if (!text) return { html: "", text: "" };
   return {
@@ -96,88 +132,127 @@ function policyBlock(b: BookingEmailData) {
   };
 }
 
-function compose(subject: string, title: string, intro: string, b: BookingEmailData, outro?: string): RenderedEmail {
-  const rows = bookingRows(b);
-  const price = priceBlock(b);
-  const policy = policyBlock(b);
+type Compose = {
+  subject: string;
+  title: string;
+  intro: string;
+  sections: Section[];
+  /** The grand total line; null when the email shows no prices. */
+  total: { label: string; lines: EmailLine[] } | null;
+  outro?: string;
+  policy?: boolean;
+};
+
+function compose(b: ReservationEmailData, c: Compose): RenderedEmail {
+  const rows = stayRows(b);
+  const policy = c.policy === false ? { html: "", text: "" } : policyBlock(b);
+  const totalLine = c.total ? `${c.total.label}: ${formatNpr(totalOf(c.total.lines))}` : null;
   const html = layout(
-    title,
-    `<p style="font-size:15px;line-height:1.5">${esc(intro)}</p>
+    c.title,
+    `<p style="font-size:15px;line-height:1.5">${esc(c.intro)}</p>
 ${table(rows)}
-<div style="margin-top:12px;font-size:14px">${price.html}</div>
+${roomsHtml(b, c.sections)}
+${totalLine ? `<div style="margin-top:12px;font-size:14px;font-weight:bold">${esc(totalLine)}</div>` : ""}
 ${policy.html ? `<div style="margin-top:16px">${policy.html}</div>` : ""}
-${outro ? `<p style="font-size:14px">${esc(outro)}</p>` : ""}`,
+${c.outro ? `<p style="font-size:14px">${esc(c.outro)}</p>` : ""}`,
   );
   const text = [
-    title,
+    c.title,
     "",
-    intro,
+    c.intro,
     "",
     ...rows.map(([l, v]) => `${l}: ${v}`),
-    "",
-    price.text,
+    ...roomsText(b, c.sections),
+    ...(totalLine ? ["", totalLine] : []),
     ...(policy.text ? ["", policy.text] : []),
-    ...(outro ? ["", outro] : []),
+    ...(c.outro ? ["", c.outro] : []),
     "",
     `${SITE.name}, ${SITE.address}`,
   ].join("\n");
-  return { subject: singleLine(subject), html, text };
+  return { subject: singleLine(c.subject), html, text };
 }
 
-export function requestReceivedEmail(b: BookingEmailData): RenderedEmail {
-  return compose(
-    `We received your request ${b.bookingNumber}`,
-    "We've received your booking request",
-    `Hello ${b.guestName}, thank you for your request. It is not confirmed yet: we will check availability and confirm by email or phone.`,
-    b,
-    "Keep your booking number handy if you contact us.",
-  );
+const kept = (b: ReservationEmailData) => b.lines.filter((l) => l.status !== "CANCELLED");
+const countRooms = (n: number) => plural(n, "room", "rooms");
+
+export function requestReceivedEmail(b: ReservationEmailData): RenderedEmail {
+  return compose(b, {
+    subject: `We received your request ${b.reference}`,
+    title: "We've received your booking request",
+    intro: `Hello ${b.guestName}, thank you for your request for ${countRooms(b.lines.length)}. It is not confirmed yet: we will check availability and confirm by email or phone.`,
+    sections: [{ heading: null, lines: b.lines, price: true, unassigned: "Room assigned on confirmation" }],
+    total: { label: "Total", lines: b.lines },
+    outro: "Keep your reference handy if you contact us.",
+  });
 }
 
-export function bookingConfirmedEmail(b: BookingEmailData): RenderedEmail {
-  return compose(
-    `Booking confirmed ${b.bookingNumber}`,
-    "Your booking is confirmed",
-    `Hello ${b.guestName}, your stay is confirmed. We look forward to welcoming you.`,
-    b,
-  );
+export function bookingConfirmedEmail(b: ReservationEmailData): RenderedEmail {
+  return compose(b, {
+    subject: `Booking confirmed ${b.reference}`,
+    title: "Your booking is confirmed",
+    intro: `Hello ${b.guestName}, your stay is confirmed (${countRooms(b.lines.length)}). We look forward to welcoming you.`,
+    sections: [{ heading: null, lines: b.lines, price: true }],
+    total: { label: "Total", lines: b.lines },
+  });
 }
 
-export function bookingCancelledEmail(b: BookingEmailData): RenderedEmail {
-  const reason = b.cancellationReason ? ` Reason: ${b.cancellationReason}` : "";
-  return compose(
-    `Booking cancelled ${b.bookingNumber}`,
-    "Your booking has been cancelled",
-    `Hello ${b.guestName}, booking ${b.bookingNumber} has been cancelled.${reason}`,
-    b,
-    "If this is a surprise, please contact us.",
-  );
+/** Some rooms are confirmed and some could not be: says which, and why. */
+export function bookingPartiallyConfirmedEmail(b: ReservationEmailData): RenderedEmail {
+  const confirmed = kept(b);
+  const declined = b.lines.filter((l) => l.status === "CANCELLED");
+  return compose(b, {
+    subject: `Booking partly confirmed ${b.reference}`,
+    title: "Part of your booking is confirmed",
+    intro: `Hello ${b.guestName}, we can confirm ${countRooms(confirmed.length)} of the ${b.lines.length} you asked for. We're sorry that ${declined.length === 1 ? "one room" : `${declined.length} rooms`} could not be confirmed.`,
+    sections: [
+      { heading: "Confirmed", lines: confirmed, price: true },
+      { heading: "Could not be confirmed", lines: declined, price: false },
+    ],
+    total: { label: "Total for the confirmed rooms", lines: confirmed },
+    outro: "If you would like to adjust your plans, please contact us.",
+  });
 }
 
-/** Alert to the resort team. `adminUrl` points at the booking in the admin portal. */
-export function newRequestAlertEmail(b: BookingEmailData, adminUrl: string): RenderedEmail {
+export function bookingCancelledEmail(b: ReservationEmailData): RenderedEmail {
+  return compose(b, {
+    subject: `Booking cancelled ${b.reference}`,
+    title: "Your booking has been cancelled",
+    intro: `Hello ${b.guestName}, booking ${b.reference} has been cancelled.`,
+    sections: [{ heading: null, lines: b.lines, price: false }],
+    total: null,
+    outro: "If this is a surprise, please contact us.",
+    policy: false,
+  });
+}
+
+/** Alert to the resort team. `adminUrl` points at the reservation in the admin portal. */
+export function newRequestAlertEmail(b: ReservationEmailData, adminUrl: string): RenderedEmail {
+  const sections: Section[] = [{ heading: null, lines: b.lines, price: true, unassigned: "Room not assigned yet" }];
   const rows: Row[] = [
     ["Guest", b.guestName],
     ["Email", b.guestEmail ?? "(none)"],
     ["Phone", b.guestPhone ?? "(none)"],
-    ...bookingRows(b),
+    ...stayRows(b),
+    ["Rooms", String(b.lines.length)],
   ];
-  const price = priceBlock(b);
+  const total = `Total: ${formatNpr(totalOf(b.lines))}`;
   const subject = singleLine(
-    `New booking request ${b.bookingNumber}: ${formatShortDate(b.checkIn)} to ${formatShortDate(b.checkOut)}`,
+    `New booking request ${b.reference}: ${countRooms(b.lines.length)}, ${formatShortDate(b.checkIn)} to ${formatShortDate(b.checkOut)}`,
   );
   const html = layout(
     "New booking request",
     `${table(rows)}
-<div style="margin-top:12px;font-size:14px">${price.html}</div>
+${roomsHtml(b, sections)}
+<div style="margin-top:12px;font-size:14px;font-weight:bold">${esc(total)}</div>
 <p style="margin-top:16px"><a href="${esc(adminUrl)}" style="color:${COLORS.forest}">Open in the admin portal</a></p>`,
   );
   const text = [
     "New booking request",
     "",
     ...rows.map(([l, v]) => `${l}: ${v}`),
+    ...roomsText(b, sections),
     "",
-    price.text,
+    total,
     "",
     `Open in the admin portal: ${adminUrl}`,
   ].join("\n");

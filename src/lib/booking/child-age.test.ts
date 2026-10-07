@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fillTokens, type TokenContext } from "@/lib/content/tokens";
 import { buildSchema, COLLECTIONS } from "@/lib/content/collections";
-import { bookingCancelledEmail, requestReceivedEmail, type BookingEmailData } from "@/lib/email/templates";
+import { bookingCancelledEmail, requestReceivedEmail, type ReservationEmailData } from "@/lib/email/templates";
 import { computeQuote } from "./pricing";
 
 const ctx = (childUnderAge: number): TokenContext => ({
@@ -16,21 +16,27 @@ const ctx = (childUnderAge: number): TokenContext => ({
   nearby: [],
 });
 
-const booking = (childUnderAge: number): BookingEmailData => ({
-  id: "b1",
-  bookingNumber: "BG-2026-000001",
+const booking = (childUnderAge: number): ReservationEmailData => ({
+  id: "r1",
+  reference: "BG-2026-000001",
   guestName: "Test Guest",
   guestEmail: "guest@example.com",
   guestPhone: null,
   checkIn: new Date("2026-11-10T00:00:00Z"),
   checkOut: new Date("2026-11-12T00:00:00Z"),
-  adults: 2,
-  children: 1,
-  roomTypeName: "Family Room",
-  roomName: null,
-  quote: computeQuote({ nights: 2, pricePerNightNpr: 4500, childPricePerNightNpr: 500, children: 1 }),
+  nights: 2,
+  lines: [
+    {
+      roomTypeName: "Family Room",
+      roomName: null,
+      adults: 2,
+      children: 1,
+      status: "PENDING",
+      cancellationReason: null,
+      quote: computeQuote({ nights: 2, pricePerNightNpr: 4500, childPricePerNightNpr: 500, children: 1 }),
+    },
+  ],
   specialRequests: null,
-  cancellationReason: null,
   terms: { checkInTime: null, checkOutTime: null, childUnderAge, cancellationPolicy: null },
 });
 

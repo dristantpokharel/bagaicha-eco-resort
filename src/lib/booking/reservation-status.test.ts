@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BookingStatus } from "@/generated/prisma/enums";
-import { deriveReservationStatus } from "./reservation-status";
+import { deriveReservationStatus, resolutionEmail } from "./reservation-status";
 
 const lines = (...statuses: BookingStatus[]) => statuses.map((status) => ({ status }));
 
@@ -24,5 +24,17 @@ describe("deriveReservationStatus", () => {
     expect(deriveReservationStatus(lines("CHECKED_OUT", "CHECKED_OUT"))).toBe("COMPLETED");
     expect(deriveReservationStatus(lines("CHECKED_OUT", "CANCELLED"))).toBe("COMPLETED");
     expect(deriveReservationStatus(lines("CHECKED_OUT", "CHECKED_IN"))).toBe("CONFIRMED");
+  });
+});
+
+describe("resolutionEmail", () => {
+  it("waits while any line is pending", () => {
+    expect(resolutionEmail(lines("CONFIRMED", "PENDING"))).toBeNull();
+    expect(resolutionEmail(lines("PENDING"))).toBeNull();
+  });
+  it("picks the email once every line is decided", () => {
+    expect(resolutionEmail(lines("CONFIRMED", "CONFIRMED"))).toBe("confirmed");
+    expect(resolutionEmail(lines("CONFIRMED", "CANCELLED"))).toBe("partial");
+    expect(resolutionEmail(lines("CANCELLED", "CANCELLED"))).toBe("cancelled");
   });
 });
