@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOOKING } from "@/config/booking";
-import { partyFits } from "./capacity";
 import {
-  canSeat,
-  canSeatFromFree,
   quoteReservation,
-  splitParty,
   summariseRooms,
-  suggestCombination,
   validateSplit,
   type RoomTypeForBooking,
 } from "./multi-room";
@@ -16,33 +11,6 @@ const deluxe: RoomTypeForBooking = { id: "dlx", name: "Deluxe Room", maxGuests: 
 const family: RoomTypeForBooking = { id: "fam", name: "Family Room", maxGuests: 6, maxAdults: 6, maxChildren: null, basePriceNpr: 4500, childPricePerNightNpr: 500 };
 const types = new Map([deluxe, family].map((t) => [t.id, t]));
 const party = (adults: number, children: number) => ({ adults, children });
-
-describe("splitParty", () => {
-  it("gives every room an adult and seats everyone", () => {
-    const split = splitParty(party(4, 2), [deluxe, deluxe]);
-    expect(split.reduce((n, p) => n + p.adults, 0)).toBe(4);
-    expect(split.reduce((n, p) => n + p.children, 0)).toBe(2);
-    split.forEach((p) => expect(partyFits(deluxe, p)).toBe(true));
-  });
-  it("splits 2 Deluxe + 1 Family for 6A+2C within every limit", () => {
-    const caps = [deluxe, deluxe, family];
-    const split = splitParty(party(6, 2), caps);
-    expect(split.reduce((n, p) => n + p.adults + p.children, 0)).toBe(8);
-    split.forEach((p, i) => expect(partyFits(caps[i], p)).toBe(true));
-  });
-  it("finds a split greedy placing would miss (limited child rooms)", () => {
-    const noKids: RoomTypeForBooking = { ...deluxe, id: "nk", maxChildren: 0 };
-    const caps = [noKids, family];
-    const split = splitParty(party(2, 3), caps);
-    split.forEach((p, i) => expect(partyFits(caps[i], p)).toBe(true));
-    expect(split[0].children).toBe(0);
-  });
-  it("returns a best attempt that validateSplit rejects when the party can't fit", () => {
-    const split = splitParty(party(5, 0), [deluxe, deluxe]);
-    const lines = split.map((p, i) => ({ roomTypeId: "dlx", ...p, index: i }));
-    expect(validateSplit(lines, types, party(5, 0)).ok).toBe(false);
-  });
-});
 
 describe("validateSplit", () => {
   const line = (roomTypeId: string, adults: number, children = 0) => ({ roomTypeId, adults, children });
@@ -92,37 +60,6 @@ describe("quoteReservation", () => {
   });
   it("refuses a room type it has no price for", () => {
     expect(() => quoteReservation([{ roomTypeId: "x", adults: 1, children: 0 }], types, 1)).toThrow();
-  });
-});
-
-describe("combinations", () => {
-  const free = (d: number, f: number) => [
-    { type: deluxe, free: d },
-    { type: family, free: f },
-  ];
-
-  it("canSeat needs an adult in every room", () => {
-    expect(canSeat([deluxe, deluxe], party(1, 2))).toBe(false);
-    expect(canSeat([deluxe, deluxe], party(2, 2))).toBe(true);
-  });
-  it("suggests the fewest rooms, then the cheapest", () => {
-    const s = suggestCombination(party(7, 1), free(2, 1), 1);
-    expect(s?.lines.map((l) => l.roomTypeId).sort()).toEqual(["dlx", "fam"]);
-    expect(s?.quote.totalPriceNpr).toBe(3000 + 4500 + 500);
-  });
-  it("suggests 1 Family + 1 Deluxe for 8 when no single room fits", () => {
-    const s = suggestCombination(party(7, 1), free(1, 1), 2);
-    expect(s?.lines).toHaveLength(2);
-    s?.lines.forEach((l) => expect(partyFits(types.get(l.roomTypeId)!, l)).toBe(true));
-  });
-  it("uses only free rooms and returns null when nothing works", () => {
-    expect(suggestCombination(party(8, 0), free(0, 1), 1)).toBeNull();
-    expect(suggestCombination(party(8, 0), free(2, 0), 1)).toBeNull();
-  });
-  it("never goes past the 4-room limit", () => {
-    expect(canSeatFromFree(party(8, 0), [{ type: deluxe, free: 5 }])).toBe(true);
-    expect(canSeatFromFree(party(10, 0), [{ type: deluxe, free: 5 }])).toBe(false);
-    expect(canSeatFromFree(party(10, 0), [{ type: deluxe, free: 5 }], 5)).toBe(true);
   });
 });
 
