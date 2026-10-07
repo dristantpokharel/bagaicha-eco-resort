@@ -52,6 +52,13 @@ export function describeCapacity(cap: Capacity, options: { childrenIncluded?: bo
   return [total, ...(options.childrenIncluded ? ["children included"] : []), ...rest].join(", ");
 }
 
+/** "Up to 6 guests"; with limits that restrict: "Up to 3 · max 2 adults" (room type buttons). */
+export function describeCapacityCompact(cap: Capacity): string {
+  const [guests, ...rest] = capacityParts(cap);
+  const first = `${guests[0].toUpperCase()}${guests.slice(1)}`;
+  return rest.length === 0 ? `${first} ${cap.maxGuests === 1 ? "guest" : "guests"}` : [first, ...rest].join(" · ");
+}
+
 /** Admin: the limits can't contradict the total. Returns field errors, empty when valid. */
 export function capacityErrors(cap: Capacity): Partial<Record<"maxAdults" | "maxChildren", string>> {
   const errors: Partial<Record<"maxAdults" | "maxChildren", string>> = {};

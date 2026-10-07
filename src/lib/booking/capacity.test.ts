@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capacityErrors, describeCapacity, describeCapacityShort, fittingTypes, partyFits, partyProblem, type Capacity } from "./capacity";
+import { capacityErrors, describeCapacity, describeCapacityCompact, describeCapacityShort, fittingTypes, partyFits, partyProblem, type Capacity } from "./capacity";
 import { validateStay } from "./rules";
 import { computeQuote } from "./pricing";
 import { roomTypeSchema } from "@/app/admin/rooms/schemas";
@@ -61,6 +61,8 @@ describe("labels", () => {
     expect(describeCapacity(family)).toBe("Up to 6 guests");
     expect(describeCapacityShort(deluxe)).toBe("up to 3, max 2 adults");
     expect(describeCapacityShort(family)).toBe("up to 6");
+    expect(describeCapacityCompact(family)).toBe("Up to 6 guests");
+    expect(describeCapacityCompact(deluxe)).toBe("Up to 3 · max 2 adults");
     expect(describeCapacity({ maxGuests: 4, maxAdults: 2, maxChildren: 1 }, { childrenIncluded: true })).toBe(
       "Up to 4 guests, children included, max 2 adults, max 1 child",
     );

@@ -96,7 +96,7 @@ export function StayBuilder({ today, childUnderAge, types, initial, free, freeFo
         </p>
       )}
 
-      <div className="border border-forest/20 bg-white p-5">
+      <section className="border border-forest/20 bg-white p-4 sm:p-5" aria-label="Dates and rooms">
         <div className="max-w-xl">
           <DateRangeField
             today={today}
@@ -114,13 +114,8 @@ export function StayBuilder({ today, childUnderAge, types, initial, free, freeFo
             {checking ? "Checking availability…" : ""}
           </p>
         </div>
-      </div>
 
-      <section className="space-y-4" aria-labelledby="rooms-heading">
-        <h2 id="rooms-heading" className="font-display text-2xl font-semibold italic text-ink-heading">
-          Your rooms
-        </h2>
-        <ul className="space-y-4">
+        <ul className="mt-3 divide-y divide-forest/15 border-t border-forest/15">
           {rooms.map((_, i) => (
             <RoomRow
               key={i}
@@ -128,6 +123,7 @@ export function StayBuilder({ today, childUnderAge, types, initial, free, freeFo
               rooms={rooms}
               types={types}
               free={stayFree}
+              nights={nights}
               childUnderAge={childUnderAge}
               onChange={(room) => update(i, room)}
               onRemove={i > 0 ? () => setRooms((all) => all.filter((_, k) => k !== i)) : undefined}
@@ -135,16 +131,14 @@ export function StayBuilder({ today, childUnderAge, types, initial, free, freeFo
           ))}
         </ul>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-forest/15 pb-4 pt-4">
           <Button type="button" variant="brand-outline" size="lg" className="text-forest" disabled={atLimit} onClick={() => setRooms((all) => [...all, { slug: null, ...DEFAULT_PARTY }])}>
             + Add room
           </Button>
           <p className="text-sm text-ink-muted">{atLimit ? `That's the most we take online (${max} rooms).` : `Up to ${max} rooms online.`}</p>
         </div>
 
-        <div
-          className={`flex flex-wrap items-center justify-between gap-4 border p-4 sm:p-5 ${atLimit ? "border-forest bg-sage" : "border-forest/20 bg-white"}`}
-        >
+        <div className={`flex flex-wrap items-center justify-between gap-4 border p-4 ${atLimit ? "border-forest bg-sage" : "border-forest/20 bg-cream/40"}`}>
           <p className="max-w-xl text-ink">Planning for a bigger group or event? Send us an enquiry and we&apos;ll get back to you with a plan.</p>
           <Link href="/enquiry?type=STAY" className={buttonClasses({ variant: atLimit ? "brand" : "brand-outline", size: "lg", className: atLimit ? "" : "text-forest" })}>
             Enquire

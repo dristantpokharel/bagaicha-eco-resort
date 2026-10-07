@@ -38,18 +38,19 @@ export function RoomGuestsField({ roomNumber, party, onChange, caps, typeName, c
 
   return (
     <div ref={rootRef} className="relative">
-      <label id={labelId} htmlFor={`${id}-trigger`} className="mb-1.5 block text-sm font-medium text-charcoal">
-        Guests in room {roomNumber}
+      <label id={labelId} htmlFor={`${id}-trigger`} className="mb-1.5 block text-sm font-medium text-charcoal lg:sr-only">
+        Guests
       </label>
       <button
         ref={triggerRef}
         id={`${id}-trigger`}
         type="button"
+        aria-label={`Guests in room ${roomNumber}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => setOpen((o) => !o)}
-        className={triggerClasses()}
+        className={`${triggerClasses()} lg:min-h-19!`}
       >
         <span>{guestsSummary(party)}</span>
         <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5 shrink-0 text-forest" fill="none" stroke="currentColor" strokeWidth="1.5">
