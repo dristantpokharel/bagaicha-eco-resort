@@ -9,6 +9,7 @@ import { findFreeRooms } from "@/lib/booking/availability";
 import { formatStayDate, nightsBetween, toDateOnlyString } from "@/lib/booking/dates";
 import { BOOKING_SOURCE_LABELS } from "@/lib/booking/labels";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
+import { SNAPSHOT_FIELDS, snapshotDiff, snapshotOf, type SnapshotField } from "@/lib/booking/guest-snapshot";
 import { deriveReservationStatus } from "@/lib/booking/reservation-status";
 import { editableFlags, reservationDateFlags } from "@/lib/booking/status";
 import { formatNpr } from "@/lib/money";
@@ -16,6 +17,7 @@ import { ContactPhone } from "@/components/admin/contact-phone";
 import { PageHeader } from "@/components/admin/page-header";
 import { ReservationStatusBadge } from "@/components/admin/status-badge";
 import { FormMessage } from "@/components/ui/form";
+import { GuestDiffersNotice } from "./guest-differs-notice";
 import { LineCard, type LineView } from "./line-card";
 import { ReservationActions } from "./reservation-actions";
 import { ReservationEditForm } from "./reservation-edit-form";
@@ -115,6 +117,13 @@ export default async function ReservationPage({
   const guests = reservation.bookings.filter((b) => b.status !== "CANCELLED");
   const created = first(sp.created) === "1";
   const emailed = first(sp.emailed);
+  const differing = can(user.role, "bookings.manage") ? snapshotDiff(snapshotOf(reservation), reservation.guest) : [];
+  const FIELD_LABELS: Record<SnapshotField, string> = { name: "Name", email: "Email", phone: "Phone", country: "Country" };
+  const diffRows = SNAPSHOT_FIELDS.filter((f) => differing.includes(f)).map((f) => ({
+    label: FIELD_LABELS[f],
+    submitted: snapshotOf(reservation)[f] ?? "—",
+    saved: reservation.guest[f] ?? "—",
+  }));
 
   return (
     <>
@@ -141,6 +150,8 @@ export default async function ReservationPage({
           </FormMessage>
         </div>
       )}
+
+      {diffRows.length > 0 && <GuestDiffersNotice reservationId={reservation.id} guestId={reservation.guest.id} rows={diffRows} />}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
@@ -210,20 +221,20 @@ export default async function ReservationPage({
             <dl className="space-y-3 text-sm">
               <Item label="Name">
                 <Link href={`/admin/guests/${reservation.guest.id}`} className="text-forest underline underline-offset-2">
-                  {reservation.guest.name}
+                  {reservation.guestName}
                 </Link>
               </Item>
-              <Item label="Phone">{reservation.guest.phone ? <ContactPhone phone={reservation.guest.phone} /> : "—"}</Item>
+              <Item label="Phone">{reservation.guestPhone ? <ContactPhone phone={reservation.guestPhone} /> : "—"}</Item>
               <Item label="Email">
-                {reservation.guest.email ? (
-                  <a href={`mailto:${reservation.guest.email}`} className="break-all underline-offset-2 hover:underline">
-                    {reservation.guest.email}
+                {reservation.guestEmail ? (
+                  <a href={`mailto:${reservation.guestEmail}`} className="break-all underline-offset-2 hover:underline">
+                    {reservation.guestEmail}
                   </a>
                 ) : (
                   "—"
                 )}
               </Item>
-              {reservation.guest.country && <Item label="Country">{reservation.guest.country}</Item>}
+              {reservation.guestCountry && <Item label="Country">{reservation.guestCountry}</Item>}
             </dl>
           </Card>
 

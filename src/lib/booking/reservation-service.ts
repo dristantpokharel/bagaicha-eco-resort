@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { BookingStatus } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/actions";
 import { assertRoomAssignable, findFreeRooms } from "./availability";
+import { snapshotDiff, snapshotOf } from "./guest-snapshot";
 import { BOOKING_STATUS_LABELS } from "./labels";
 import { canTransition } from "./status";
 
@@ -122,4 +123,39 @@ export async function cancelOpenLines(tx: Tx, reservationId: string, reason: str
   });
   await syncTotal(tx, reservationId);
   return { reference: reservation.reference, cancelled: updated.count };
+}
+
+// ─── Submitted details vs the saved guest ────────────────────────────────────
+
+async function loadForGuestFix(tx: Prisma.TransactionClient, reservationId: string, expectedGuestId: string) {
+  await lockReservation(tx, reservationId);
+  const reservation = await tx.reservation.findUnique({ where: { id: reservationId }, include: { guest: true } });
+  if (!reservation) throw new ActionError("That booking no longer exists.");
+  if (reservation.guestId !== expectedGuestId) throw new ActionError("The saved guest was just changed. Reload the page.");
+  const fields = snapshotDiff(snapshotOf(reservation), reservation.guest);
+  if (fields.length === 0) throw new ActionError("The submitted details already match the saved guest.");
+  return { reservation, fields };
+}
+
+/** Copies the submitted details onto the linked guest (only the fields that were filled in). Staff only. */
+export async function updateGuestFromSnapshot(tx: Prisma.TransactionClient, reservationId: string, expectedGuestId: string) {
+  const { reservation, fields } = await loadForGuestFix(tx, reservationId, expectedGuestId);
+  const snap = snapshotOf(reservation);
+  const data: Prisma.GuestUpdateInput = {};
+  if (fields.includes("name")) data.name = snap.name;
+  if (fields.includes("email")) data.email = snap.email;
+  if (fields.includes("phone")) data.phone = snap.phone;
+  if (fields.includes("country")) data.country = snap.country;
+  await tx.guest.update({ where: { id: reservation.guestId }, data });
+  return { reference: reservation.reference, guestId: reservation.guestId, fields };
+}
+
+/** Leaves the old guest untouched and links the reservation to a new guest made from the submitted details. Staff only. */
+export async function linkToNewGuest(tx: Prisma.TransactionClient, reservationId: string, expectedGuestId: string) {
+  const { reservation, fields } = await loadForGuestFix(tx, reservationId, expectedGuestId);
+  const guest = await tx.guest.create({
+    data: { name: reservation.guestName, email: reservation.guestEmail, phone: reservation.guestPhone, country: reservation.guestCountry },
+  });
+  await tx.reservation.update({ where: { id: reservationId }, data: { guestId: guest.id } });
+  return { reference: reservation.reference, fromGuestId: reservation.guestId, guestId: guest.id, fields };
 }

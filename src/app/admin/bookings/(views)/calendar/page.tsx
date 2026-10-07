@@ -52,7 +52,7 @@ export default async function BookingCalendarPage({ searchParams }: { searchPara
         checkOut: true,
         roomId: true,
         roomTypeId: true,
-        reservation: { select: { id: true, reference: true, guest: { select: { name: true } }, _count: { select: { bookings: true } } } },
+        reservation: { select: { id: true, reference: true, guestName: true, _count: { select: { bookings: true } } } },
       },
       orderBy: { checkIn: "asc" },
     }),
@@ -69,8 +69,8 @@ export default async function BookingCalendarPage({ searchParams }: { searchPara
       key: b.id,
       // Each room has its own bar; clicking opens the whole reservation.
       href: `/admin/bookings/${b.reservation.id}`,
-      label: `${b.reservation.guest.name} · ${b.reservation.reference}`,
-      title: `${b.reservation.reference}, ${b.reservation.guest.name}${
+      label: `${b.reservation.guestName} · ${b.reservation.reference}`,
+      title: `${b.reservation.reference}, ${b.reservation.guestName}${
         b.reservation._count.bookings > 1 ? ` (${b.reservation._count.bookings} rooms)` : ""
       }, ${BOOKING_STATUS_LABELS[b.status]}: ${toDateOnlyString(b.checkIn)} to ${toDateOnlyString(b.checkOut)}`,
       start: cols.start,

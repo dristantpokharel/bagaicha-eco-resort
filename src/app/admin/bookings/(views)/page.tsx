@@ -168,12 +168,12 @@ export default async function BookingsPage({
                       <div className="text-xs text-charcoal-light">{BOOKING_SOURCE_LABELS[r.source]}</div>
                     </td>
                     <td className="py-3 pr-4">
-                      <Link href={`/admin/guests/${r.guest.id}`} className="underline-offset-2 hover:underline">
-                        {r.guest.name}
+                      <Link href={`/admin/guests/${r.guestId}`} className="underline-offset-2 hover:underline">
+                        {r.guestName}
                       </Link>
-                      {r.guest.phone && (
+                      {r.guestPhone && (
                         <div className="text-xs">
-                          <ContactPhone phone={r.guest.phone} />
+                          <ContactPhone phone={r.guestPhone} />
                         </div>
                       )}
                     </td>

@@ -181,6 +181,7 @@ describe.skipIf(!env)("reservation admin changes against the database", { timeou
         data: {
           reference: `${tag}-F${String(day).padStart(3, "0")}`,
           guestId: who.id,
+          guestName: who.name,
           checkIn,
           checkOut,
           source: "PHONE",

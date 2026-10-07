@@ -22,9 +22,11 @@ import {
   cancelOpenLines,
   confirmAllPending,
   confirmLineInRoom,
+  linkToNewGuest,
   lockReservation,
   syncTotal,
   transitionLine,
+  updateGuestFromSnapshot,
 } from "@/lib/booking/reservation-service";
 import { resolutionEmail } from "@/lib/booking/reservation-status";
 import { editableFlags, permissionForTransition, reservationDateFlags } from "@/lib/booking/status";
@@ -33,6 +35,7 @@ import { formatNpr } from "@/lib/money";
 import {
   cancelLineSchema,
   cancelReservationSchema,
+  guestFixSchema,
   confirmLineSchema,
   lineIdSchema,
   manualBookingSchema,
@@ -239,6 +242,47 @@ export async function updateReservation(_prev: ActionResult | null, formData: Fo
 
     revalidateAdmin();
     return { ok: true, message };
+  });
+}
+
+/** The submitted details differ from the saved guest: copy them onto that guest. */
+export async function updateGuestFromSubmitted(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("bookings.manage");
+    const input = parseForm(guestFixSchema, formData);
+    await db.$transaction(async (tx) => {
+      const done = await updateGuestFromSnapshot(tx, input.reservationId, input.guestId);
+      await logActivity(tx, {
+        userId: actor.id,
+        action: "reservation.guest_updated",
+        entityType: "Reservation",
+        entityId: input.reservationId,
+        // Field names only: contact details stay out of the log.
+        details: { reference: done.reference, guestId: done.guestId, fields: done.fields },
+      });
+    }, BOOKING_TX_OPTIONS);
+    revalidateAdmin();
+    return { ok: true, message: "Guest updated with the submitted details." };
+  });
+}
+
+/** The submitted details belong to someone else: keep the saved guest as is and link this booking to a new one. */
+export async function linkToNewGuestAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("bookings.manage");
+    const input = parseForm(guestFixSchema, formData);
+    await db.$transaction(async (tx) => {
+      const done = await linkToNewGuest(tx, input.reservationId, input.guestId);
+      await logActivity(tx, {
+        userId: actor.id,
+        action: "reservation.guest_relinked",
+        entityType: "Reservation",
+        entityId: input.reservationId,
+        details: { reference: done.reference, fromGuestId: done.fromGuestId, toGuestId: done.guestId, fields: done.fields },
+      });
+    }, BOOKING_TX_OPTIONS);
+    revalidateAdmin();
+    return { ok: true, message: "Linked to a new guest." };
   });
 }
 

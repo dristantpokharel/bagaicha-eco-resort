@@ -31,7 +31,6 @@ export async function loadReservationEmailData(reservationId: string): Promise<R
   const r = await db.reservation.findUnique({
     where: { id: reservationId },
     include: {
-      guest: true,
       bookings: {
         include: { roomType: { select: { name: true } }, room: { select: { name: true } } },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -43,9 +42,9 @@ export async function loadReservationEmailData(reservationId: string): Promise<R
   return {
     id: r.id,
     reference: r.reference,
-    guestName: r.guest.name,
-    guestEmail: r.guest.email,
-    guestPhone: r.guest.phone,
+    guestName: r.guestName,
+    guestEmail: r.guestEmail,
+    guestPhone: r.guestPhone,
     checkIn: r.checkIn,
     checkOut: r.checkOut,
     nights,

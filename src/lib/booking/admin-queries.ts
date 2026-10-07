@@ -15,7 +15,10 @@ export const reservationListSelect = {
   checkOut: true,
   totalPriceNpr: true,
   createdAt: true,
-  guest: { select: { id: true, name: true, phone: true, email: true } },
+  guestId: true,
+  guestName: true,
+  guestPhone: true,
+  guestEmail: true,
   bookings: {
     select: { id: true, status: true, adults: true, children: true, roomType: { select: { name: true } }, room: { select: { name: true } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -100,9 +103,9 @@ export function buildReservationWhere(filters: ReservationFilters): Prisma.Reser
     and.push({
       OR: [
         { reference: { contains: q, mode: "insensitive" } },
-        { guest: { name: { contains: q, mode: "insensitive" } } },
-        { guest: { email: { contains: q, mode: "insensitive" } } },
-        ...(digits.length >= 4 ? [{ guest: { phone: { contains: digits } } }] : []),
+        { guestName: { contains: q, mode: "insensitive" } },
+        { guestEmail: { contains: q, mode: "insensitive" } },
+        ...(digits.length >= 4 ? [{ guestPhone: { contains: digits } }] : []),
       ],
     });
   }

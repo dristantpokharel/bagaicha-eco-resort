@@ -20,7 +20,6 @@ const UPCOMING_DAYS = 14;
 const LOW_STOCK_SHOWN = 10;
 
 const stayInclude = {
-  guest: { select: { id: true, name: true, phone: true } },
   bookings: {
     select: { status: true, adults: true, children: true, roomType: { select: { name: true } }, room: { select: { name: true } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -89,7 +88,7 @@ export default async function AdminDashboardPage() {
                 key={r.id}
                 id={r.id}
                 number={r.reference}
-                guest={r.guest}
+                guest={{ id: r.guestId, name: r.guestName, phone: r.guestPhone }}
                 detail={`${roomsDetail(r, ["CONFIRMED"])} · ${guestCount(r, ["CONFIRMED"])} guest${guestCount(r, ["CONFIRMED"]) === 1 ? "" : "s"} · ${nightsBetween(r.checkIn, r.checkOut)} night${nightsBetween(r.checkIn, r.checkOut) === 1 ? "" : "s"}`}
               />
             ))}
@@ -97,7 +96,7 @@ export default async function AdminDashboardPage() {
 
           <Widget title="Today's departures" count={departures.length} empty="No departures expected today.">
             {departures.map((r) => (
-              <Row key={r.id} id={r.id} number={r.reference} guest={r.guest} detail={roomsDetail(r, ["CHECKED_IN"])} />
+              <Row key={r.id} id={r.id} number={r.reference} guest={{ id: r.guestId, name: r.guestName, phone: r.guestPhone }} detail={roomsDetail(r, ["CHECKED_IN"])} />
             ))}
           </Widget>
 
@@ -112,7 +111,7 @@ export default async function AdminDashboardPage() {
                 key={r.id}
                 id={r.id}
                 number={r.reference}
-                guest={r.guest}
+                guest={{ id: r.guestId, name: r.guestName, phone: r.guestPhone }}
                 detail={`${formatStayDate(r.checkIn)} to ${formatStayDate(r.checkOut)} · ${roomsDetail(r, ["PENDING"])}`}
                 note={`Waiting ${waiting(r.createdAt, now)}`}
               />
@@ -121,7 +120,7 @@ export default async function AdminDashboardPage() {
 
           <Widget title={`Confirmed, next ${UPCOMING_DAYS} days`} count={upcoming.length} empty="Nothing confirmed in the coming days.">
             {upcoming.map((r) => (
-              <Row key={r.id} id={r.id} number={r.reference} guest={r.guest} detail={`${formatStayDate(r.checkIn)} to ${formatStayDate(r.checkOut)} · ${roomsDetail(r, ["CONFIRMED"])}`} />
+              <Row key={r.id} id={r.id} number={r.reference} guest={{ id: r.guestId, name: r.guestName, phone: r.guestPhone }} detail={`${formatStayDate(r.checkIn)} to ${formatStayDate(r.checkOut)} · ${roomsDetail(r, ["CONFIRMED"])}`} />
             ))}
           </Widget>
         </div>

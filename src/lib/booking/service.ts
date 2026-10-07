@@ -76,6 +76,10 @@ export async function createReservationRecord(tx: Tx, input: NewReservationInput
     data: {
       reference,
       guestId: guest.id,
+      guestName: input.guest.name,
+      guestEmail: input.guest.email || null,
+      guestPhone: input.guest.phone || null,
+      guestCountry: input.guest.country || null,
       checkIn,
       checkOut,
       source: input.source,

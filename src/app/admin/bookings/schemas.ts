@@ -82,6 +82,8 @@ export const cancelLineSchema = z.object({
   reason: z.string().trim().min(3, { error: "Give a short reason." }).max(500),
 });
 export const reservationIdSchema = z.object({ reservationId: id });
+/** The guest the page showed, so a fix is refused if someone relinked the reservation in the meantime. */
+export const guestFixSchema = z.object({ reservationId: id, guestId: id });
 export const cancelReservationSchema = z.object({
   reservationId: id,
   reason: z.string().trim().min(3, { error: "Give a short reason." }).max(500),

@@ -234,7 +234,13 @@ model Reservation {
   id              String        @id @default(cuid())
   /// e.g. BG-2026-000123, from booking_number_seq.
   reference       String        @unique
+  /// The guest this request was matched to, for history. Never rewritten by a public request.
   guestId         String
+  /// The contact details as submitted with this reservation. Every screen and email uses these, not the Guest row.
+  guestName       String
+  guestEmail      String?
+  guestPhone      String?
+  guestCountry    String?
   checkIn         DateTime      @db.Date
   checkOut        DateTime      @db.Date
   source          BookingSource
