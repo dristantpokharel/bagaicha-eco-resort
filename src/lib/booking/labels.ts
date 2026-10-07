@@ -1,3 +1,4 @@
+import type { ReservationStatus } from "./reservation-status";
 import type { BookingSource, BookingStatus, EnquiryStatus, EnquiryType } from "@/generated/prisma/enums";
 
 export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
@@ -6,6 +7,14 @@ export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
   CHECKED_IN: "Checked in",
   CHECKED_OUT: "Checked out",
   CANCELLED: "Cancelled",
+};
+
+export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
+  PENDING: "Pending",
+  PARTIALLY_CONFIRMED: "Partially confirmed",
+  CONFIRMED: "Confirmed",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
 };
 
 export const BOOKING_SOURCE_LABELS: Record<BookingSource, string> = {

@@ -8,6 +8,8 @@ export const BOOKING = {
   /** Public requests only; staff can book outside these limits. */
   maxNights: 30,
   maxDaysAhead: 365,
+  /** Rooms in one public request; staff can add more, and larger groups use /enquiry. */
+  maxRoomsPerRequest: 4,
   /** Prefilled on phone fields; numbers are stored in international form. */
   defaultCountryCode: "+977",
 } as const;
