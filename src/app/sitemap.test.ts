@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FOOTER_NAV, NAV } from "@/config/site-copy";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -21,4 +21,15 @@ describe("sitemap and robots", () => {
     expect(r.rules).toMatchObject({ disallow: expect.arrayContaining(["/admin", "/login"]) });
     expect(r.sitemap).toMatch(/\/sitemap\.xml$/);
   });
+
+  it("on staging: robots disallows everything and the sitemap is disabled", async () => {
+    vi.stubEnv("SITE_ENV", "staging");
+    vi.resetModules();
+    const staging = await import("./robots");
+    const stagingSitemap = await import("./sitemap");
+    expect(staging.default()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
+    expect(() => stagingSitemap.default()).toThrow();
+  });
 });
+
+afterEach(() => vi.unstubAllEnvs());

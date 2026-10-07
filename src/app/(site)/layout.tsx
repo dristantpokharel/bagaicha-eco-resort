@@ -2,6 +2,7 @@ import { BOOKING_HREF, FOOTER_NAV, NAV } from "@/config/site-copy";
 import { getBusiness } from "@/lib/content/queries";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { StagingBanner } from "@/components/site/staging-banner";
 import { WhatsAppButton } from "@/components/site/whatsapp-button";
 
 /** Public site frame: skip link, header, page, footer and the WhatsApp shortcut. */
@@ -21,6 +22,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       </main>
       <SiteFooter business={business} nav={FOOTER_NAV} bookingHref={BOOKING_HREF} />
       <WhatsAppButton number={business.whatsapp} />
+      <StagingBanner />
     </>
   );
 }

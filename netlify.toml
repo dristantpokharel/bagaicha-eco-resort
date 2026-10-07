@@ -1,0 +1,8 @@
+# Netlify build for Next.js 16. Netlify's OpenNext runtime is picked up automatically.
+# Secrets and per-site settings are set in the Netlify UI, never in this file (see docs/staging.md).
+
+[build]
+  command = "npm run build:netlify"
+
+[build.environment]
+  NODE_VERSION = "22"

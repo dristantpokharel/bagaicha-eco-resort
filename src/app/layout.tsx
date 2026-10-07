@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Montserrat, Red_Hat_Display, Source_Sans_3 } from "next/font/google";
 import { DEFAULT_OG_IMAGE, SITE } from "@/config/site";
+import { isStaging } from "@/lib/site-env";
 import "./globals.css";
 
 // Brochure fonts (docs/design-tokens.md §2). Seravek isn't licensed for web, so
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     ],
     apple: { url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
   },
+  ...(isStaging ? { robots: { index: false, follow: false, nocache: true } } : {}),
   openGraph: { siteName: SITE.name, type: "website", locale: "en", images: [DEFAULT_OG_IMAGE] },
 };
 

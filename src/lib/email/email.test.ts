@@ -68,12 +68,16 @@ describe("templates", () => {
 describe("dev redirect", () => {
   const msg = { to: "guest@example.com", subject: "Hello", html: "<p>x</p>", text: "x" };
   it("is a no-op without EMAIL_DEV_TO", () => {
-    expect(applyDevRedirect(msg, undefined)).toEqual(msg);
-    expect(applyDevRedirect(msg, "  ")).toEqual(msg);
+    expect(applyDevRedirect(msg, undefined)).toEqual({ ...msg, to: ["guest@example.com"] });
+    expect(applyDevRedirect(msg, "  ")).toEqual({ ...msg, to: ["guest@example.com"] });
+    expect(applyDevRedirect(msg, " , ")).toEqual({ ...msg, to: ["guest@example.com"] });
+  });
+  it("accepts a comma-separated list, trimmed and de-duplicated", () => {
+    expect(applyDevRedirect(msg, " a@example.com, b@example.com ,,a@example.com").to).toEqual(["a@example.com", "b@example.com"]);
   });
   it("redirects and names the intended recipient in the subject", () => {
     expect(applyDevRedirect(msg, "dev@example.com")).toMatchObject({
-      to: "dev@example.com",
+      to: ["dev@example.com"],
       subject: "[DEV → guest@example.com] Hello",
     });
   });
@@ -87,7 +91,7 @@ describe("dev redirect", () => {
     const sent = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
     expect(sent.to).toEqual(["dev@example.com"]);
     expect(sent.subject).toContain("guest@example.com");
-    expect(result).toEqual({ ok: true, redirectedTo: "dev@example.com" });
+    expect(result).toEqual({ ok: true, redirectedTo: ["dev@example.com"] });
   });
   it("sends normally when EMAIL_DEV_TO is unset", async () => {
     vi.stubEnv("RESEND_API_KEY", "k");
@@ -97,6 +101,27 @@ describe("dev redirect", () => {
     vi.stubGlobal("fetch", fetchMock);
     await sendEmail(msg);
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string).to).toEqual(["guest@example.com"]);
+  });
+  it("sends to every address in a comma-separated EMAIL_DEV_TO", async () => {
+    vi.stubEnv("RESEND_API_KEY", "k");
+    vi.stubEnv("EMAIL_FROM", "from@example.com");
+    vi.stubEnv("EMAIL_DEV_TO", "a@example.com, b@example.com");
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await sendEmail(msg);
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string).to).toEqual(["a@example.com", "b@example.com"]);
+  });
+  it("on staging, refuses to send unless EMAIL_DEV_TO is set", async () => {
+    vi.stubEnv("SITE_ENV", "staging");
+    vi.stubEnv("RESEND_API_KEY", "k");
+    vi.stubEnv("EMAIL_FROM", "from@example.com");
+    vi.stubEnv("EMAIL_DEV_TO", "");
+    vi.resetModules();
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { sendEmail: stagingSend } = await import("./send");
+    expect(await stagingSend(msg)).toEqual({ ok: false, reason: "not-configured" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
   it("reports not-configured and rejections without throwing", async () => {
     vi.stubEnv("RESEND_API_KEY", "");

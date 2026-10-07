@@ -1,12 +1,13 @@
+import { showPlaceholders } from "@/lib/site-env";
+
 /**
  * Dev placeholders (AGENTS.md rule 5). Rows carry `placeholderFields`: the names of
- * fields still holding placeholder text. Dev shows them with a badge; production hides them.
+ * fields still holding placeholder text. Dev and staging show them with a badge; production hides them.
  */
 
-type Flagged = { placeholderFields?: readonly string[] | null };
+export { showPlaceholders };
 
-/** Show placeholder text (with a badge) outside production only. */
-export const showPlaceholders = process.env.NODE_ENV !== "production";
+type Flagged = { placeholderFields?: readonly string[] | null };
 
 export function isPlaceholder(row: Flagged, field: string): boolean {
   return !!row.placeholderFields?.includes(field);
@@ -40,7 +41,7 @@ export function remainingPlaceholders(
   return flagged.filter((field) => same(previous[field], next[field]));
 }
 
-/** Flagged images (stand-ins, rights unconfirmed) show in development only; production hides them everywhere. */
+/** Flagged images (stand-ins, rights unconfirmed) show in development and staging only; production hides them everywhere. */
 export function mediaVisible(media: { isPlaceholder: boolean }, show: boolean = showPlaceholders): boolean {
   return show || !media.isPlaceholder;
 }
