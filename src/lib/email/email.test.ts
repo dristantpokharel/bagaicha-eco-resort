@@ -25,7 +25,7 @@ const booking = (over: Partial<BookingEmailData> = {}): BookingEmailData => ({
   quote: computeQuote({ nights: 2, pricePerNightNpr: 4500, childPricePerNightNpr: 500, children: 1 }),
   specialRequests: null,
   cancellationReason: null,
-  terms: { checkInTime: "2:00 PM", checkOutTime: "11:00 AM", cancellationPolicy: "Plans changed? Tell us 24 hours ahead." },
+  terms: { checkInTime: "2:00 PM", checkOutTime: "11:00 AM", childUnderAge: 8, cancellationPolicy: "Plans changed? Tell us 24 hours ahead." },
   ...over,
 });
 

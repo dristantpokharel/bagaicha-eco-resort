@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { BOOKING } from "@/config/booking";
 import { buttonClasses } from "@/components/ui/button";
 import type { PublicRoomType } from "@/lib/content/queries";
 import { formatNpr } from "@/lib/money";
@@ -13,7 +12,7 @@ import { ContentText } from "./content-text";
  * One room type as an editorial row: photos on one side, text on the other.
  * `flip` swaps the sides so a list of rooms alternates image/text, text/image.
  */
-export function RoomSection({ room, flip = false }: { room: PublicRoomType; flip?: boolean }) {
+export function RoomSection({ room, childUnderAge, flip = false }: { room: PublicRoomType; childUnderAge: number; flip?: boolean }) {
   const [main, ...details] = room.photos;
   const flagged = (f: string) => room.placeholderFields.includes(f);
   return (
@@ -48,7 +47,7 @@ export function RoomSection({ room, flip = false }: { room: PublicRoomType; flip
                 <dd className="mt-1 text-ink">Up to {room.maxGuests}, children included</dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-label text-ink-muted">Children under {BOOKING.childUnderAge}</dt>
+                <dt className="text-label text-ink-muted">Children under {childUnderAge}</dt>
                 <dd className="mt-1 text-ink">
                   {room.childPricePerNightNpr > 0
                     ? `${formatNpr(room.childPricePerNightNpr)} per child per night, added to the room price`

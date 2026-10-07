@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { BOOKING } from "@/config/booking";
 import { db } from "@/lib/db";
+import { loadStayTerms } from "@/lib/content/stay-terms";
 import { PageHeader } from "@/components/admin/page-header";
 import { NewBookingForm } from "./new-booking-form";
 
 export const metadata = { title: "New booking" };
 
 export default async function NewBookingPage() {
+  const { childUnderAge } = await loadStayTerms();
   const roomTypes = await db.roomType.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -34,7 +36,7 @@ export default async function NewBookingPage() {
         <NewBookingForm
           roomTypes={roomTypes}
           defaultCountryCode={BOOKING.defaultCountryCode}
-          childUnderAge={BOOKING.childUnderAge}
+          childUnderAge={childUnderAge}
         />
       )}
     </>

@@ -6,6 +6,7 @@ const ctx: TokenContext = {
   checkOutTime: "11:00 AM",
   address: "Khairi, Gulariya-3, Bardiya, Nepal",
   cancellationPolicy: "Tell us 24 hours ahead.",
+  childUnderAge: 8,
   rooms: [
     { name: "Family Room", maxGuests: 6, childPricePerNightNpr: 0 },
     { name: "Deluxe Room", maxGuests: 2, childPricePerNightNpr: 500 },

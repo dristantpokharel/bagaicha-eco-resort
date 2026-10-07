@@ -17,20 +17,20 @@ describe("content schemas", () => {
   });
 
   it("splits line lists and checks phone numbers and emails", () => {
-    const ok = parse("business", { name: "X", phones: "+977 9747932458\n\n+977 9851081502", emails: "a@b.com" });
+    const ok = parse("business", { name: "X", childUnderAge: "8", phones: "+977 9747932458\n\n+977 9851081502", emails: "a@b.com" });
     expect(ok.success && ok.data.phones).toEqual(["+977 9747932458", "+977 9851081502"]);
-    expect(parse("business", { name: "X", phones: "call me" }).success).toBe(false);
-    expect(parse("business", { name: "X", emails: "nope" }).success).toBe(false);
+    expect(parse("business", { name: "X", childUnderAge: "8", phones: "call me" }).success).toBe(false);
+    expect(parse("business", { name: "X", childUnderAge: "8", emails: "nope" }).success).toBe(false);
   });
 
   it("only accepts web addresses for links", () => {
-    expect(parse("business", { name: "X", instagramUrl: "javascript:alert(1)" }).success).toBe(false);
-    expect(parse("business", { name: "X", instagramUrl: "https://instagram.com/x" }).success).toBe(true);
+    expect(parse("business", { name: "X", childUnderAge: "8", instagramUrl: "javascript:alert(1)" }).success).toBe(false);
+    expect(parse("business", { name: "X", childUnderAge: "8", instagramUrl: "https://instagram.com/x" }).success).toBe(true);
   });
 
   it("keeps coordinates in range", () => {
-    expect(parse("business", { name: "X", latitude: "91" }).success).toBe(false);
-    const ok = parse("business", { name: "X", latitude: "28.229779", longitude: "81.332061" });
+    expect(parse("business", { name: "X", childUnderAge: "8", latitude: "91" }).success).toBe(false);
+    const ok = parse("business", { name: "X", childUnderAge: "8", latitude: "28.229779", longitude: "81.332061" });
     expect(ok.success && ok.data.latitude).toBeCloseTo(28.229779);
   });
 

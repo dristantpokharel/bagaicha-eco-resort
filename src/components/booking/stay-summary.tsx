@@ -1,4 +1,3 @@
-import { BOOKING } from "@/config/booking";
 import { formatStayDate } from "@/lib/booking/dates";
 import { quoteLines, type Quote } from "@/lib/booking/pricing";
 import { formatNpr } from "@/lib/money";
@@ -13,6 +12,7 @@ export function StaySummary({
   quote,
   checkInTime,
   checkOutTime,
+  childUnderAge,
 }: {
   roomTypeName: string;
   checkIn: Date;
@@ -22,6 +22,7 @@ export function StaySummary({
   quote: Quote;
   checkInTime: string | null;
   checkOutTime: string | null;
+  childUnderAge: number;
 }) {
   const lines = quoteLines(quote, formatNpr);
   return (
@@ -44,7 +45,7 @@ export function StaySummary({
           <dt className="text-ink-muted">Guests</dt>
           <dd className="text-ink">
             {adults} adult{adults === 1 ? "" : "s"}
-            {childCount > 0 ? `, ${childCount} child${childCount === 1 ? "" : "ren"} under ${BOOKING.childUnderAge}` : ""}
+            {childCount > 0 ? `, ${childCount} child${childCount === 1 ? "" : "ren"} under ${childUnderAge}` : ""}
           </dd>
         </div>
       </dl>

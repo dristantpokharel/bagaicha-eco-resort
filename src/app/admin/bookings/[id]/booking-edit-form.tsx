@@ -62,7 +62,7 @@ export function BookingEditForm({
           )}
           {flags.party && (
             <>
-              <Field id="edit-adults" label="Adults (incl. children 8+)" error={errors?.adults}>
+              <Field id="edit-adults" label={`Adults (incl. children ${childUnderAge}+)`} error={errors?.adults}>
                 <Input id="edit-adults" name="adults" type="number" min={1} max={20} defaultValue={values.adults} {...a11y("adults")} />
               </Field>
               <Field id="edit-children" label={`Children under ${childUnderAge}`} error={errors?.children}>

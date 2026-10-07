@@ -1,4 +1,3 @@
-import { BOOKING } from "@/config/booking";
 import { formatNpr } from "@/lib/money";
 
 /**
@@ -16,6 +15,7 @@ export type TokenContext = {
   checkOutTime: string | null;
   address: string | null;
   cancellationPolicy: string | null;
+  childUnderAge: number;
   rooms: { name: string; maxGuests: number; childPricePerNightNpr: number }[];
   nearby: { name: string; distance: string | null; travelTime: string | null }[];
 };
@@ -36,7 +36,7 @@ function resolve(name: string, arg: string | undefined, ctx: TokenContext): stri
     case "cancellationPolicy":
       return ctx.cancellationPolicy;
     case "childUnderAge":
-      return String(BOOKING.childUnderAge);
+      return String(ctx.childUnderAge);
     case "childRates":
       return ctx.rooms.length
         ? ctx.rooms

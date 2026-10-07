@@ -69,7 +69,7 @@ export function NewBookingForm({
           <Field id="new-checkOut" label="Check-out" error={errors?.checkOut}>
             <Input id="new-checkOut" name="checkOut" type="date" required {...a11y("checkOut")} />
           </Field>
-          <Field id="new-adults" label="Adults (incl. children 8+)" error={errors?.adults}>
+          <Field id="new-adults" label={`Adults (incl. children ${childUnderAge}+)`} error={errors?.adults}>
             <Input id="new-adults" name="adults" type="number" min={1} max={20} defaultValue={2} {...a11y("adults")} />
           </Field>
           <Field id="new-children" label={`Children under ${childUnderAge}`} error={errors?.children}>

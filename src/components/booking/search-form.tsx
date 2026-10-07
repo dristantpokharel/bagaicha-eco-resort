@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { BOOKING } from "@/config/booking";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select } from "@/components/ui/form";
+import { Input } from "@/components/ui/form";
 import { DateRangeField } from "@/components/booking/date-range-field";
+import { GuestsField } from "@/components/booking/guests-field";
+import { RoomTypePills } from "@/components/booking/room-type-pills";
 import { addDays, parseDateOnly } from "@/lib/booking/dates";
 import { latestCheckOut, soldOutForSelection, type AvailabilityPayload } from "@/lib/booking/availability-map";
 
@@ -24,8 +26,7 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
   const [checkIn, setCheckIn] = useState(defaults.checkIn);
   const [checkOut, setCheckOut] = useState(defaults.checkOut);
   const [room, setRoom] = useState(roomTypes.some((r) => r.slug === initialRoom) ? (initialRoom as string) : "");
-  const [adults, setAdults] = useState(defaults.adults);
-  const [children, setChildren] = useState(defaults.children);
+  const [party, setParty] = useState({ adults: defaults.adults, children: defaults.children });
   const [payload, setPayload] = useState<AvailabilityPayload | null>(null);
 
   // Sold-out nights are a nicety: if the request fails the calendar still works and the server re-checks on submit.
@@ -38,14 +39,14 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
     return () => controller.abort();
   }, []);
 
-  const party = adults + children;
+  const partySize = party.adults + party.children;
   const soldOut = useMemo(
-    () => (payload ? soldOutForSelection(payload, room || null, party) : new Set<string>()),
-    [payload, room, party],
+    () => (payload ? soldOutForSelection(payload, room || null, partySize) : new Set<string>()),
+    [payload, room, partySize],
   );
 
   const selectedType = roomTypes.find((r) => r.slug === room);
-  const tooSmall = selectedType && selectedType.maxGuests < party;
+  const tooSmall = selectedType && selectedType.maxGuests < partySize;
 
   const inDate = parseDateOnly(checkIn);
   const outDate = parseDateOnly(checkOut);
@@ -54,64 +55,38 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
       ? latestCheckOut(soldOut, inDate, BOOKING.maxNights, addDays(parseDateOnly(today) as Date, BOOKING.maxDaysAhead)) < outDate
       : false;
 
-  const counts = (from: number, to: number) =>
-    Array.from({ length: to - from + 1 }, (_, i) => from + i).map((n) => (
-      <option key={n} value={n}>
-        {n}
-      </option>
-    ));
-
   return (
-    <form action="/book" method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 lg:items-start" noValidate>
-      <div className="sm:col-span-2 lg:col-span-6 lg:max-w-sm">
-        <Field
-          id="room"
-          label="Room type (optional)"
-          hint={tooSmall ? `${selectedType.name} sleeps up to ${selectedType.maxGuests} guests, children included.` : undefined}
-        >
-          <Select id="room" name="room" value={room} onChange={(e) => setRoom(e.target.value)} className="h-12!">
-            <option value="">Any room</option>
-            {roomTypes.map((r) => (
-              <option key={r.slug} value={r.slug}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+    <form action="/book" method="get" className="space-y-5" noValidate>
+      <RoomTypePills
+        roomTypes={roomTypes}
+        value={room}
+        onChange={setRoom}
+        hint={tooSmall ? `${selectedType.name} sleeps up to ${selectedType.maxGuests} guests, children included.` : undefined}
+      />
 
-      <div className="sm:col-span-2 lg:col-span-2">
-        <DateRangeField
-          today={today}
-          checkIn={checkIn}
-          checkOut={checkOut}
-          onChange={(i, o) => {
-            setCheckIn(i);
-            setCheckOut(o);
-          }}
-          soldOut={soldOut}
-          error={errors?.checkIn ?? errors?.checkOut}
-          notice={crossesSoldOut ? "These dates include a sold-out night for this selection. Try other dates." : undefined}
-        />
-        <noscript>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <Input name="checkIn" type="date" aria-label="Check-in" min={today} defaultValue={defaults.checkIn} />
-            <Input name="checkOut" type="date" aria-label="Check-out" min={today} defaultValue={defaults.checkOut} />
-          </div>
-        </noscript>
-      </div>
-      <Field id="adults" label="Adults (incl. children 8+)" error={errors?.adults}>
-        <Select id="adults" name="adults" value={adults} onChange={(e) => setAdults(Number(e.target.value))} className="h-12!">
-          {counts(1, maxGuests)}
-        </Select>
-      </Field>
-      <Field id="children" label={`Children under ${childUnderAge}`} error={errors?.children}>
-        <Select id="children" name="children" value={children} onChange={(e) => setChildren(Number(e.target.value))} className="h-12!">
-          {counts(0, Math.max(maxGuests - 1, 0))}
-        </Select>
-      </Field>
-      <div className="sm:col-span-2 lg:col-span-1 lg:self-end">
-        <Button type="submit" variant="brand" size="lg" className="w-full">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] lg:items-end">
+        <div>
+          <DateRangeField
+            today={today}
+            checkIn={checkIn}
+            checkOut={checkOut}
+            onChange={(i, o) => {
+              setCheckIn(i);
+              setCheckOut(o);
+            }}
+            soldOut={soldOut}
+            error={errors?.checkIn ?? errors?.checkOut}
+            notice={crossesSoldOut ? "These dates include a sold-out night for this selection. Try other dates." : undefined}
+          />
+          <noscript>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Input name="checkIn" type="date" aria-label="Check-in" min={today} defaultValue={defaults.checkIn} />
+              <Input name="checkOut" type="date" aria-label="Check-out" min={today} defaultValue={defaults.checkOut} />
+            </div>
+          </noscript>
+        </div>
+        <GuestsField party={party} onChange={setParty} maxGuests={maxGuests} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
+        <Button type="submit" variant="brand" size="lg" className="min-h-14 w-full lg:w-auto lg:px-8">
           Check availability
         </Button>
       </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { loadStayTerms } from "@/lib/content/stay-terms";
 import { requirePagePermission } from "@/lib/auth";
 import { ADMIN_SECTIONS } from "@/lib/admin-nav";
 import { loadPickerLibrary, pickerMediaSelect, placementKey, toPlacements } from "@/lib/media-queries";
@@ -35,6 +36,7 @@ export default async function EditRoomTypePage({
 
   // Photos need media.manage too (same roles today, but keep the rule explicit).
   const canManageMedia = can(user.role, "media.manage");
+  const { childUnderAge } = await loadStayTerms();
   const library = canManageMedia ? await loadPickerLibrary() : [];
   const placements = toPlacements(roomType.media);
 
@@ -59,6 +61,7 @@ export default async function EditRoomTypePage({
             Details
           </h2>
           <RoomTypeForm
+            childUnderAge={childUnderAge}
             key={roomType.updatedAt.toISOString()}
             roomType={{
               id: roomType.id,

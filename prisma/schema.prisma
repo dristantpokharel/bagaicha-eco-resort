@@ -390,6 +390,8 @@ model BusinessInfo {
   /// Shown to guests as written, e.g. "2:00 PM". Used on /book, in emails and the FAQ.
   checkInTime       String?
   checkOutTime      String?
+  /// Children below this age pay the per-child rate; from this age they count as adults. Read by labels, FAQ tokens, emails and pricing text.
+  childUnderAge     Int      @default(8)
   latitude          Float?
   longitude         Float?
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.

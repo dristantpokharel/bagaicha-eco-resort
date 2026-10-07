@@ -242,6 +242,7 @@ async function loadTokenContext(): Promise<TokenContext> {
     checkOutTime: terms.checkOutTime,
     address: business.address,
     cancellationPolicy: terms.cancellationPolicy,
+    childUnderAge: terms.childUnderAge,
     rooms,
     nearby,
   };

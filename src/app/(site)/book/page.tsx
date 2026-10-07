@@ -103,6 +103,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                   quote={chosen.quote}
                   checkInTime={terms.checkInTime}
                   checkOutTime={terms.checkOutTime}
+                  childUnderAge={terms.childUnderAge}
                 />
               }
             />
@@ -198,7 +199,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           <SearchForm
             today={toDateOnlyString(today)}
             maxGuests={maxGuests}
-            childUnderAge={BOOKING.childUnderAge}
+            childUnderAge={terms.childUnderAge}
             roomTypes={bookableTypes}
             defaults={defaults}
             errors={formErrors}

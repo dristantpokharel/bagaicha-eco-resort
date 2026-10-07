@@ -230,7 +230,7 @@ body {
 }
 
 /* ─── Public forms (/book, /enquiry): brochure look for the shared form controls ─── */
-.form-brand label {
+.form-brand :is(label, legend) {
   font-family: var(--font-label);
   font-size: 0.75rem;
   font-weight: 500;

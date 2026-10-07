@@ -20,7 +20,7 @@ export type RoomTypeValues = {
 };
 
 /** Create (no `roomType`) or edit a room type. */
-export function RoomTypeForm({ roomType }: { roomType?: RoomTypeValues }) {
+export function RoomTypeForm({ roomType, childUnderAge }: { roomType?: RoomTypeValues; childUnderAge: number }) {
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(
     roomType ? updateRoomType : createRoomType,
     null,
@@ -87,7 +87,7 @@ export function RoomTypeForm({ roomType }: { roomType?: RoomTypeValues }) {
         </Field>
         <Field
           id="rt-child-price"
-          label="Per child under 8 (NPR/night)"
+          label={`Per child under ${childUnderAge} (NPR/night)`}
           error={errors?.childPricePerNightNpr}
           hint="Added per child per night. 0 = free."
         >

@@ -1,4 +1,3 @@
-import { BOOKING } from "@/config/booking";
 import type { StayTerms } from "@/lib/content/stay-terms";
 import { SITE } from "@/config/site";
 import { formatShortDate, formatStayDate } from "@/lib/booking/dates";
@@ -34,7 +33,7 @@ const COLORS = { cream: "#F7F3E5", forest: "#283327", ink: "#2B2B2B", muted: "#5
 
 function guestsLabel(b: BookingEmailData) {
   const adults = `${b.adults} adult${b.adults === 1 ? "" : "s"}`;
-  return b.children > 0 ? `${adults}, ${b.children} child${b.children === 1 ? "" : "ren"} under ${BOOKING.childUnderAge}` : adults;
+  return b.children > 0 ? `${adults}, ${b.children} child${b.children === 1 ? "" : "ren"} under ${b.terms.childUnderAge}` : adults;
 }
 
 type Row = [label: string, value: string];

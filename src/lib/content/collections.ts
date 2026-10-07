@@ -95,6 +95,15 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
       { name: "directionsUrl", label: "Get Directions link", kind: "url", hint: "Opens turn-by-turn directions." },
       { name: "checkInTime", label: "Check-in time", kind: "text", max: 20, hint: 'Shown as written, e.g. "2:00 PM". Used on the booking page, in emails and the FAQ.' },
       { name: "checkOutTime", label: "Check-out time", kind: "text", max: 20, hint: 'Shown as written, e.g. "11:00 AM".' },
+      {
+        name: "childUnderAge",
+        label: "Child age limit",
+        kind: "int",
+        required: true,
+        min: 1,
+        maxValue: 17,
+        hint: "Children younger than this pay the per-child rate; from this age they count as adults. Used on the booking page, room pages, emails and the FAQ.",
+      },
       { name: "latitude", label: "Latitude", kind: "float", min: -90, maxValue: 90 },
       { name: "longitude", label: "Longitude", kind: "float", min: -180, maxValue: 180 },
     ],
@@ -264,7 +273,9 @@ function fieldSchema(field: Field): z.ZodType {
       if (field.kind === "int") n = n.int({ error: "Use a whole number." });
       if (field.min !== undefined) n = n.min(field.min, { error: `At least ${field.min}.` });
       if (field.maxValue !== undefined) n = n.max(field.maxValue, { error: `At most ${field.maxValue}.` });
-      return z.preprocess((v) => (typeof v === "string" ? v.replace(/[,\s]/g, "") : v), z.preprocess(emptyToNull, n.nullable()));
+      const clean = (v: unknown) => (typeof v === "string" ? v.replace(/[,\s]/g, "") : v);
+      if (field.required) return z.preprocess((v) => (clean(v) === "" ? undefined : clean(v)), n);
+      return z.preprocess(clean, z.preprocess(emptyToNull, n.nullable()));
     }
     case "select": {
       const allowed = (field.options ?? []).map((o) => o.value);

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BOOKING } from "@/config/booking";
 import { db } from "@/lib/db";
 import { loadStayTerms } from "@/lib/content/stay-terms";
 import { can, requirePagePermission } from "@/lib/auth";
@@ -123,7 +122,7 @@ export default async function BookingPage({
               <Item label="Nights">{nights}</Item>
               <Item label="Guests">
                 {booking.adults} adult{booking.adults === 1 ? "" : "s"}
-                {booking.children > 0 && `, ${booking.children} child${booking.children === 1 ? "" : "ren"} under ${BOOKING.childUnderAge}`}
+                {booking.children > 0 && `, ${booking.children} child${booking.children === 1 ? "" : "ren"} under ${terms.childUnderAge}`}
               </Item>
               <Item label="Room type">{booking.roomType.name}</Item>
               <Item label="Room">{booking.room?.name ?? <span className="text-warning">Not assigned yet</span>}</Item>
@@ -160,7 +159,7 @@ export default async function BookingPage({
               flags={flags}
               roomTypes={roomTypes}
               rooms={editRooms}
-              childUnderAge={BOOKING.childUnderAge}
+              childUnderAge={terms.childUnderAge}
             />
           </Card>
         </div>
