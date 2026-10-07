@@ -73,7 +73,14 @@ export function LineCard({
             Room {line.number}: {line.roomTypeName}
           </h3>
           <p className="text-sm text-charcoal-light">
-            {line.roomName ? `Room ${line.roomName}` : <span className="text-warning">No room assigned yet</span>} · {line.guestsLabel}
+            {line.roomName ? (
+              `Room ${line.roomName}`
+            ) : status === "CANCELLED" ? (
+              "No room was assigned"
+            ) : (
+              <span className="text-warning">No room assigned yet</span>
+            )}{" "}
+            · {line.guestsLabel}
           </p>
         </div>
         <StatusBadge status={status} />
