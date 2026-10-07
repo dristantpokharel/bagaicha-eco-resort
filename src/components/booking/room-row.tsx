@@ -1,8 +1,7 @@
 "use client";
 
 import { RoomGuestsField } from "@/components/booking/room-guests-field";
-import { describeCapacityCompact } from "@/lib/booking/capacity";
-import { quoteRooms, typeOption, type BuilderRoom, type BuilderType, type StayFree } from "@/lib/booking/room-builder";
+import { calculationLines, quoteRooms, typeOption, type BuilderRoom, type BuilderType, type StayFree } from "@/lib/booking/room-builder";
 import { formatNpr } from "@/lib/money";
 
 type Props = {
@@ -23,12 +22,12 @@ export function RoomRow({ index, rooms, types, free, nights, childUnderAge, onCh
   const room = rooms[index];
   const chosen = types.find((t) => t.slug === room.slug);
   const number = index + 1;
-  const total = chosen && nights > 0 ? quoteRooms([room], new Map([[chosen.slug, chosen]]), nights).totalPriceNpr : null;
+  const quote = chosen && nights > 0 ? quoteRooms([room], new Map([[chosen.slug, chosen]]), nights).lines[0]?.quote : undefined;
 
   return (
     <li className="py-5 first:pt-4">
-      <div className="grid gap-x-4 gap-y-3 lg:grid-cols-[4.5rem_minmax(0,1fr)_14rem] lg:items-start">
-        <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start lg:justify-start lg:gap-0 lg:pt-4">
+      <div className="grid gap-3 lg:flex lg:items-start lg:gap-4">
+        <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start lg:justify-start lg:gap-0 lg:w-[4.5rem] lg:shrink-0 lg:pt-4">
           <h3 className="font-display text-xl font-semibold italic text-ink-heading">Room {number}</h3>
           {onRemove && (
             <button type="button" onClick={onRemove} className="min-h-11 text-sm text-forest underline underline-offset-4 lg:min-h-8" aria-label={`Remove room ${number}`}>
@@ -37,7 +36,7 @@ export function RoomRow({ index, rooms, types, free, nights, childUnderAge, onCh
           )}
         </div>
 
-        <fieldset>
+        <fieldset className="lg:min-w-0">
           <legend className="sr-only">Room type for room {number}</legend>
           {/* Wraps on desktop; on phones one scrolling line, so any number of types fits. */}
           <div className="-m-1 flex gap-2 overflow-x-auto p-1 sm:flex-wrap sm:overflow-visible">
@@ -65,26 +64,33 @@ export function RoomRow({ index, rooms, types, free, nights, childUnderAge, onCh
                     }
                   >
                     <span className="font-medium">{type.name}</span>
-                    <span>{describeCapacityCompact(type)}</span>
+                    <span>{formatNpr(type.basePriceNpr)} / night</span>
                     {status && <span className="text-xs opacity-80">{status}</span>}
                   </span>
                 </label>
               );
             })}
           </div>
-          <p className="mt-2 min-h-5 text-sm text-ink-muted">
-            {chosen ? `${formatNpr(chosen.basePriceNpr)} / night${total !== null ? ` · ${nights} ${nights === 1 ? "night" : "nights"}: ${formatNpr(total)}` : ""}` : ""}
-          </p>
+          <div className="mt-2 min-h-5 text-sm text-ink-muted">
+            {chosen &&
+              (quote ? calculationLines(quote, formatNpr) : [`${formatNpr(chosen.basePriceNpr)} / night`]).map((line) => (
+                <p key={line} className={line.startsWith("Room total") ? "text-ink" : undefined}>
+                  {line}
+                </p>
+              ))}
+          </div>
         </fieldset>
 
-        <RoomGuestsField
-          roomNumber={number}
-          party={{ adults: room.adults, children: room.children }}
-          onChange={(party) => onChange({ ...room, ...party })}
-          caps={chosen ? [chosen] : types}
-          typeName={chosen?.name}
-          childUnderAge={childUnderAge}
-        />
+        <div className="lg:w-56 lg:shrink-0">
+          <RoomGuestsField
+            roomNumber={number}
+            party={{ adults: room.adults, children: room.children }}
+            onChange={(party) => onChange({ ...room, ...party })}
+            caps={chosen ? [chosen] : types}
+            typeName={chosen?.name}
+            childUnderAge={childUnderAge}
+          />
+        </div>
       </div>
     </li>
   );

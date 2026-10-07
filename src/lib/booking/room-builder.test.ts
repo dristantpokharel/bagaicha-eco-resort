@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculationLines,
   checkRooms,
   childAgeRange,
   fitReason,
   guestLimits,
   guestNote,
   guestsSummary,
+  largestCapacity,
   quoteRooms,
   startingParty,
   stepGuests,
@@ -129,5 +131,22 @@ describe("pricing", () => {
     expect(q.lines[1]?.quote.totalPriceNpr).toBe(2 * 4500);
     expect(q.lines[2]).toBeNull();
     expect(q.totalPriceNpr).toBe(7000 + 9000);
+  });
+});
+
+describe("the room calculation", () => {
+  const fmt = (n: number) => `NPR ${n.toLocaleString("en-US")}`;
+  it("shows rate × nights, a child line when there are children, then the room total", () => {
+    const withChild = quoteRooms([room("fam", 2, 1)], types, 2).lines[0]!.quote;
+    expect(calculationLines(withChild, fmt)).toEqual(["NPR 4,500 × 2 nights = NPR 9,000", "NPR 500 × 1 child × 2 nights = NPR 1,000", "Room total: NPR 10,000"]);
+    const none = quoteRooms([room("dlx")], types, 1).lines[0]!.quote;
+    expect(calculationLines(none, fmt)).toEqual(["NPR 3,000 × 1 night = NPR 3,000", "Room total: NPR 3,000"]);
+  });
+});
+
+describe("largest limits", () => {
+  it("takes the most on each limit across types", () => {
+    expect(largestCapacity([deluxe, family])).toEqual({ maxGuests: 6, maxAdults: 6, maxChildren: null });
+    expect(largestCapacity([type("a", 4, 2, 1, 1), type("b", 3, 3, 1, 2)])).toEqual({ maxGuests: 4, maxAdults: 3, maxChildren: 2 });
   });
 });

@@ -4,8 +4,9 @@ import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/booking/stepper";
 import { PopoverSheet, triggerClasses, useIsWide } from "@/components/booking/popover-sheet";
-import type { Capacity, Party } from "@/lib/booking/capacity";
-import { childAgeRange, guestLimits, guestNote, guestsSummary, stepGuests } from "@/lib/booking/room-builder";
+import type { Party } from "@/lib/booking/capacity";
+import { describeCapacityCompact, type Capacity } from "@/lib/booking/capacity";
+import { childAgeRange, guestLimits, guestNote, guestsSummary, largestCapacity, stepGuests } from "@/lib/booking/room-builder";
 
 type Props = {
   roomNumber: number;
@@ -29,6 +30,7 @@ export function RoomGuestsField({ roomNumber, party, onChange, caps, typeName, c
   const labelId = `${id}-label`;
   const limits = guestLimits(party, caps);
   const note = guestNote(party, caps, typeName);
+  const capacity = describeCapacityCompact(largestCapacity(caps));
 
   const close = (returnFocus = true) => {
     setOpen(false);
@@ -69,9 +71,12 @@ export function RoomGuestsField({ roomNumber, party, onChange, caps, typeName, c
         sheet="bottom"
         desktopClassName="left-0 w-80 max-w-[calc(100vw-2rem)]"
         footer={
-          <Button type="button" variant="brand" size="lg" className="w-full" onClick={() => close()}>
-            Done
-          </Button>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-ink-muted">{capacity}</p>
+            <Button type="button" variant="brand" size="lg" onClick={() => close()}>
+              Done
+            </Button>
+          </div>
         }
       >
         <div className="divide-y divide-forest/15">
@@ -89,7 +94,8 @@ export function RoomGuestsField({ roomNumber, party, onChange, caps, typeName, c
           {note}
         </p>
         {wide && (
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <p className="text-sm text-ink-muted">{capacity}</p>
             <Button type="button" variant="secondary" size="md" onClick={() => close()}>
               Done
             </Button>

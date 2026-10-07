@@ -146,3 +146,23 @@ export function quoteRooms(rooms: BuilderRoom[], types: ReadonlyMap<string, Buil
   });
   return { lines, totalPriceNpr: lines.reduce((n, l) => n + (l?.quote.totalPriceNpr ?? 0), 0) };
 }
+
+/** The most any room allows on each limit, for a room with no type chosen yet. */
+export function largestCapacity(caps: Capacity[]): Capacity {
+  return {
+    maxGuests: Math.max(...caps.map((c) => c.maxGuests)),
+    maxAdults: Math.max(...caps.map((c) => c.maxAdults)),
+    maxChildren: caps.some((c) => c.maxChildren === null) ? null : Math.max(...caps.map((c) => c.maxChildren ?? 0)),
+  };
+}
+
+/** The calculation shown under a chosen type: "NPR 4,500 × 2 nights = NPR 9,000", a child line, then the room total. */
+export function calculationLines(quote: Quote, formatMoney: (npr: number) => string): string[] {
+  const nights = plural(quote.nights, "night", "nights");
+  const lines = [`${formatMoney(quote.pricePerNightNpr)} × ${nights} = ${formatMoney(quote.roomSubtotalNpr)}`];
+  if (quote.children > 0 && quote.childPricePerNightNpr > 0) {
+    lines.push(`${formatMoney(quote.childPricePerNightNpr)} × ${plural(quote.children, "child", "children")} × ${nights} = ${formatMoney(quote.childSubtotalNpr)}`);
+  }
+  lines.push(`Room total: ${formatMoney(quote.totalPriceNpr)}`);
+  return lines;
+}
