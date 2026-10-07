@@ -11,15 +11,23 @@ import { logActivity } from "@/lib/activity-log";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { formatStayDate, nightsBetween, toDateOnlyString } from "@/lib/booking/dates";
 import { todayInResort } from "@/lib/dates";
-import { assertRoomAssignable, findFreeRooms, isRoomConflictError, ROOM_CONFLICT_MESSAGE } from "@/lib/booking/availability";
+import { assertRoomAssignable, isRoomConflictError, ROOM_CONFLICT_MESSAGE } from "@/lib/booking/availability";
 import { partyProblem } from "@/lib/booking/capacity";
 import { computeQuote } from "@/lib/booking/pricing";
 import { validateStay } from "@/lib/booking/rules";
 import { validateSplit } from "@/lib/booking/multi-room";
 import { createReservationRecord } from "@/lib/booking/service";
-import { BOOKING_STATUS_LABELS } from "@/lib/booking/labels";
+import {
+  cancelLineWithReason,
+  cancelOpenLines,
+  confirmAllPending,
+  confirmLineInRoom,
+  lockReservation,
+  syncTotal,
+  transitionLine,
+} from "@/lib/booking/reservation-service";
 import { resolutionEmail } from "@/lib/booking/reservation-status";
-import { canTransition, editableFlags, permissionForTransition, reservationDateFlags } from "@/lib/booking/status";
+import { editableFlags, permissionForTransition, reservationDateFlags } from "@/lib/booking/status";
 import { notifyReservation, type NotifyOutcome } from "@/lib/email/booking-emails";
 import { formatNpr } from "@/lib/money";
 import {
@@ -66,19 +74,6 @@ async function emailIfResolved(reservationId: string): Promise<NotifyOutcome | n
   } catch {
     return null;
   }
-}
-
-/** Serialises changes to one reservation (two people confirming and cancelling at once). Held until the transaction ends. */
-async function lockReservation(tx: Tx, reservationId: string) {
-  await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${reservationId} FOR UPDATE`;
-}
-
-/** The reservation's total is the sum of its rooms that haven't been cancelled (unchanged if all were). */
-async function syncTotal(tx: Tx, reservationId: string) {
-  const lines = await tx.booking.findMany({ where: { reservationId }, select: { status: true, totalPriceNpr: true } });
-  const kept = lines.filter((l) => l.status !== "CANCELLED");
-  if (kept.length === 0) return;
-  await tx.reservation.update({ where: { id: reservationId }, data: { totalPriceNpr: kept.reduce((n, l) => n + l.totalPriceNpr, 0) } });
 }
 
 // ─── Create ──────────────────────────────────────────────────────────────────
@@ -328,43 +323,24 @@ export async function updateBookingLine(_prev: ActionResult | null, formData: Fo
 
 // ─── Status changes ──────────────────────────────────────────────────────────
 
-type Line = Prisma.BookingGetPayload<{ include: { reservation: { select: { reference: true } } } }>;
-
-/**
- * Moves one room line to the next status inside one transaction, with its reservation locked. The status is part
- * of the update's WHERE clause, so two people acting at once can't both succeed.
- */
+/** Runs one room's status change and its activity-log entry in one transaction. Returns the reservation's id. */
 async function changeLineStatus(params: {
   bookingId: string;
-  to: BookingStatus;
   actor: CurrentUser;
   action: string;
-  prepare?: (tx: Tx, line: Line) => Promise<Prisma.BookingUncheckedUpdateManyInput>;
-  details?: (line: Line) => Prisma.InputJsonObject;
+  to: BookingStatus;
+  change: (tx: Tx) => Promise<Awaited<ReturnType<typeof transitionLine>>>;
+  details?: (line: Awaited<ReturnType<typeof transitionLine>>) => Prisma.InputJsonObject;
 }): Promise<string> {
-  const { bookingId, to, actor } = params;
   try {
     return await db.$transaction(async (tx) => {
-      const peek = await tx.booking.findUnique({ where: { id: bookingId }, select: { reservationId: true } });
-      if (!peek) throw new ActionError("That room no longer exists.");
-      await lockReservation(tx, peek.reservationId);
-      const line = await tx.booking.findUnique({ where: { id: bookingId }, include: { reservation: { select: { reference: true } } } });
-      if (!line) throw new ActionError("That room no longer exists.");
-      if (!canTransition(line.status, to)) {
-        throw new ActionError(
-          `This room is ${BOOKING_STATUS_LABELS[line.status].toLowerCase()}, so it can't be moved to ${BOOKING_STATUS_LABELS[to].toLowerCase()}. Reload the page.`,
-        );
-      }
-      const data = (await params.prepare?.(tx, line)) ?? {};
-      const updated = await tx.booking.updateMany({ where: { id: bookingId, status: line.status }, data: { ...data, status: to } });
-      if (updated.count !== 1) throw new ActionError("Someone else just changed this room. Reload the page and try again.");
-      await syncTotal(tx, line.reservationId);
+      const line = await params.change(tx);
       await logActivity(tx, {
-        userId: actor.id,
+        userId: params.actor.id,
         action: params.action,
         entityType: "Reservation",
         entityId: line.reservationId,
-        details: { reference: line.reservation.reference, bookingId, from: line.status, to, ...params.details?.(line) },
+        details: { reference: line.reservation.reference, bookingId: params.bookingId, from: line.status, to: params.to, ...params.details?.(line) },
       });
       return line.reservationId;
     }, BOOKING_TX_OPTIONS);
@@ -380,14 +356,11 @@ export async function confirmLine(_prev: ActionResult | null, formData: FormData
 
     const reservationId = await changeLineStatus({
       bookingId,
-      to: "CONFIRMED",
       actor,
+      to: "CONFIRMED",
       action: "reservation.roomConfirmed",
       // Re-checked inside the transaction with the room locked: room active, right type, no block, no overlap.
-      prepare: async (tx, line) => {
-        await assertRoomAssignable(tx, { roomId, roomTypeId: line.roomTypeId, checkIn: line.checkIn, checkOut: line.checkOut, excludeBookingId: line.id });
-        return { roomId, confirmedAt: new Date() };
-      },
+      change: (tx) => confirmLineInRoom(tx, bookingId, roomId),
       details: () => ({ roomId }),
     });
 
@@ -409,42 +382,14 @@ export async function confirmAllLines(_prev: ActionResult | null, formData: Form
 
     try {
       await db.$transaction(async (tx) => {
-        await lockReservation(tx, reservationId);
-        const reservation = await tx.reservation.findUnique({
-          where: { id: reservationId },
-          include: { bookings: { where: { status: "PENDING" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: { roomType: { select: { name: true } } } } },
-        });
-        if (!reservation) throw new ActionError("That booking no longer exists.");
-        const pending = reservation.bookings;
-        if (pending.length === 0) throw new ActionError("No rooms are waiting for confirmation.");
-
-        // One free room per pending line, distinct within a type.
-        const assignments: { line: (typeof pending)[number]; roomId: string }[] = [];
-        for (const typeId of new Set(pending.map((l) => l.roomTypeId))) {
-          const lines = pending.filter((l) => l.roomTypeId === typeId);
-          const free = await findFreeRooms(tx, typeId, reservation.checkIn, reservation.checkOut);
-          if (free.length < lines.length) {
-            throw new ActionError(
-              `Not enough ${lines[0].roomType.name} rooms are free for these dates: ${lines.length} needed, ${free.length} free. Nothing was confirmed. Confirm the rooms one by one, or change the dates.`,
-            );
-          }
-          lines.forEach((line, i) => assignments.push({ line, roomId: free[i].id }));
-        }
-
-        // Check and write in a fixed room order (the same order every writer locks in).
-        for (const { line, roomId } of [...assignments].sort((a, b) => a.roomId.localeCompare(b.roomId))) {
-          await assertRoomAssignable(tx, { roomId, roomTypeId: line.roomTypeId, checkIn: line.checkIn, checkOut: line.checkOut, excludeBookingId: line.id });
-          const updated = await tx.booking.updateMany({ where: { id: line.id, status: "PENDING" }, data: { status: "CONFIRMED", roomId, confirmedAt: new Date() } });
-          if (updated.count !== 1) throw new ActionError("Someone else just changed this booking. Reload the page and try again.");
-        }
-        count = assignments.length;
-        await syncTotal(tx, reservationId);
+        const { reference, confirmed } = await confirmAllPending(tx, reservationId);
+        count = confirmed;
         await logActivity(tx, {
           userId: actor.id,
           action: "reservation.allConfirmed",
           entityType: "Reservation",
           entityId: reservationId,
-          details: { reference: reservation.reference, rooms: count },
+          details: { reference, rooms: count },
         });
       }, BOOKING_TX_OPTIONS);
     } catch (error) {
@@ -463,13 +408,14 @@ export async function checkInLine(_prev: ActionResult | null, formData: FormData
     const { bookingId } = parseForm(lineIdSchema, formData);
     await changeLineStatus({
       bookingId,
-      to: "CHECKED_IN",
       actor,
+      to: "CHECKED_IN",
       action: "reservation.roomCheckedIn",
-      prepare: async (_tx, line) => {
-        if (line.checkIn > todayInResort()) throw new ActionError(`Check-in opens on ${formatStayDate(line.checkIn)}.`);
-        return { checkedInAt: new Date() };
-      },
+      change: (tx) =>
+        transitionLine(tx, bookingId, "CHECKED_IN", async (line) => {
+          if (line.checkIn > todayInResort()) throw new ActionError(`Check-in opens on ${formatStayDate(line.checkIn)}.`);
+          return { checkedInAt: new Date() };
+        }),
     });
     revalidateAdmin();
     return { ok: true, message: "Guests checked in." };
@@ -482,10 +428,10 @@ export async function checkOutLine(_prev: ActionResult | null, formData: FormDat
     const { bookingId } = parseForm(lineIdSchema, formData);
     await changeLineStatus({
       bookingId,
-      to: "CHECKED_OUT",
       actor,
+      to: "CHECKED_OUT",
       action: "reservation.roomCheckedOut",
-      prepare: async () => ({ checkedOutAt: new Date() }),
+      change: (tx) => transitionLine(tx, bookingId, "CHECKED_OUT", async () => ({ checkedOutAt: new Date() })),
     });
     revalidateAdmin();
     return { ok: true, message: "Guests checked out." };
@@ -499,10 +445,10 @@ export async function cancelLine(_prev: ActionResult | null, formData: FormData)
     const { bookingId, reason } = parseForm(cancelLineSchema, formData);
     const reservationId = await changeLineStatus({
       bookingId,
-      to: "CANCELLED",
       actor,
+      to: "CANCELLED",
       action: "reservation.roomCancelled",
-      prepare: async () => ({ cancelledAt: new Date(), cancellationReason: reason }),
+      change: (tx) => cancelLineWithReason(tx, bookingId, reason),
       details: () => ({ reason }),
     });
     const outcome = await emailIfResolved(reservationId);
@@ -519,25 +465,14 @@ export async function cancelReservation(_prev: ActionResult | null, formData: Fo
     let count = 0;
 
     await db.$transaction(async (tx) => {
-      await lockReservation(tx, reservationId);
-      const reservation = await tx.reservation.findUnique({
-        where: { id: reservationId },
-        include: { bookings: { where: { status: { in: ["PENDING", "CONFIRMED"] } } } },
-      });
-      if (!reservation) throw new ActionError("That booking no longer exists.");
-      if (reservation.bookings.length === 0) throw new ActionError("No rooms can be cancelled any more.");
-      const updated = await tx.booking.updateMany({
-        where: { id: { in: reservation.bookings.map((b) => b.id) }, status: { in: ["PENDING", "CONFIRMED"] } },
-        data: { status: "CANCELLED", cancelledAt: new Date(), cancellationReason: reason },
-      });
-      count = updated.count;
-      await syncTotal(tx, reservationId);
+      const { reference, cancelled } = await cancelOpenLines(tx, reservationId, reason);
+      count = cancelled;
       await logActivity(tx, {
         userId: actor.id,
         action: "reservation.allCancelled",
         entityType: "Reservation",
         entityId: reservationId,
-        details: { reference: reservation.reference, rooms: count, reason },
+        details: { reference, rooms: count, reason },
       });
     }, BOOKING_TX_OPTIONS);
 
