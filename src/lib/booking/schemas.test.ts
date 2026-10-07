@@ -28,7 +28,7 @@ describe("enquirySchema", () => {
 
 describe("publicBookingSchema", () => {
   const base = {
-    checkIn: "2027-03-10", checkOut: "2027-03-12", adults: "2", children: "0", roomTypeId: "abc",
+    checkIn: "2027-03-10", checkOut: "2027-03-12", adults: "2", children: "0", rooms: JSON.stringify([{ roomTypeId: "abc", adults: 2, children: 0 }]),
     name: "Sita Rai", email: "sita@example.com", phone: "9800000000",
   };
   it("normalizes phone, coerces counts and ignores unknown fields like price", () => {
@@ -36,6 +36,17 @@ describe("publicBookingSchema", () => {
     expect(r.success && r.data.phone).toBe("+9779800000000");
     expect(r.success && r.data.adults).toBe(2);
     expect(r.success && "totalPriceNpr" in r.data).toBe(false);
+  });
+  it("reads the room lines and ignores any price in them", () => {
+    const rooms = JSON.stringify([{ roomTypeId: "a", adults: 2, children: 1, totalPriceNpr: 1 }, { roomTypeId: "b", adults: 1, children: 0 }]);
+    const r = publicBookingSchema.safeParse({ ...base, rooms });
+    expect(r.success && r.data.rooms).toEqual([{ roomTypeId: "a", adults: 2, children: 1 }, { roomTypeId: "b", adults: 1, children: 0 }]);
+  });
+  it("rejects missing, empty or broken room selections", () => {
+    expect(publicBookingSchema.safeParse({ ...base, rooms: "[]" }).success).toBe(false);
+    expect(publicBookingSchema.safeParse({ ...base, rooms: "not json" }).success).toBe(false);
+    expect(publicBookingSchema.safeParse({ ...base, rooms: undefined }).success).toBe(false);
+    expect(publicBookingSchema.safeParse({ ...base, rooms: JSON.stringify([{ roomTypeId: "a", adults: -1, children: 0 }]) }).success).toBe(false);
   });
   it("requires email and phone", () => {
     expect(publicBookingSchema.safeParse({ ...base, email: "" }).success).toBe(false);

@@ -1,6 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { ActionError } from "@/lib/actions";
-import { fittingTypes, type Party } from "./capacity";
 
 type Client = Prisma.TransactionClient;
 
@@ -41,13 +40,21 @@ export function findFreeRooms(
   });
 }
 
-/** Active room types that take the party (see capacity.ts) and have at least one free room. */
-export async function findAvailableRoomTypes(client: Client, checkIn: Date, checkOut: Date, party: Party) {
+/**
+ * Active room types with how many of their rooms are free for the WHOLE stay [checkIn, checkOut).
+ * Each counted room has no overlapping stay or block on any night, so N here means N distinct rooms that can
+ * all take the stay; rooms that are free on different nights are never added together.
+ * Types with no free room are left out.
+ */
+export async function findFreeCounts(client: Client, checkIn: Date, checkOut: Date) {
   const types = await client.roomType.findMany({
-    where: { isActive: true, rooms: { some: freeRoomWhere(checkIn, checkOut) } },
+    where: { isActive: true },
+    include: { rooms: { where: freeRoomWhere(checkIn, checkOut), select: { id: true } } },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
-  return fittingTypes(types, party);
+  return types
+    .filter((t) => t.rooms.length > 0)
+    .map(({ rooms, ...type }) => ({ type, free: rooms.length }));
 }
 
 /**
@@ -90,9 +97,9 @@ export async function assertRoomAssignable(
       checkOut: { gt: checkIn },
       ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
     },
-    select: { bookingNumber: true },
+    select: { reservation: { select: { reference: true } } },
   });
-  if (clash) throw new ActionError(`${room.name} is already booked for overlapping dates (${clash.bookingNumber}).`);
+  if (clash) throw new ActionError(`${room.name} is already booked for overlapping dates (${clash.reservation.reference}).`);
 
   return room;
 }

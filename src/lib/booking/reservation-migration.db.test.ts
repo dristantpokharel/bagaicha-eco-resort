@@ -130,7 +130,7 @@ describe.skipIf(!env)("multi-room reservations migration", { timeout: 120_000 },
     expect(broken).not.toBe(migrationSql(NEW_MIGRATION));
     await expect(client.query(broken)).rejects.toThrow(/have no reservation/);
 
-    const state = (await client.query(`SELECT to_regclass('reservations') AS r`)).rows[0];
+    const state = (await client.query(`SELECT to_regclass(current_schema() || '.reservations') AS r`)).rows[0];
     expect(state.r).toBeNull();
     const kept = (await client.query(`SELECT count(*)::int AS n FROM bookings WHERE "bookingNumber" IS NOT NULL`)).rows[0];
     expect(kept.n).toBe(4);

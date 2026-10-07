@@ -59,17 +59,41 @@ export const childrenField = count(0, 20);
 const id = z.string().trim().min(1).max(64);
 const dateString = z.string().trim().max(10);
 
+/** The dates and the whole party. The rooms (and who sleeps where) are separate: see roomLinesField. */
 export const stayFields = {
   checkIn: dateString,
   checkOut: dateString,
   adults: adultsField,
   children: childrenField,
-  roomTypeId: id,
 };
+
+const roomLine = z.object({
+  roomTypeId: id,
+  adults: z.number().int().min(0).max(20),
+  children: z.number().int().min(0).max(20),
+});
+
+/**
+ * The selected rooms, sent as a JSON array of { roomTypeId, adults, children } in one form field.
+ * Only ids and guest counts are accepted; prices always come from the database. The room-count limit and
+ * the per-room capacity are checked by validateSplit, so people get specific messages.
+ */
+export const roomLinesField = z
+  .string()
+  .transform((raw, ctx) => {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      ctx.addIssue({ code: "custom", message: "Your room selection wasn't understood. Please choose your rooms again." });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(roomLine).min(1, { error: "Choose at least one room." }).max(20, { error: "Choose at least one room." }));
 
 /** Public booking request. Prices are never accepted from the browser. */
 export const publicBookingSchema = z.object({
   ...stayFields,
+  rooms: roomLinesField,
   name: guestName,
   email: emailSchema,
   phone: requiredPhone,
