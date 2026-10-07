@@ -7,7 +7,9 @@ import { TurnstileWidget } from "@/components/forms/turnstile-widget";
 import { submitBookingRequest, type BookingRequestState } from "@/app/(site)/book/actions";
 
 type Props = {
-  stay: { checkIn: string; checkOut: string; adults: number; children: number; roomTypeId: string };
+  stay: { checkIn: string; checkOut: string; adults: number; children: number };
+  /** The selected rooms; sent as one JSON field. The server re-validates them and prices them from the database. */
+  rooms: { roomTypeId: string; adults: number; children: number }[];
   defaultCountryCode: string;
   /** Server-rendered stay recap, shown beside the form and after success. */
   summary: ReactNode;
@@ -16,7 +18,7 @@ type Props = {
 };
 
 /** Guest details + submit. The server recomputes price and availability; nothing priced is posted. */
-export function BookingForm({ stay, defaultCountryCode, summary, cancellationPolicy }: Props) {
+export function BookingForm({ stay, rooms, defaultCountryCode, summary, cancellationPolicy }: Props) {
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [state, action, pending] = useActionState<BookingRequestState, FormData>(async (prev, formData) => {
@@ -38,17 +40,19 @@ export function BookingForm({ stay, defaultCountryCode, summary, cancellationPol
       <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-4" role="status">
           <h2 className="font-display text-2xl font-semibold italic text-ink-heading">Request received</h2>
-          <p className="text-ink">Your booking number is</p>
-          <p className="font-label text-3xl font-semibold tracking-wide text-forest">{state.bookingNumber}</p>
           <p className="text-ink">
-            This is a request, not a confirmed booking yet. We will check availability and confirm by email or phone. Keep
-            your booking number if you contact us.
+            Your reference is
+          </p>
+          <p className="font-label text-3xl font-semibold tracking-wide text-forest">{state.reference}</p>
+          <p className="text-ink">
+            You asked for {state.rooms.length === 1 ? "1 room" : `${state.rooms.length} rooms`}. This is a request, not a confirmed
+            booking yet. We will check availability and confirm by email or phone. Keep your reference if you contact us.
           </p>
           {state.confirmationEmail === "sent" ? (
             <p className="text-ink">We&apos;ve emailed you a copy of your request.</p>
           ) : (
             <p className="text-ink">
-              We couldn&apos;t send the confirmation email, but your request is saved. Please note your booking number.
+              We couldn&apos;t send the confirmation email, but your request is saved. Please note your reference.
             </p>
           )}
           {cancellationPolicy && <p className="text-sm text-ink-muted">Cancellation policy: {cancellationPolicy}</p>}
@@ -65,6 +69,7 @@ export function BookingForm({ stay, defaultCountryCode, summary, cancellationPol
         {(Object.entries(stay) as [string, string | number][]).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
         ))}
+        <input type="hidden" name="rooms" value={JSON.stringify(rooms)} />
         {/* Honeypot: hidden from people and assistive tech; bots tend to fill it. */}
         <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
           <label htmlFor="website">Website</label>

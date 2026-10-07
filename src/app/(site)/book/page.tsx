@@ -5,17 +5,19 @@ import { PublicShell } from "@/components/booking/public-shell";
 import { SearchForm } from "@/components/booking/search-form";
 import { StaySummary } from "@/components/booking/stay-summary";
 import { BookingForm } from "@/components/booking/booking-form";
+import { RoomSelector, type SelectorType } from "@/components/booking/room-selector";
 import { buttonClasses } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { todayInResort } from "@/lib/dates";
 import { toDateOnlyString } from "@/lib/booking/dates";
-import { findAvailableRoomTypes } from "@/lib/booking/availability";
+import { findFreeCounts } from "@/lib/booking/availability";
 import { loadAvailability } from "@/lib/booking/availability-data";
-import { suggestAlternatives, unavailableReason, type DateRangeSuggestion, type TypeSuggestion, type UnavailableReason } from "@/lib/booking/availability-map";
-import { describeCapacity, fittingTypes, partyFits, type Capacity } from "@/lib/booking/capacity";
+import { suggestAlternatives, unavailableReason, type CombinationSuggestion, type DateRangeSuggestion, type UnavailableReason } from "@/lib/booking/availability-map";
+import { describeCapacity, partyFits } from "@/lib/booking/capacity";
 import { addDays, formatCompactDate } from "@/lib/booking/dates";
-import { computeQuote, quoteLines } from "@/lib/booking/pricing";
+import { canSeatFromFree, quoteReservation, suggestCombination, summariseRooms, validateSplit, type RoomLine, type RoomTypeForBooking } from "@/lib/booking/multi-room";
 import { validateStay } from "@/lib/booking/rules";
+import { decodeLines, decodePick, encodePick } from "@/lib/booking/selection-url";
 import { formatNpr } from "@/lib/money";
 import { getRoomTypes, getStayTerms } from "@/lib/content/queries";
 import { pageMetadata } from "@/lib/seo";
@@ -38,9 +40,9 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   // Bookable types with their occupancy limits; drive the room pills, the steppers and the "fits" checks.
   const bookableTypes = await db.roomType.findMany({
     where: { isActive: true, rooms: { some: { isActive: true } } },
-    select: { slug: true, name: true, maxGuests: true, maxAdults: true, maxChildren: true },
+    select: { slug: true, name: true, maxGuests: true, maxAdults: true, maxChildren: true, _count: { select: { rooms: { where: { isActive: true } } } } },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-  });
+  }).then((rows) => rows.map(({ _count, ...type }) => ({ ...type, rooms: _count.rooms })));
   // Public copy of each room (placeholder text is hidden in production) and the room picked on /stay.
   const terms = await getStayTerms();
   const publicRooms = new Map((await getRoomTypes()).map((r) => [r.slug, r]));
@@ -59,59 +61,26 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   if (searched && bookableTypes.length > 0) {
     const stay = validateStay(defaults, { today, publicRequest: true });
+    const party = { adults: defaults.adults, children: defaults.children };
     if (!stay.ok) {
       formErrors = stay.errors;
-    } else if (fittingTypes(bookableTypes, defaults).length === 0) {
+    } else if (!canSeatFromFree(party, bookableTypes.map((t) => ({ type: t, free: t.rooms })))) {
       content = <TooManyGuests />;
     } else {
-      const available = await findAvailableRoomTypes(db, stay.checkIn, stay.checkOut, defaults);
-      const withQuotes = available.map((roomType) => ({
-        roomType,
-        quote: computeQuote({
-          nights: stay.nights,
-          pricePerNightNpr: roomType.basePriceNpr,
-          childPricePerNightNpr: roomType.childPricePerNightNpr,
-          children: defaults.children,
-        }),
-      }));
-      const requested = bookableTypes.find((r) => r.slug === first(sp.room));
-      const chosen = withQuotes.find((r) => r.roomType.slug === requested?.slug);
+      const free = await findFreeCounts(db, stay.checkIn, stay.checkOut);
+      const pill = bookableTypes.find((r) => r.slug === first(sp.room));
+      const visible = pill ? free.filter((f) => f.type.slug === pill.slug) : free;
+      const params = { ...stringParams(defaults), ...(pill ? { room: pill.slug } : {}) };
+      const types = new Map(free.map((f) => [f.type.id, f.type]));
 
-      if (chosen) {
-        content = (
-          <>
-            <p className="mb-6">
-              <Link href={backToResults(defaults)} className="text-sm text-forest underline underline-offset-4">
-                ← Choose a different room
-              </Link>
-            </p>
-            <BookingForm
-              stay={{ ...defaults, roomTypeId: chosen.roomType.id }}
-              defaultCountryCode={BOOKING.defaultCountryCode}
-              cancellationPolicy={terms.cancellationPolicy}
-              summary={
-                <StaySummary
-                  roomTypeName={chosen.roomType.name}
-                  checkIn={stay.checkIn}
-                  checkOut={stay.checkOut}
-                  adults={defaults.adults}
-                  childCount={defaults.children}
-                  quote={chosen.quote}
-                  checkInTime={terms.checkInTime}
-                  checkOutTime={terms.checkOutTime}
-                  childUnderAge={terms.childUnderAge}
-                />
-              }
-            />
-          </>
-        );
-      } else if (requested || withQuotes.length === 0) {
-        // The chosen room (or every room) can't take these dates: offer what does fit.
-        const { types, index } = await loadAvailability(stay.checkIn, addDays(stay.checkIn, ALTERNATIVE_WINDOW_DAYS + stay.nights + 1));
+      if (!canSeatFromFree(party, visible.map((f) => ({ type: f.type, free: f.free })))) {
+        // Not enough rooms are free for the whole stay: offer a combination, other dates, then /enquiry.
+        const { types: infoTypes, index } = await loadAvailability(stay.checkIn, addDays(stay.checkIn, ALTERNATIVE_WINDOW_DAYS + stay.nights + 1));
+        const pillInfo = infoTypes.find((t) => t.slug === pill?.slug);
         const alternatives = suggestAlternatives({
           index,
-          types,
-          chosenTypeId: types.find((t) => t.slug === requested?.slug)?.id ?? null,
+          types: infoTypes,
+          chosenTypeId: pillInfo?.id ?? null,
           checkIn: stay.checkIn,
           checkOut: stay.checkOut,
           adults: defaults.adults,
@@ -121,55 +90,123 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           maxRanges: 3,
           maxDaysAhead: BOOKING.maxDaysAhead,
         });
-        const tooSmall = requested && !partyFits(requested, defaults);
-        const requestedType = types.find((t) => t.slug === requested?.slug);
-        const reason = requestedType && !tooSmall ? unavailableReason(index, requestedType.id, stay.checkIn, stay.checkOut) : null;
         const dates = `${formatCompactDate(stay.checkIn)} → ${formatCompactDate(stay.checkOut)}`;
+        const pillFree = visible[0]?.free ?? 0;
+        const pillFitsEver = pill ? canSeatFromFree(party, [{ type: pill, free: pill.rooms }]) : true;
         content = (
           <Unavailable
             heading={
-              requested
-                ? tooSmall
-                  ? `${requested.name} doesn't fit this group`
-                  : `${requested.name} isn't available for ${dates}`
-                : `Nothing is available for ${dates}`
+              pill
+                ? pillFitsEver
+                  ? `${pill.name} isn't available for your group on ${dates}`
+                  : `${pill.name} can't hold this group`
+                : `Nothing is available for your group on ${dates}`
             }
-            reason={requested ? (tooSmall ? `${describeCapacity(requested)}.` : reasonText(requested.name, reason)) : null}
-            requestedName={tooSmall ? undefined : requested?.name}
-            otherTypes={alternatives.otherTypes}
+            reason={
+              pill
+                ? pillFitsEver
+                  ? pillFree === 0 && pillInfo
+                    ? reasonText(pill.name, unavailableReason(index, pillInfo.id, stay.checkIn, stay.checkOut))
+                    : `Only ${pillFree} ${pill.name} ${pillFree === 1 ? "room is" : "rooms are"} free for the whole stay, which isn't enough for your group.`
+                  : `${describeCapacity(pill)} per room, and we take up to ${BOOKING.maxRoomsPerRequest} rooms online.`
+                : "Not enough rooms are free for the whole stay to seat your group."
+            }
+            requestedName={pill && pillFitsEver ? pill.name : undefined}
+            combination={alternatives.combination}
+            names={new Map(infoTypes.map((t) => [t.id, { name: t.name, slug: t.slug }]))}
             dateRanges={alternatives.dateRanges}
             nights={stay.nights}
-            descriptions={publicRooms}
-            params={stringParams(defaults)}
-            roomSlug={tooSmall ? undefined : requested?.slug}
+            params={params}
+            roomSlug={pill && pillFitsEver ? pill.slug : undefined}
           />
         );
       } else {
-        content = (
-          <div className="space-y-4" aria-live="polite">
-            <h2 className="font-display text-2xl font-semibold italic text-ink-heading">Available for your dates</h2>
-            <ul className="grid gap-5 md:grid-cols-2">
-              {withQuotes.map(({ roomType, quote }) => (
-                <RoomOption
-                  key={roomType.id}
-                  name={roomType.name}
-                  capacity={roomType}
-                  description={publicRooms.get(roomType.slug)?.description}
-                  quote={quote}
-                  href={roomHref(stringParams(defaults), roomType.slug)}
-                  cta="Request this room"
-                />
-              ))}
-            </ul>
-            <p className="text-sm text-ink-muted">
-              One room per booking. For a larger group, make separate bookings or{" "}
-              <Link href="/enquiry" className="text-forest underline underline-offset-4">
-                send an enquiry
-              </Link>
-              .
-            </p>
-          </div>
-        );
+        const decoded = decodeLines(first(sp.lines));
+        const chosen = decoded ? resolveLines(decoded, free, types, party) : null;
+
+        if (chosen) {
+          const quote = quoteReservation(chosen, types, stay.nights);
+          content = (
+            <>
+              <p className="mb-6">
+                <Link href={`/book?${new URLSearchParams({ ...params, pick: encodePick(countByTypeSlug(chosen, types)) })}`} className="text-sm text-forest underline underline-offset-4">
+                  ← Change rooms
+                </Link>
+              </p>
+              <BookingForm
+                stay={{ ...defaults }}
+                rooms={chosen}
+                defaultCountryCode={BOOKING.defaultCountryCode}
+                cancellationPolicy={terms.cancellationPolicy}
+                summary={
+                  <StaySummary
+                    rooms={chosen.map((line, i) => ({
+                      roomTypeName: types.get(line.roomTypeId)!.name,
+                      adults: line.adults,
+                      children: line.children,
+                      quote: quote.lines[i],
+                    }))}
+                    checkIn={stay.checkIn}
+                    checkOut={stay.checkOut}
+                    checkInTime={terms.checkInTime}
+                    checkOutTime={terms.checkOutTime}
+                    childUnderAge={terms.childUnderAge}
+                  />
+                }
+              />
+            </>
+          );
+        } else {
+          const selectorTypes: SelectorType[] = visible.map(({ type, free: n }) => ({
+            id: type.id,
+            slug: type.slug,
+            name: type.name,
+            description: publicRooms.get(type.slug)?.description ?? null,
+            free: n,
+            maxGuests: type.maxGuests,
+            maxAdults: type.maxAdults,
+            maxChildren: type.maxChildren,
+            basePriceNpr: type.basePriceNpr,
+            childPricePerNightNpr: type.childPricePerNightNpr,
+          }));
+          const picked = decodePick(first(sp.pick));
+          const initialCounts: Record<string, number> = {};
+          for (const t of selectorTypes) if (picked[t.slug]) initialCounts[t.id] = picked[t.slug];
+          if (Object.keys(initialCounts).length === 0 && pill) {
+            // Coming from a room on /stay: start with as few rooms of that type as hold the group.
+            const entry = visible[0];
+            for (let n = 1; entry && n <= Math.min(entry.free, BOOKING.maxRoomsPerRequest); n++) {
+              if (canSeatFromFree(party, [{ type: entry.type, free: n }], n)) {
+                initialCounts[entry.type.id] = n;
+                break;
+              }
+            }
+          }
+          const combo = visible.some((f) => partyFits(f.type, party))
+            ? null
+            : suggestCombination(party, visible, stay.nights);
+          content = (
+            <RoomSelector
+              // A new search or a new link must not inherit the previous selection.
+              key={`${params.checkIn}|${params.checkOut}|${params.adults}|${params.children}|${params.room ?? ""}|${first(sp.pick)}`}
+              types={selectorTypes}
+              party={party}
+              nights={stay.nights}
+              childUnderAge={terms.childUnderAge}
+              params={params}
+              initialCounts={initialCounts}
+              suggestion={
+                combo
+                  ? {
+                      counts: countByTypeId(combo.lines),
+                      label: summariseRooms(combo.lines.map((l) => types.get(l.roomTypeId)!.name)),
+                    }
+                  : null
+              }
+              notice={decoded ? "That room selection is no longer available. Please choose your rooms again." : undefined}
+            />
+          );
+        }
       }
     }
   }
@@ -227,41 +264,41 @@ function stringParams(d: { checkIn: string; checkOut: string; adults: number; ch
 
 const ALTERNATIVE_WINDOW_DAYS = 60;
 
-const roomHref = (params: Record<string, string>, slug: string) => `/book?${new URLSearchParams({ ...params, room: slug })}`;
+type FreeEntry = { type: { id: string; slug: string; name: string }; free: number };
 
-function RoomOption({
-  name,
-  capacity,
-  description,
-  quote,
-  href,
-  cta,
-}: {
-  name: string;
-  capacity: Capacity;
-  description?: string | null;
-  quote: TypeSuggestion["quote"];
-  href: string;
-  cta: string;
-}) {
-  return (
-    <li className="flex flex-col border border-forest/20 bg-white p-5">
-      <h3 className="font-display text-xl font-semibold italic text-ink-heading">{name}</h3>
-      <p className="mt-1 text-sm text-ink-muted">{describeCapacity(capacity, { childrenIncluded: true })}</p>
-      {description && <p className="mt-3 text-sm text-ink">{description}</p>}
-      <div className="mt-4 text-sm">
-        {quoteLines(quote, formatNpr).map((line) => (
-          <p key={line} className="text-ink-muted">
-            {line}
-          </p>
-        ))}
-        <p className="mt-2 text-lg font-semibold text-ink">Total: {formatNpr(quote.totalPriceNpr)}</p>
-      </div>
-      <Link href={href} className={buttonClasses({ variant: "brand", size: "lg", className: "mt-5 w-full" })}>
-        {cta}
-      </Link>
-    </li>
-  );
+/** Turns the lines in the URL into room lines, or null if any is unknown, doesn't fit, isn't free or doesn't add up to the party. */
+function resolveLines(
+  decoded: { slug: string; adults: number; children: number }[],
+  free: FreeEntry[],
+  types: ReadonlyMap<string, RoomTypeForBooking>,
+  party: { adults: number; children: number },
+): RoomLine[] | null {
+  const bySlug = new Map(free.map((f) => [f.type.slug, f]));
+  const lines: RoomLine[] = [];
+  const used = new Map<string, number>();
+  for (const d of decoded) {
+    const entry = bySlug.get(d.slug);
+    if (!entry) return null;
+    used.set(entry.type.id, (used.get(entry.type.id) ?? 0) + 1);
+    if (used.get(entry.type.id)! > entry.free) return null;
+    lines.push({ roomTypeId: entry.type.id, adults: d.adults, children: d.children });
+  }
+  return validateSplit(lines, types, party).ok ? lines : null;
+}
+
+function countByTypeId(lines: RoomLine[]) {
+  const out: Record<string, number> = {};
+  for (const l of lines) out[l.roomTypeId] = (out[l.roomTypeId] ?? 0) + 1;
+  return out;
+}
+
+function countByTypeSlug(lines: RoomLine[], types: ReadonlyMap<string, { slug: string }>) {
+  const out: Record<string, number> = {};
+  for (const l of lines) {
+    const slug = types.get(l.roomTypeId)!.slug;
+    out[slug] = (out[slug] ?? 0) + 1;
+  }
+  return out;
 }
 
 function reasonText(name: string, reason: UnavailableReason | null): string | null {
@@ -272,29 +309,30 @@ function reasonText(name: string, reason: UnavailableReason | null): string | nu
   return `Every ${name} is free on some of these nights, but no single room is free for the whole stay.`;
 }
 
-/** Shown when the chosen room type (or every type) can't take the dates: other rooms, other dates, then /enquiry. */
+/** Shown when the party can't be seated for the dates: a working combination, other dates, then /enquiry. */
 function Unavailable({
   heading,
   reason,
   requestedName,
-  otherTypes,
+  combination,
+  names,
   dateRanges,
   nights,
-  descriptions,
   params,
   roomSlug,
 }: {
   heading: string;
   reason: string | null;
   requestedName?: string;
-  otherTypes: TypeSuggestion[];
+  combination: CombinationSuggestion | null;
+  names: Map<string, { name: string; slug: string }>;
   dateRanges: DateRangeSuggestion[];
   nights: number;
-  descriptions: Map<string, { description?: string | null }>;
   params: Record<string, string>;
   roomSlug?: string;
 }) {
-  const nothing = otherTypes.length === 0 && dateRanges.length === 0;
+  const nothing = !combination && dateRanges.length === 0;
+  const searchOnly = Object.fromEntries(Object.entries(params).filter(([key]) => key !== "room"));
   return (
     <div className="space-y-8" aria-live="polite">
       <div className="space-y-2">
@@ -302,29 +340,27 @@ function Unavailable({
         {reason && <p className="text-ink">{reason}</p>}
       </div>
 
-      {otherTypes.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="font-label text-xs uppercase tracking-[0.14em] text-ink-heading">Other rooms for your dates</h3>
-          <ul className="grid gap-5 md:grid-cols-2">
-            {otherTypes.map(({ roomType, quote }) => (
-              <RoomOption
-                key={roomType.id}
-                name={roomType.name}
-                capacity={roomType}
-                description={descriptions.get(roomType.slug)?.description}
-                quote={quote}
-                href={roomHref(params, roomType.slug)}
-                cta="Choose this instead"
-              />
-            ))}
-          </ul>
+      {combination && (
+        <section className="space-y-3 border border-forest/20 bg-white p-5">
+          <h3 className="font-label text-xs uppercase tracking-[0.14em] text-ink-heading">Free for your dates and group</h3>
+          <p className="text-ink">{summariseRooms(combination.lines.map((l) => names.get(l.roomTypeId)!.name))}</p>
+          <p className="text-lg font-semibold text-ink">Total: {formatNpr(combination.quote.totalPriceNpr)}</p>
+          <Link
+            href={`/book?${new URLSearchParams({
+              ...searchOnly,
+              pick: encodePick(countByTypeSlug(combination.lines, names)),
+            })}`}
+            className={buttonClasses({ variant: "brand", size: "lg" })}
+          >
+            See these rooms
+          </Link>
         </section>
       )}
 
       {dateRanges.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-label text-xs uppercase tracking-[0.14em] text-ink-heading">
-            {requestedName ? `${requestedName} is free for ${nights} night${nights === 1 ? "" : "s"} on` : `Free for ${nights} night${nights === 1 ? "" : "s"} on`}
+            {requestedName ? `${requestedName} is free for ${nights} night${nights === 1 ? "" : "s"} on` : `Your group can stay for ${nights} night${nights === 1 ? "" : "s"} on`}
           </h3>
           <ul className="flex flex-wrap gap-3">
             {dateRanges.map((range) => (
@@ -359,15 +395,11 @@ function Unavailable({
   );
 }
 
-function backToResults(d: Parameters<typeof stringParams>[0]) {
-  return `/book?${new URLSearchParams(stringParams(d))}`;
-}
-
 function TooManyGuests() {
   return (
     <p className="border border-forest/20 bg-white p-5 text-ink">
-      None of our rooms takes a group like this in one room, and each booking is for one room. For a bigger group, please make
-      separate bookings or{" "}
+      We can seat up to {BOOKING.maxRoomsPerRequest} rooms per online request, and none of those combinations holds a group this
+      size. For a bigger group, please{" "}
       <Link href="/enquiry" className="text-forest underline underline-offset-4">
         send us an enquiry
       </Link>
