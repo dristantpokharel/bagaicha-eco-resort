@@ -50,6 +50,21 @@ export function soldOutNights(index: AvailabilityIndex, roomTypeId: string, from
   return out;
 }
 
+export type UnavailableReason =
+  | { kind: "sold-out"; soldOutNights: number; nights: number }
+  | { kind: "no-single-room" };
+
+/**
+ * Why a type can't take [checkIn, checkOut): some nights have no free room at all ("sold-out"), or every
+ * night has a free room but no single room covers the whole stay ("no-single-room"). Null when it can.
+ */
+export function unavailableReason(index: AvailabilityIndex, roomTypeId: string, checkIn: Date, checkOut: Date): UnavailableReason | null {
+  if (typeIsBookable(index, roomTypeId, checkIn, checkOut)) return null;
+  const nights = nightsBetween(checkIn, checkOut);
+  const soldOut = soldOutNights(index, roomTypeId, checkIn, nights).length;
+  return soldOut > 0 ? { kind: "sold-out", soldOutNights: soldOut, nights } : { kind: "no-single-room" };
+}
+
 // ─── Public payload ──────────────────────────────────────────────────────────
 
 export type AvailabilityPayload = {

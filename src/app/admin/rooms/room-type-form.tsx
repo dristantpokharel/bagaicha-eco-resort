@@ -113,7 +113,7 @@ export function RoomTypeForm({ roomType, childUnderAge }: { roomType?: RoomTypeV
           />
         </Field>
         <div className="sm:col-span-2 lg:col-span-4">
-          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid items-start gap-4 sm:grid-cols-3 lg:grid-cols-4">
             <Field id="rt-guests" label="Maximum guests" error={errors?.maxGuests}>
               <Input
                 id="rt-guests"
@@ -140,7 +140,7 @@ export function RoomTypeForm({ roomType, childUnderAge }: { roomType?: RoomTypeV
                 {...capA11y("maxAdults")}
               />
             </Field>
-            <Field id="rt-children" label="Maximum children (optional)" error={errors?.maxChildren}>
+            <Field id="rt-children" label="Max children" hint="Optional. Blank = no limit." error={errors?.maxChildren}>
               <Input
                 id="rt-children"
                 name="maxChildren"

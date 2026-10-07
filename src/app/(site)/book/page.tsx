@@ -11,7 +11,7 @@ import { todayInResort } from "@/lib/dates";
 import { toDateOnlyString } from "@/lib/booking/dates";
 import { findAvailableRoomTypes } from "@/lib/booking/availability";
 import { loadAvailability } from "@/lib/booking/availability-data";
-import { suggestAlternatives, type DateRangeSuggestion, type TypeSuggestion } from "@/lib/booking/availability-map";
+import { suggestAlternatives, unavailableReason, type DateRangeSuggestion, type TypeSuggestion, type UnavailableReason } from "@/lib/booking/availability-map";
 import { describeCapacity, fittingTypes, partyFits, type Capacity } from "@/lib/booking/capacity";
 import { addDays, formatCompactDate } from "@/lib/booking/dates";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
@@ -122,15 +122,19 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           maxDaysAhead: BOOKING.maxDaysAhead,
         });
         const tooSmall = requested && !partyFits(requested, defaults);
+        const requestedType = types.find((t) => t.slug === requested?.slug);
+        const reason = requestedType && !tooSmall ? unavailableReason(index, requestedType.id, stay.checkIn, stay.checkOut) : null;
+        const dates = `${formatCompactDate(stay.checkIn)} → ${formatCompactDate(stay.checkOut)}`;
         content = (
           <Unavailable
             heading={
               requested
                 ? tooSmall
-                  ? `The ${requested.name} doesn't fit this group (${describeCapacity(requested).toLowerCase()})`
-                  : `The ${requested.name} isn't available for those dates`
-                : "Nothing available for those dates"
+                  ? `${requested.name} doesn't fit this group`
+                  : `${requested.name} isn't available for ${dates}`
+                : `Nothing is available for ${dates}`
             }
+            reason={requested ? (tooSmall ? `${describeCapacity(requested)}.` : reasonText(requested.name, reason)) : null}
             requestedName={tooSmall ? undefined : requested?.name}
             otherTypes={alternatives.otherTypes}
             dateRanges={alternatives.dateRanges}
@@ -260,9 +264,18 @@ function RoomOption({
   );
 }
 
+function reasonText(name: string, reason: UnavailableReason | null): string | null {
+  if (!reason) return null;
+  if (reason.kind === "sold-out") {
+    return `Sold out on ${reason.soldOutNights} of the ${reason.nights} night${reason.nights === 1 ? "" : "s"}.`;
+  }
+  return `Every ${name} is free on some of these nights, but no single room is free for the whole stay.`;
+}
+
 /** Shown when the chosen room type (or every type) can't take the dates: other rooms, other dates, then /enquiry. */
 function Unavailable({
   heading,
+  reason,
   requestedName,
   otherTypes,
   dateRanges,
@@ -272,6 +285,7 @@ function Unavailable({
   roomSlug,
 }: {
   heading: string;
+  reason: string | null;
   requestedName?: string;
   otherTypes: TypeSuggestion[];
   dateRanges: DateRangeSuggestion[];
@@ -283,11 +297,14 @@ function Unavailable({
   const nothing = otherTypes.length === 0 && dateRanges.length === 0;
   return (
     <div className="space-y-8" aria-live="polite">
-      <h2 className="font-display text-2xl font-semibold italic text-ink-heading">{heading}</h2>
+      <div className="space-y-2">
+        <h2 className="font-display text-2xl font-semibold italic text-ink-heading">{heading}</h2>
+        {reason && <p className="text-ink">{reason}</p>}
+      </div>
 
       {otherTypes.length > 0 && (
         <section className="space-y-4">
-          <h3 className="font-label text-xs uppercase tracking-[0.14em] text-ink-heading">Available for the same dates</h3>
+          <h3 className="font-label text-xs uppercase tracking-[0.14em] text-ink-heading">Other rooms for your dates</h3>
           <ul className="grid gap-5 md:grid-cols-2">
             {otherTypes.map(({ roomType, quote }) => (
               <RoomOption

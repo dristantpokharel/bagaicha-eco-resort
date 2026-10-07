@@ -64,7 +64,7 @@ export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, 
         hint={tooSmall ? `${selectedType.name} doesn't fit this group: ${describeCapacity(selectedType).toLowerCase()}.` : undefined}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] lg:items-end">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] lg:items-start">
         <div>
           <DateRangeField
             today={today}
@@ -86,9 +86,16 @@ export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, 
           </noscript>
         </div>
         <GuestsField party={party} onChange={setParty} caps={caps} typeName={selectedType?.name} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
-        <Button type="submit" variant="brand" size="lg" className="min-h-14 w-full lg:w-auto lg:px-8">
-          Check availability
-        </Button>
+        <div>
+          {/* Same height as the labels beside it, so the button's top lines up with the fields. */}
+          {/* Decorative spacer, hidden from assistive tech. */}
+          <label aria-hidden="true" className="invisible mb-1.5 hidden text-sm font-medium lg:block">
+            &nbsp;
+          </label>
+          <Button type="submit" variant="brand" size="lg" className="min-h-14 w-full lg:w-auto lg:px-8">
+            Check availability
+          </Button>
+        </div>
       </div>
     </form>
   );

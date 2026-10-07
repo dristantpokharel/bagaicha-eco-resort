@@ -8,6 +8,7 @@ import {
   soldOutNights,
   suggestAlternatives,
   typeIsBookable,
+  unavailableReason,
   type Occupancy,
   type RoomTypeInfo,
 } from "./availability-map";
@@ -187,5 +188,23 @@ describe("alternatives", () => {
       ...base, index, chosenTypeId: null, checkIn: d("2026-10-12"), checkOut: d("2026-10-14"), adults: 2, children: 0,
     });
     expect(dateRanges[0]).toEqual({ checkIn: d("2026-10-25"), checkOut: d("2026-10-27") });
+  });
+});
+
+describe("unavailableReason", () => {
+  const rooms = [
+    { id: "a", roomTypeId: "std" },
+    { id: "b", roomTypeId: "std" },
+  ];
+  it("is null when one room covers the stay", () => {
+    expect(unavailableReason(buildIndex(rooms, []), "std", d("2026-10-10"), d("2026-10-13"))).toBeNull();
+  });
+  it("says sold out when some nights have no free room", () => {
+    const index = buildIndex(rooms, [stay("a", "2026-10-11", "2026-10-13"), stay("b", "2026-10-12", "2026-10-14")]);
+    expect(unavailableReason(index, "std", d("2026-10-10"), d("2026-10-14"))).toEqual({ kind: "sold-out", soldOutNights: 1, nights: 4 });
+  });
+  it("says no single room when every night is free in some room but not one room for all", () => {
+    const index = buildIndex(rooms, [stay("a", "2026-10-12", "2026-10-13"), stay("b", "2026-10-10", "2026-10-12")]);
+    expect(unavailableReason(index, "std", d("2026-10-10"), d("2026-10-13"))).toEqual({ kind: "no-single-room" });
   });
 });
