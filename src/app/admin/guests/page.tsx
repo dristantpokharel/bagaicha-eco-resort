@@ -47,8 +47,8 @@ export default async function GuestsPage({
         phone: true,
         email: true,
         country: true,
-        _count: { select: { bookings: true } },
-        bookings: { orderBy: { checkIn: "desc" }, take: 1, select: { checkIn: true } },
+        _count: { select: { reservations: true } },
+        reservations: { orderBy: { checkIn: "desc" }, take: 1, select: { checkIn: true } },
       },
     }),
     db.guest.count({ where }),
@@ -111,8 +111,8 @@ export default async function GuestsPage({
                   </td>
                   <td className="py-3 pr-4">{g.phone ? <ContactPhone phone={g.phone} /> : "—"}</td>
                   <td className="py-3 pr-4 break-all">{g.email ?? "—"}</td>
-                  <td className="py-3 pr-4">{g._count.bookings}</td>
-                  <td className="py-3 whitespace-nowrap">{g.bookings[0] ? formatStayDate(g.bookings[0].checkIn) : "—"}</td>
+                  <td className="py-3 pr-4">{g._count.reservations}</td>
+                  <td className="py-3 whitespace-nowrap">{g.reservations[0] ? formatStayDate(g.reservations[0].checkIn) : "—"}</td>
                 </tr>
               ))}
             </tbody>

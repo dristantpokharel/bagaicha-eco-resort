@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatStayDate, nightsBetween } from "@/lib/booking/dates";
-import { BOOKING_SOURCE_LABELS, BOOKING_STATUS_LABELS } from "@/lib/booking/labels";
+import { BOOKING_SOURCE_LABELS, RESERVATION_STATUS_LABELS } from "@/lib/booking/labels";
 import {
   BOOKING_SOURCES,
-  BOOKING_STATUSES,
-  bookingListSelect,
-  buildBookingWhere,
-  parseBookingFilters,
+  RESERVATION_STATUSES,
+  buildReservationWhere,
+  parseReservationFilters,
+  reservationListSelect,
 } from "@/lib/booking/admin-queries";
+import { summariseRooms } from "@/lib/booking/multi-room";
+import { deriveReservationStatus } from "@/lib/booking/reservation-status";
 import { formatNpr } from "@/lib/money";
 import { formatDateTime } from "@/lib/dates";
 import { ContactPhone } from "@/components/admin/contact-phone";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { ReservationStatusBadge } from "@/components/admin/status-badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/form";
 
@@ -26,21 +28,21 @@ export default async function BookingsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const filters = parseBookingFilters(sp);
+  const filters = parseReservationFilters(sp);
   const sort = sp.sort === "checkin" ? "checkin" : "newest";
   const pageParam = Number(Array.isArray(sp.page) ? sp.page[0] : sp.page);
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const where = buildBookingWhere(filters);
+  const where = buildReservationWhere(filters);
 
-  const [bookings, total, roomTypes] = await Promise.all([
-    db.booking.findMany({
+  const [reservations, total, roomTypes] = await Promise.all([
+    db.reservation.findMany({
       where,
-      select: bookingListSelect,
+      select: reservationListSelect,
       orderBy: sort === "checkin" ? [{ checkIn: "desc" }, { createdAt: "desc" }] : { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    db.booking.count({ where }),
+    db.reservation.count({ where }),
     db.roomType.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
   ]);
 
@@ -69,15 +71,15 @@ export default async function BookingsPage({
       <form method="get" className="grid gap-3 rounded-lg border border-forest/10 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2">
           <Label htmlFor="q">Search</Label>
-          <Input id="q" name="q" defaultValue={filters.q} placeholder="Booking number, guest name, email or phone" maxLength={100} />
+          <Input id="q" name="q" defaultValue={filters.q} placeholder="Reference, guest name, email or phone" maxLength={100} />
         </div>
         <div>
           <Label htmlFor="status">Status</Label>
           <Select id="status" name="status" defaultValue={filters.status ?? ""}>
             <option value="">All</option>
-            {BOOKING_STATUSES.map((s) => (
+            {RESERVATION_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {BOOKING_STATUS_LABELS[s]}
+                {RESERVATION_STATUS_LABELS[s]}
               </option>
             ))}
           </Select>
@@ -130,11 +132,11 @@ export default async function BookingsPage({
       </form>
 
       <p className="text-sm text-charcoal-light" aria-live="polite">
-        {total} booking{total === 1 ? "" : "s"}
+        {total} booking{total === 1 ? "" : "s"} (a booking can have several rooms)
         {hasFilters ? " match your filters" : ""}.
       </p>
 
-      {bookings.length === 0 ? (
+      {reservations.length === 0 ? (
         <p className="rounded-md border border-dashed border-forest/30 bg-white px-4 py-8 text-center text-sm text-charcoal-light">
           {hasFilters ? "No bookings match these filters." : "No bookings yet. Requests from the website will appear here."}
         </p>
@@ -143,7 +145,7 @@ export default async function BookingsPage({
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-forest/10 text-xs tracking-wide text-charcoal-light uppercase">
               <tr>
-                {["Booking", "Guest", "Stay", "Room", "Guests", "Total", "Status", "Requested"].map((h) => (
+                {["Reference", "Guest", "Stay", "Rooms", "Guests", "Total", "Status", "Requested"].map((h) => (
                   <th key={h} scope="col" className="py-2 pr-4 font-medium">
                     {h}
                   </th>
@@ -151,46 +153,52 @@ export default async function BookingsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-forest/10">
-              {bookings.map((b) => (
-                <tr key={b.id} className="align-top">
-                  <td className="py-3 pr-4">
-                    <Link href={`/admin/bookings/${b.id}`} className="font-medium text-forest underline-offset-2 hover:underline">
-                      {b.bookingNumber}
-                    </Link>
-                    <div className="text-xs text-charcoal-light">{BOOKING_SOURCE_LABELS[b.source]}</div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <Link href={`/admin/guests/${b.guest.id}`} className="underline-offset-2 hover:underline">
-                      {b.guest.name}
-                    </Link>
-                    {b.guest.phone && (
-                      <div className="text-xs">
-                        <ContactPhone phone={b.guest.phone} />
+              {reservations.map((r) => {
+                const nights = nightsBetween(r.checkIn, r.checkOut);
+                const kept = r.bookings.filter((b) => b.status !== "CANCELLED");
+                const guests = kept.reduce((n, b) => n + b.adults + b.children, 0);
+                const children = kept.reduce((n, b) => n + b.children, 0);
+                const assigned = r.bookings.flatMap((b) => (b.room ? [b.room.name] : []));
+                return (
+                  <tr key={r.id} className="align-top">
+                    <td className="py-3 pr-4">
+                      <Link href={`/admin/bookings/${r.id}`} className="font-medium text-forest underline-offset-2 hover:underline">
+                        {r.reference}
+                      </Link>
+                      <div className="text-xs text-charcoal-light">{BOOKING_SOURCE_LABELS[r.source]}</div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <Link href={`/admin/guests/${r.guest.id}`} className="underline-offset-2 hover:underline">
+                        {r.guest.name}
+                      </Link>
+                      {r.guest.phone && (
+                        <div className="text-xs">
+                          <ContactPhone phone={r.guest.phone} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">
+                      {formatStayDate(r.checkIn)}
+                      <div className="text-xs text-charcoal-light">
+                        to {formatStayDate(r.checkOut)} ({nights} night{nights === 1 ? "" : "s"})
                       </div>
-                    )}
-                  </td>
-                  <td className="py-3 pr-4 whitespace-nowrap">
-                    {formatStayDate(b.checkIn)}
-                    <div className="text-xs text-charcoal-light">
-                      to {formatStayDate(b.checkOut)} ({nightsBetween(b.checkIn, b.checkOut)} night
-                      {nightsBetween(b.checkIn, b.checkOut) === 1 ? "" : "s"})
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    {b.roomType.name}
-                    <div className="text-xs text-charcoal-light">{b.room?.name ?? "Not assigned"}</div>
-                  </td>
-                  <td className="py-3 pr-4 whitespace-nowrap">
-                    {b.adults + b.children}
-                    {b.children > 0 && <span className="text-xs text-charcoal-light"> ({b.children} child)</span>}
-                  </td>
-                  <td className="py-3 pr-4 whitespace-nowrap">{formatNpr(b.totalPriceNpr)}</td>
-                  <td className="py-3 pr-4">
-                    <StatusBadge status={b.status} />
-                  </td>
-                  <td className="py-3 text-xs whitespace-nowrap text-charcoal-light">{formatDateTime(b.createdAt)}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 pr-4">
+                      {summariseRooms(r.bookings.map((b) => b.roomType.name))}
+                      <div className="text-xs text-charcoal-light">{assigned.length > 0 ? `Rooms ${assigned.join(", ")}` : "Not assigned"}</div>
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">
+                      {guests}
+                      {children > 0 && <span className="text-xs text-charcoal-light"> ({children} child)</span>}
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">{formatNpr(r.totalPriceNpr)}</td>
+                    <td className="py-3 pr-4">
+                      <ReservationStatusBadge status={deriveReservationStatus(r.bookings)} />
+                    </td>
+                    <td className="py-3 text-xs whitespace-nowrap text-charcoal-light">{formatDateTime(r.createdAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

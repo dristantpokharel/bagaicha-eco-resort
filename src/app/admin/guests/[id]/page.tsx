@@ -7,7 +7,9 @@ import { formatStayDate, nightsBetween } from "@/lib/booking/dates";
 import { formatNpr } from "@/lib/money";
 import { ContactPhone } from "@/components/admin/contact-phone";
 import { PageHeader } from "@/components/admin/page-header";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { ReservationStatusBadge } from "@/components/admin/status-badge";
+import { summariseRooms } from "@/lib/booking/multi-room";
+import { deriveReservationStatus } from "@/lib/booking/reservation-status";
 import { GuestForm } from "./guest-form";
 
 export const metadata = { title: "Guest" };
@@ -19,24 +21,22 @@ export default async function GuestPage({ params }: { params: Promise<{ id: stri
   const guest = await db.guest.findUnique({
     where: { id },
     include: {
-      bookings: {
+      reservations: {
         orderBy: { checkIn: "desc" },
         select: {
           id: true,
-          bookingNumber: true,
-          status: true,
+          reference: true,
           checkIn: true,
           checkOut: true,
           totalPriceNpr: true,
-          roomType: { select: { name: true } },
-          room: { select: { name: true } },
+          bookings: { select: { status: true, roomType: { select: { name: true } }, room: { select: { name: true } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         },
       },
     },
   });
   if (!guest) notFound();
 
-  const stays = guest.bookings.filter((b) => b.status === "CHECKED_IN" || b.status === "CHECKED_OUT").length;
+  const stays = guest.reservations.filter((r) => r.bookings.some((b) => b.status === "CHECKED_IN" || b.status === "CHECKED_OUT")).length;
 
   return (
     <>
@@ -47,7 +47,7 @@ export default async function GuestPage({ params }: { params: Promise<{ id: stri
       </p>
       <PageHeader
         title={guest.name}
-        description={`${guest.bookings.length} booking${guest.bookings.length === 1 ? "" : "s"}, ${stays} completed or current stay${stays === 1 ? "" : "s"}`}
+        description={`${guest.reservations.length} booking${guest.reservations.length === 1 ? "" : "s"}, ${stays} completed or current stay${stays === 1 ? "" : "s"}`}
         actions={guest.phone ? <ContactPhone phone={guest.phone} /> : undefined}
       />
 
@@ -69,14 +69,14 @@ export default async function GuestPage({ params }: { params: Promise<{ id: stri
 
         <section className="rounded-lg border border-forest/10 bg-white p-5">
           <h2 className="mb-3 font-display text-lg text-forest">Stay history</h2>
-          {guest.bookings.length === 0 ? (
+          {guest.reservations.length === 0 ? (
             <p className="text-sm text-charcoal-light">No bookings yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-forest/10 text-xs tracking-wide text-charcoal-light uppercase">
                   <tr>
-                    {["Booking", "Stay", "Room", "Total", "Status"].map((h) => (
+                    {["Booking", "Stay", "Rooms", "Total", "Status"].map((h) => (
                       <th key={h} scope="col" className="py-2 pr-4 font-medium">
                         {h}
                       </th>
@@ -84,28 +84,29 @@ export default async function GuestPage({ params }: { params: Promise<{ id: stri
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-forest/10">
-                  {guest.bookings.map((b) => {
-                    const nights = nightsBetween(b.checkIn, b.checkOut);
+                  {guest.reservations.map((r) => {
+                    const nights = nightsBetween(r.checkIn, r.checkOut);
+                    const assigned = r.bookings.flatMap((b) => (b.room ? [b.room.name] : []));
                     return (
-                      <tr key={b.id}>
+                      <tr key={r.id}>
                         <td className="py-3 pr-4">
-                          <Link href={`/admin/bookings/${b.id}`} className="font-medium text-forest underline-offset-2 hover:underline">
-                            {b.bookingNumber}
+                          <Link href={`/admin/bookings/${r.id}`} className="font-medium text-forest underline-offset-2 hover:underline">
+                            {r.reference}
                           </Link>
                         </td>
                         <td className="py-3 pr-4 whitespace-nowrap">
-                          {formatStayDate(b.checkIn)}
+                          {formatStayDate(r.checkIn)}
                           <div className="text-xs text-charcoal-light">
                             {nights} night{nights === 1 ? "" : "s"}
                           </div>
                         </td>
                         <td className="py-3 pr-4">
-                          {b.roomType.name}
-                          <div className="text-xs text-charcoal-light">{b.room?.name ?? "Not assigned"}</div>
+                          {summariseRooms(r.bookings.map((b) => b.roomType.name))}
+                          <div className="text-xs text-charcoal-light">{assigned.length > 0 ? `Rooms ${assigned.join(", ")}` : "Not assigned"}</div>
                         </td>
-                        <td className="py-3 pr-4 whitespace-nowrap">{formatNpr(b.totalPriceNpr)}</td>
+                        <td className="py-3 pr-4 whitespace-nowrap">{formatNpr(r.totalPriceNpr)}</td>
                         <td className="py-3">
-                          <StatusBadge status={b.status} />
+                          <ReservationStatusBadge status={deriveReservationStatus(r.bookings)} />
                         </td>
                       </tr>
                     );

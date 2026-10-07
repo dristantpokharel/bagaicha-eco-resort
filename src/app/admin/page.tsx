@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { can, requirePageUser, ROLE_LABELS } from "@/lib/auth";
 import { addDays, formatStayDate, nightsBetween } from "@/lib/booking/dates";
 import { todayInResort } from "@/lib/dates";
+import type { Prisma } from "@/generated/prisma/client";
+import type { BookingStatus } from "@/generated/prisma/enums";
+import { summariseRooms } from "@/lib/booking/multi-room";
 import { PageHeader } from "@/components/admin/page-header";
 import { ContactPhone } from "@/components/admin/contact-phone";
 import { StockBadge } from "@/components/admin/stock-badge";
@@ -16,12 +19,25 @@ export const metadata = { title: "Dashboard" };
 const UPCOMING_DAYS = 14;
 const LOW_STOCK_SHOWN = 10;
 
-const guestSelect = { select: { id: true, name: true, phone: true } } as const;
 const stayInclude = {
-  guest: guestSelect,
-  roomType: { select: { name: true } },
-  room: { select: { name: true } },
-} as const;
+  guest: { select: { id: true, name: true, phone: true } },
+  bookings: {
+    select: { status: true, adults: true, children: true, roomType: { select: { name: true } }, room: { select: { name: true } } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  },
+} satisfies Prisma.ReservationInclude;
+
+type Stay = { bookings: { status: BookingStatus; adults: number; children: number; roomType: { name: string }; room: { name: string } | null }[] };
+
+/** "2× Deluxe Room (201, 202), 1× Family Room"; only rooms in the given states, so cancelled ones don't show. */
+function roomsDetail(r: Stay, statuses: BookingStatus[]) {
+  const lines = r.bookings.filter((b) => statuses.includes(b.status));
+  const rooms = lines.flatMap((b) => (b.room ? [b.room.name] : []));
+  return `${summariseRooms(lines.map((b) => b.roomType.name))}${rooms.length ? ` (${rooms.join(", ")})` : ""}`;
+}
+
+const guestCount = (r: Stay, statuses: BookingStatus[]) =>
+  r.bookings.filter((b) => statuses.includes(b.status)).reduce((n, b) => n + b.adults + b.children, 0);
 
 /** "3 hours", "2 days": how long a request has been waiting. */
 function waiting(since: Date, now: Date) {
@@ -41,14 +57,15 @@ export default async function AdminDashboardPage() {
   const lowStock = canInventory ? await listLowStockItems() : [];
   const placeholders = can(user.role, "content.manage") ? await listPlaceholders() : null;
 
+  // Reservations, not rooms: a booking of three rooms is one arrival, one request.
   const [arrivals, departures, pending, pendingCount, upcoming, newEnquiries] = canBookings
     ? await Promise.all([
-        db.booking.findMany({ where: { status: "CONFIRMED", checkIn: today }, include: stayInclude, orderBy: { createdAt: "asc" } }),
-        db.booking.findMany({ where: { status: "CHECKED_IN", checkOut: today }, include: stayInclude, orderBy: { createdAt: "asc" } }),
-        db.booking.findMany({ where: { status: "PENDING" }, include: stayInclude, orderBy: { createdAt: "asc" }, take: 10 }),
-        db.booking.count({ where: { status: "PENDING" } }),
-        db.booking.findMany({
-          where: { status: "CONFIRMED", checkIn: { gt: today, lte: addDays(today, UPCOMING_DAYS) } },
+        db.reservation.findMany({ where: { checkIn: today, bookings: { some: { status: "CONFIRMED" } } }, include: stayInclude, orderBy: { createdAt: "asc" } }),
+        db.reservation.findMany({ where: { checkOut: today, bookings: { some: { status: "CHECKED_IN" } } }, include: stayInclude, orderBy: { createdAt: "asc" } }),
+        db.reservation.findMany({ where: { bookings: { some: { status: "PENDING" } } }, include: stayInclude, orderBy: { createdAt: "asc" }, take: 10 }),
+        db.reservation.count({ where: { bookings: { some: { status: "PENDING" } } } }),
+        db.reservation.findMany({
+          where: { checkIn: { gt: today, lte: addDays(today, UPCOMING_DAYS) }, bookings: { some: { status: "CONFIRMED" } } },
           include: stayInclude,
           orderBy: [{ checkIn: "asc" }, { createdAt: "asc" }],
           take: 20,
@@ -67,14 +84,20 @@ export default async function AdminDashboardPage() {
       {canBookings ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <Widget title="Today's arrivals" count={arrivals.length} empty="No arrivals expected today.">
-            {arrivals.map((b) => (
-              <Row key={b.id} id={b.id} number={b.bookingNumber} guest={b.guest} detail={`${b.roomType.name}${b.room ? `, ${b.room.name}` : ""} · ${b.adults + b.children} guest${b.adults + b.children === 1 ? "" : "s"} · ${nightsBetween(b.checkIn, b.checkOut)} night${nightsBetween(b.checkIn, b.checkOut) === 1 ? "" : "s"}`} />
+            {arrivals.map((r) => (
+              <Row
+                key={r.id}
+                id={r.id}
+                number={r.reference}
+                guest={r.guest}
+                detail={`${roomsDetail(r, ["CONFIRMED"])} · ${guestCount(r, ["CONFIRMED"])} guest${guestCount(r, ["CONFIRMED"]) === 1 ? "" : "s"} · ${nightsBetween(r.checkIn, r.checkOut)} night${nightsBetween(r.checkIn, r.checkOut) === 1 ? "" : "s"}`}
+              />
             ))}
           </Widget>
 
           <Widget title="Today's departures" count={departures.length} empty="No departures expected today.">
-            {departures.map((b) => (
-              <Row key={b.id} id={b.id} number={b.bookingNumber} guest={b.guest} detail={`${b.roomType.name}${b.room ? `, ${b.room.name}` : ""}`} />
+            {departures.map((r) => (
+              <Row key={r.id} id={r.id} number={r.reference} guest={r.guest} detail={roomsDetail(r, ["CHECKED_IN"])} />
             ))}
           </Widget>
 
@@ -84,21 +107,21 @@ export default async function AdminDashboardPage() {
             empty="No requests waiting."
             footer={pendingCount > pending.length ? <Link href="/admin/bookings?status=PENDING" className="text-forest underline underline-offset-4">See all {pendingCount} pending requests</Link> : undefined}
           >
-            {pending.map((b) => (
+            {pending.map((r) => (
               <Row
-                key={b.id}
-                id={b.id}
-                number={b.bookingNumber}
-                guest={b.guest}
-                detail={`${formatStayDate(b.checkIn)} to ${formatStayDate(b.checkOut)} · ${b.roomType.name}`}
-                note={`Waiting ${waiting(b.createdAt, now)}`}
+                key={r.id}
+                id={r.id}
+                number={r.reference}
+                guest={r.guest}
+                detail={`${formatStayDate(r.checkIn)} to ${formatStayDate(r.checkOut)} · ${roomsDetail(r, ["PENDING"])}`}
+                note={`Waiting ${waiting(r.createdAt, now)}`}
               />
             ))}
           </Widget>
 
           <Widget title={`Confirmed, next ${UPCOMING_DAYS} days`} count={upcoming.length} empty="Nothing confirmed in the coming days.">
-            {upcoming.map((b) => (
-              <Row key={b.id} id={b.id} number={b.bookingNumber} guest={b.guest} detail={`${formatStayDate(b.checkIn)} to ${formatStayDate(b.checkOut)} · ${b.roomType.name}${b.room ? `, ${b.room.name}` : ""}`} />
+            {upcoming.map((r) => (
+              <Row key={r.id} id={r.id} number={r.reference} guest={r.guest} detail={`${formatStayDate(r.checkIn)} to ${formatStayDate(r.checkOut)} · ${roomsDetail(r, ["CONFIRMED"])}`} />
             ))}
           </Widget>
         </div>

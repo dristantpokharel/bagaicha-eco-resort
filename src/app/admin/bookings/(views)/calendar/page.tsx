@@ -45,7 +45,15 @@ export default async function BookingCalendarPage({ searchParams }: { searchPara
     }),
     db.booking.findMany({
       where: { status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] }, checkIn: { lt: month.end }, checkOut: { gt: month.start } },
-      select: { id: true, bookingNumber: true, status: true, checkIn: true, checkOut: true, roomId: true, roomTypeId: true, guest: { select: { name: true } } },
+      select: {
+        id: true,
+        status: true,
+        checkIn: true,
+        checkOut: true,
+        roomId: true,
+        roomTypeId: true,
+        reservation: { select: { id: true, reference: true, guest: { select: { name: true } }, _count: { select: { bookings: true } } } },
+      },
       orderBy: { checkIn: "asc" },
     }),
     db.roomBlock.findMany({
@@ -59,9 +67,12 @@ export default async function BookingCalendarPage({ searchParams }: { searchPara
     if (!cols) return null;
     return {
       key: b.id,
-      href: `/admin/bookings/${b.id}`,
-      label: `${b.guest.name} · ${b.bookingNumber}`,
-      title: `${b.bookingNumber}, ${b.guest.name}, ${BOOKING_STATUS_LABELS[b.status]}: ${toDateOnlyString(b.checkIn)} to ${toDateOnlyString(b.checkOut)}`,
+      // Each room has its own bar; clicking opens the whole reservation.
+      href: `/admin/bookings/${b.reservation.id}`,
+      label: `${b.reservation.guest.name} · ${b.reservation.reference}`,
+      title: `${b.reservation.reference}, ${b.reservation.guest.name}${
+        b.reservation._count.bookings > 1 ? ` (${b.reservation._count.bookings} rooms)` : ""
+      }, ${BOOKING_STATUS_LABELS[b.status]}: ${toDateOnlyString(b.checkIn)} to ${toDateOnlyString(b.checkOut)}`,
       start: cols.start,
       end: cols.end,
       className: BAR_STYLES[b.status],
