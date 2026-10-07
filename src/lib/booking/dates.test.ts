@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, nightsBetween, parseDateOnly, rangesOverlap, toDateOnlyString } from "./dates";
+import { addDays, describeRange, nightsBetween, parseDateOnly, rangesOverlap, toDateOnlyString } from "./dates";
 
 const d = (s: string) => parseDateOnly(s)!;
 
@@ -43,5 +43,15 @@ describe("rangesOverlap [start, end)", () => {
   it("rejects partial overlaps on either side", () => {
     expect(overlaps("2026-02-23", "2026-02-25")).toBe(true);
     expect(overlaps("2026-02-24", "2026-02-26")).toBe(true);
+  });
+});
+
+describe("describeRange", () => {
+  it("reads like the calendar footer", () => {
+    expect(describeRange(d("2026-10-09"), d("2026-10-16"))).toBe("9 Oct → 16 Oct · 7 nights");
+    expect(describeRange(d("2026-10-09"), d("2026-10-10"))).toBe("9 Oct → 10 Oct · 1 night");
+  });
+  it("adds years when the stay crosses New Year", () => {
+    expect(describeRange(d("2026-12-30"), d("2027-01-02"))).toBe("30 Dec 2026 → 2 Jan 2027 · 3 nights");
   });
 });

@@ -51,3 +51,11 @@ export function formatShortDate(date: Date): string {
 export function formatCompactDate(date: Date): string {
   return formatInTimeZone(date, "UTC", "d MMM yyyy");
 }
+
+/** "9 Oct → 16 Oct · 7 nights" (calendar footer). Years appear only when the stay crosses into another year. */
+export function describeRange(checkIn: Date, checkOut: Date): string {
+  const nights = nightsBetween(checkIn, checkOut);
+  const pattern = checkIn.getUTCFullYear() === checkOut.getUTCFullYear() ? "d MMM" : "d MMM yyyy";
+  const show = (d: Date) => formatInTimeZone(d, "UTC", pattern);
+  return `${show(checkIn)} → ${show(checkOut)} · ${nights} night${nights === 1 ? "" : "s"}`;
+}

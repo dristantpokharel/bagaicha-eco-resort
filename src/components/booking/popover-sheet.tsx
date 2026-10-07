@@ -38,6 +38,8 @@ export function PopoverSheet({
   sheet = "full",
   desktopClassName = "",
   footer,
+  footerOnWide = false,
+  dismissOnBackdrop = true,
   children,
 }: {
   open: boolean;
@@ -51,6 +53,10 @@ export function PopoverSheet({
   sheet?: "full" | "bottom";
   desktopClassName?: string;
   footer?: ReactNode;
+  /** Show the footer under the panel on desktop too (it is always shown on phones). */
+  footerOnWide?: boolean;
+  /** Phones: tapping outside the sheet closes it. Off for the calendar, which closes only via Done or its close button. */
+  dismissOnBackdrop?: boolean;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -80,7 +86,7 @@ export function PopoverSheet({
 
   return (
     <>
-      {!wide && <div className="fixed inset-0 z-40 bg-forest/40" aria-hidden="true" onClick={() => onClose(true)} />}
+      {!wide && <div className="fixed inset-0 z-40 bg-forest/40" aria-hidden="true" onClick={dismissOnBackdrop ? () => onClose(true) : undefined} />}
       <div
         id={id}
         role="dialog"
@@ -100,6 +106,7 @@ export function PopoverSheet({
         )}
         <div className={wide ? "" : "flex-1 px-4 py-3"}>{children}</div>
         {!wide && footer && <div className="sticky bottom-0 border-t border-forest/15 bg-white p-4">{footer}</div>}
+        {wide && footer && footerOnWide && <div className="mt-4 border-t border-forest/15 pt-3">{footer}</div>}
       </div>
     </>
   );

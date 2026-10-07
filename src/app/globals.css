@@ -12,6 +12,7 @@
   --color-olive: #5A6248;
   --color-leaf: #505E3E;
   --color-sage: #D9DFC5;
+  --color-sage-hover: #C9D1B0;
   --color-sage-muted: #ACB299;
   --color-ink: #3F4430;
   --color-ink-heading: #454C31;
@@ -286,17 +287,24 @@ body {
   color: var(--color-ink-muted);
 }
 .dp .rdp-day_button {
+  position: relative;
   font-size: 0.9375rem;
   cursor: pointer;
+}
+.dp .rdp-selected {
+  font-size: inherit;
 }
 .dp .rdp-day_button:disabled {
   cursor: not-allowed;
 }
-.dp .rdp-day_button:hover:not(:disabled) {
-  background-color: var(--color-cream-dark);
+/* Hover: light sage with dark text, on days that can be picked. Never on disabled or sold-out days, never white. */
+.dp .rdp-day:not(.rdp-disabled):not(.dp-soldout):not(.rdp-range_start):not(.rdp-range_end) .rdp-day_button:hover {
+  background-color: var(--color-sage);
+  color: var(--color-ink-heading);
 }
-.dp .rdp-selected .rdp-day_button:hover:not(:disabled) {
-  background-color: transparent;
+/* A day inside the range sits on the sage band already, so hover darkens it a step. */
+.dp .rdp-range_middle:not(.rdp-disabled) .rdp-day_button:hover {
+  background-color: var(--color-sage-hover);
 }
 .dp .rdp-today:not(.rdp-selected) .rdp-day_button {
   box-shadow: inset 0 0 0 1px var(--color-forest);
@@ -305,6 +313,15 @@ body {
 .dp .rdp-button_next,
 .dp .rdp-button_previous {
   color: var(--color-forest);
+}
+/* Keyboard focus stays visible on every state (cream on the forest start/end days). */
+.dp .rdp-day_button:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: -4px;
+}
+.dp .rdp-range_start .rdp-day_button:focus-visible,
+.dp .rdp-range_end .rdp-day_button:focus-visible {
+  outline-color: var(--color-cream);
 }
 /* Sold-out nights: struck through and hatched, whether or not they can be clicked (a check-out may land on one). */
 .dp .dp-soldout .rdp-day_button {
@@ -315,10 +332,37 @@ body {
 .dp .dp-soldout.rdp-disabled:not(.rdp-selected) {
   opacity: 0.7;
 }
+/* Start and end: solid forest, cream text, always readable (also when hovered or struck as sold out). */
 .dp .rdp-range_start .rdp-day_button,
 .dp .rdp-range_end .rdp-day_button {
+  z-index: 1;
   background-image: none;
+  background-color: var(--color-forest);
   color: var(--color-cream);
+  text-decoration: none;
+}
+/* Ticket tabs: a small arrow on the inner edge of each end, pointing into the range. */
+.dp .rdp-range_start:not(.rdp-range_end) .rdp-day_button::after,
+.dp .rdp-range_end:not(.rdp-range_start) .rdp-day_button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+.dp .rdp-range_start:not(.rdp-range_end) .rdp-day_button::after {
+  left: 100%;
+  border-left: 7px solid var(--color-forest);
+}
+.dp .rdp-range_end:not(.rdp-range_start) .rdp-day_button::after {
+  right: 100%;
+  border-right: 7px solid var(--color-forest);
+}
+/* Don't point off the edge of the week. */
+.dp .rdp-day:last-child.rdp-range_start .rdp-day_button::after,
+.dp .rdp-day:first-child.rdp-range_end .rdp-day_button::after {
+  display: none;
 }
 @media (max-width: 639px) {
   .dp.rdp-root {
