@@ -11,21 +11,29 @@ import { logActivity } from "@/lib/activity-log";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { formatStayDate, nightsBetween, toDateOnlyString } from "@/lib/booking/dates";
 import { todayInResort } from "@/lib/dates";
-import { assertRoomAssignable, isRoomConflictError, ROOM_CONFLICT_MESSAGE } from "@/lib/booking/availability";
+import { assertRoomAssignable, findFreeRooms, isRoomConflictError, ROOM_CONFLICT_MESSAGE } from "@/lib/booking/availability";
+import { partyProblem } from "@/lib/booking/capacity";
 import { computeQuote } from "@/lib/booking/pricing";
 import { validateStay } from "@/lib/booking/rules";
-import { createBookingRecord } from "@/lib/booking/service";
+import { validateSplit } from "@/lib/booking/multi-room";
+import { createReservationRecord } from "@/lib/booking/service";
 import { BOOKING_STATUS_LABELS } from "@/lib/booking/labels";
-import { canTransition, editableFlags, permissionForTransition } from "@/lib/booking/status";
-import { notifyBooking, type NotifyOutcome } from "@/lib/email/booking-emails";
+import { resolutionEmail } from "@/lib/booking/reservation-status";
+import { canTransition, editableFlags, permissionForTransition, reservationDateFlags } from "@/lib/booking/status";
+import { notifyReservation, type NotifyOutcome } from "@/lib/email/booking-emails";
 import { formatNpr } from "@/lib/money";
 import {
-  bookingIdSchema,
-  cancelBookingSchema,
-  confirmBookingSchema,
+  cancelLineSchema,
+  cancelReservationSchema,
+  confirmLineSchema,
+  lineIdSchema,
   manualBookingSchema,
-  updateBookingSchema,
+  reservationIdSchema,
+  updateLineSchema,
+  updateReservationSchema,
 } from "./schemas";
+
+type Tx = Prisma.TransactionClient;
 
 function revalidateAdmin() {
   revalidateAvailability();
@@ -38,23 +46,44 @@ function rethrowFriendly(error: unknown): never {
   throw error;
 }
 
-function emailNote(outcome: NotifyOutcome | null): string {
+function emailNote(outcome: NotifyOutcome | null | "none"): string {
+  if (outcome === "none") return "";
   if (!outcome || outcome.guest === "failed") return " The email to the guest could not be sent.";
   if (outcome.guest === "skipped") return " The guest has no email address, so no email was sent.";
   return " An email was sent to the guest.";
 }
 
-async function sendGuestEmail(kind: "confirmed" | "cancelled", bookingId: string): Promise<NotifyOutcome | null> {
+/**
+ * After a change that decided a room: once no room is pending, the guest gets one email for the whole
+ * reservation (confirmed, partly confirmed or cancelled). While rooms are still pending nothing is sent.
+ */
+async function emailIfResolved(reservationId: string): Promise<NotifyOutcome | null | "none"> {
+  const lines = await db.booking.findMany({ where: { reservationId }, select: { status: true } });
+  const kind = resolutionEmail(lines);
+  if (!kind) return "none";
   try {
-    return await notifyBooking(kind, bookingId);
+    return await notifyReservation(kind, reservationId);
   } catch {
     return null;
   }
 }
 
+/** Serialises changes to one reservation (two people confirming and cancelling at once). Held until the transaction ends. */
+async function lockReservation(tx: Tx, reservationId: string) {
+  await tx.$queryRaw`SELECT id FROM reservations WHERE id = ${reservationId} FOR UPDATE`;
+}
+
+/** The reservation's total is the sum of its rooms that haven't been cancelled (unchanged if all were). */
+async function syncTotal(tx: Tx, reservationId: string) {
+  const lines = await tx.booking.findMany({ where: { reservationId }, select: { status: true, totalPriceNpr: true } });
+  const kept = lines.filter((l) => l.status !== "CANCELLED");
+  if (kept.length === 0) return;
+  await tx.reservation.update({ where: { id: reservationId }, data: { totalPriceNpr: kept.reduce((n, l) => n + l.totalPriceNpr, 0) } });
+}
+
 // ─── Create ──────────────────────────────────────────────────────────────────
 
-/** Staff entering a phone / walk-in booking. A room makes it CONFIRMED straight away. */
+/** Staff entering a phone / walk-in booking for one or more rooms. A room on a line makes that line CONFIRMED. */
 export async function createManualBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   let createdId: string | null = null;
   let emailed = "none";
@@ -62,53 +91,61 @@ export async function createManualBooking(_prev: ActionResult | null, formData: 
   const result = await runAction(async () => {
     const actor = await requirePermission("bookings.manage");
     const input = parseForm(manualBookingSchema, formData);
-    if (input.roomId) await requirePermission("bookings.changeStatus");
+    if (input.rooms.some((r) => r.roomId)) await requirePermission("bookings.changeStatus");
 
-    const roomType = await db.roomType.findUnique({ where: { id: input.roomTypeId } });
-    if (!roomType?.isActive) throw new ActionError("Choose an active room type.", { roomTypeId: "Choose a room type." });
+    const typeIds = [...new Set(input.rooms.map((r) => r.roomTypeId))];
+    const found = await db.roomType.findMany({ where: { id: { in: typeIds }, isActive: true } });
+    if (found.length !== typeIds.length) throw new ActionError("Choose active room types.", { rooms: "Choose active room types." });
+    const roomTypes = new Map(found.map((t) => [t.id, t]));
 
-    const stay = validateStay(input, { today: todayInResort(), publicRequest: false, capacity: roomType });
+    const party = input.rooms.reduce((p, r) => ({ adults: p.adults + r.adults, children: p.children + r.children }), { adults: 0, children: 0 });
+    const stay = validateStay({ ...input, ...party, adults: Math.max(party.adults, 1) }, { today: todayInResort(), publicRequest: false });
     if (!stay.ok) throw new ActionError(Object.values(stay.errors)[0], stay.errors);
+    // Staff are not held to the online room limit; each room must still suit its guests.
+    const split = validateSplit(input.rooms, roomTypes, party, { maxRooms: null });
+    if (!split.ok) {
+      const message = Object.values(split.lineErrors)[0] ?? split.errors[0];
+      throw new ActionError(message, { rooms: message });
+    }
 
     try {
       createdId = await db.$transaction(async (tx) => {
-        const created = await createBookingRecord(tx, {
-          roomType,
+        const created = await createReservationRecord(tx, {
+          roomTypes,
+          lines: input.rooms,
           checkIn: stay.checkIn,
           checkOut: stay.checkOut,
-          adults: input.adults,
-          children: input.children,
           guest: { name: input.name, email: input.email, phone: input.phone, country: input.country },
           source: input.source,
           specialRequests: input.specialRequests,
           internalNotes: input.internalNotes,
           createdById: actor.id,
-          roomId: input.roomId,
+          maxRooms: null,
         });
         await logActivity(tx, {
           userId: actor.id,
-          action: "booking.created",
-          entityType: "Booking",
-          entityId: created.booking.id,
+          action: "reservation.created",
+          entityType: "Reservation",
+          entityId: created.reservation.id,
           details: {
-            bookingNumber: created.booking.bookingNumber,
+            reference: created.reservation.reference,
             source: input.source,
-            status: created.booking.status,
-            roomType: roomType.name,
+            rooms: created.bookings.map((b) => roomTypes.get(b.roomTypeId)!.name),
+            statuses: created.bookings.map((b) => b.status),
             checkIn: input.checkIn,
             checkOut: input.checkOut,
             totalPriceNpr: created.quote.totalPriceNpr,
           },
         });
-        return created.booking.id;
+        return created.reservation.id;
       }, BOOKING_TX_OPTIONS);
     } catch (error) {
       rethrowFriendly(error);
     }
 
-    if (input.roomId && createdId) {
-      const outcome = await sendGuestEmail("confirmed", createdId);
-      emailed = !outcome || outcome.guest === "failed" ? "failed" : outcome.guest;
+    if (createdId) {
+      const outcome = await emailIfResolved(createdId);
+      emailed = outcome === "none" ? "none" : !outcome || outcome.guest === "failed" ? "failed" : outcome.guest;
     }
     revalidateAdmin();
     return { ok: true, message: "Booking created." };
@@ -121,21 +158,111 @@ export async function createManualBooking(_prev: ActionResult | null, formData: 
 
 // ─── Edit ────────────────────────────────────────────────────────────────────
 
-export async function updateBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+const serialize = (v: unknown) => (v instanceof Date ? toDateOnlyString(v) : v);
+/** Free text typed about a guest: the log records that it changed, never the text. */
+const FREE_TEXT: readonly string[] = ["specialRequests", "internalNotes"];
+
+function diff<T extends Record<string, unknown>>(before: Record<string, unknown>, next: T) {
+  const changes: Record<string, { from: unknown; to: unknown } | "edited"> = {};
+  for (const key of Object.keys(next)) {
+    const from = serialize(before[key]);
+    const to = serialize(next[key]);
+    if (from !== to) changes[key] = FREE_TEXT.includes(key) ? "edited" : { from, to };
+  }
+  return changes;
+}
+
+/** Reservation-level edit: dates (moved for every open room together), the guest's requests and staff notes. */
+export async function updateReservation(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const actor = await requirePermission("bookings.manage");
-    const input = parseForm(updateBookingSchema, formData);
-    let message = "Booking saved.";
+    const input = parseForm(updateReservationSchema, formData);
+    let message = "Reservation saved.";
 
     try {
       await db.$transaction(async (tx) => {
-        const before = await tx.booking.findUnique({ where: { id: input.bookingId }, include: { roomType: true } });
+        await lockReservation(tx, input.reservationId);
+        const before = await tx.reservation.findUnique({ where: { id: input.reservationId }, include: { bookings: true } });
         if (!before) throw new ActionError("That booking no longer exists.");
-        const flags = editableFlags(before.status);
+        const flags = reservationDateFlags(before.bookings.map((b) => b.status));
 
-        // Only editable parts are taken from the form; the rest keep their stored values.
         const checkInStr = flags.checkIn && input.checkIn ? input.checkIn : toDateOnlyString(before.checkIn);
         const checkOutStr = flags.checkOut && input.checkOut ? input.checkOut : toDateOnlyString(before.checkOut);
+        const stay = validateStay({ checkIn: checkInStr, checkOut: checkOutStr, adults: 1, children: 0 }, { today: todayInResort(), publicRequest: false });
+        if (!stay.ok && (flags.checkIn || flags.checkOut)) throw new ActionError(Object.values(stay.errors)[0], stay.errors);
+        const checkIn = stay.ok ? stay.checkIn : before.checkIn;
+        const checkOut = stay.ok ? stay.checkOut : before.checkOut;
+        const datesChanged = checkIn.getTime() !== before.checkIn.getTime() || checkOut.getTime() !== before.checkOut.getTime();
+
+        const nights = nightsBetween(checkIn, checkOut);
+        const open = before.bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CHECKED_OUT");
+        if (datesChanged) {
+          // Every open room must still be free (and unblocked) for the new dates; rooms are locked in a fixed order.
+          const withRoom = open.filter((b) => b.roomId && (b.status === "CONFIRMED" || b.status === "CHECKED_IN"));
+          for (const b of [...withRoom].sort((x, y) => x.roomId!.localeCompare(y.roomId!))) {
+            await assertRoomAssignable(tx, { roomId: b.roomId!, roomTypeId: b.roomTypeId, checkIn, checkOut, excludeBookingId: b.id });
+          }
+          for (const b of open) {
+            const quote = computeQuote({
+              nights,
+              pricePerNightNpr: b.pricePerNightNpr,
+              childPricePerNightNpr: b.childPricePerNightNpr,
+              children: b.children,
+            });
+            await tx.booking.update({ where: { id: b.id }, data: { checkIn, checkOut, totalPriceNpr: quote.totalPriceNpr } });
+          }
+        }
+
+        const next = {
+          checkIn,
+          checkOut,
+          specialRequests: input.specialRequests ?? null,
+          internalNotes: input.internalNotes ?? null,
+        };
+        const changes = diff(before, next);
+        if (Object.keys(changes).length === 0) {
+          message = "No changes to save.";
+          return;
+        }
+        await tx.reservation.update({ where: { id: before.id }, data: next });
+        await syncTotal(tx, before.id);
+        await logActivity(tx, {
+          userId: actor.id,
+          action: "reservation.updated",
+          entityType: "Reservation",
+          entityId: before.id,
+          details: { reference: before.reference, changes: changes as Prisma.InputJsonObject },
+        });
+        if (datesChanged) {
+          const total = (await tx.reservation.findUnique({ where: { id: before.id }, select: { totalPriceNpr: true } }))!.totalPriceNpr;
+          if (total !== before.totalPriceNpr) message = `Reservation saved. The total is now ${formatNpr(total)} (was ${formatNpr(before.totalPriceNpr)}).`;
+        }
+      }, BOOKING_TX_OPTIONS);
+    } catch (error) {
+      rethrowFriendly(error);
+    }
+
+    revalidateAdmin();
+    return { ok: true, message };
+  });
+}
+
+/** Edit one room line: its guests, its room type (while pending) or its room (once confirmed). */
+export async function updateBookingLine(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("bookings.manage");
+    const input = parseForm(updateLineSchema, formData);
+    let message = "Room saved.";
+
+    try {
+      await db.$transaction(async (tx) => {
+        const peek = await tx.booking.findUnique({ where: { id: input.bookingId }, select: { reservationId: true } });
+        if (!peek) throw new ActionError("That room no longer exists.");
+        await lockReservation(tx, peek.reservationId);
+        const before = await tx.booking.findUnique({ where: { id: input.bookingId }, include: { roomType: true, reservation: { select: { reference: true } } } });
+        if (!before) throw new ActionError("That room no longer exists.");
+        const flags = editableFlags(before.status);
+
         const adults = flags.party && input.adults !== undefined ? input.adults : before.adults;
         const children = flags.party && input.children !== undefined ? input.children : before.children;
 
@@ -147,79 +274,47 @@ export async function updateBooking(_prev: ActionResult | null, formData: FormDa
         }
         const typeChanged = roomType.id !== before.roomTypeId;
 
-        const stay = validateStay(
-          { checkIn: checkInStr, checkOut: checkOutStr, adults, children },
-          { today: todayInResort(), publicRequest: false, capacity: roomType },
-        );
-        // Closed bookings (checked out / cancelled) only take notes, so skip stay rules for them.
-        const closed = !flags.checkIn && !flags.checkOut;
-        if (!stay.ok && !closed) throw new ActionError(Object.values(stay.errors)[0], stay.errors);
-        const checkIn = stay.ok ? stay.checkIn : before.checkIn;
-        const checkOut = stay.ok ? stay.checkOut : before.checkOut;
-
-        const roomId = before.status === "PENDING" || closed ? before.roomId : flags.room && input.roomId ? input.roomId : before.roomId;
-        const datesOrRoomChanged =
-          checkIn.getTime() !== before.checkIn.getTime() ||
-          checkOut.getTime() !== before.checkOut.getTime() ||
-          roomId !== before.roomId;
-        if ((before.status === "CONFIRMED" || before.status === "CHECKED_IN") && roomId && datesOrRoomChanged) {
-          await assertRoomAssignable(tx, {
-            roomId,
-            roomTypeId: roomType.id,
-            checkIn,
-            checkOut,
-            excludeBookingId: before.id,
-          });
+        if (flags.party || typeChanged) {
+          const problem = partyProblem(roomType, { adults, children });
+          if (problem) throw new ActionError(problem.message, { [problem.field]: problem.message });
         }
 
-        // Keep the booking's own rates unless the room type changed (then that type's current rates apply).
+        const roomId = flags.room && input.roomId ? input.roomId : before.roomId;
+        if ((before.status === "CONFIRMED" || before.status === "CHECKED_IN") && roomId && roomId !== before.roomId) {
+          await assertRoomAssignable(tx, { roomId, roomTypeId: roomType.id, checkIn: before.checkIn, checkOut: before.checkOut, excludeBookingId: before.id });
+        }
+
+        // Keep the room's own rates unless its type changed (then that type's current rates apply).
         const pricePerNightNpr = typeChanged ? roomType.basePriceNpr : before.pricePerNightNpr;
         const childPricePerNightNpr = typeChanged ? roomType.childPricePerNightNpr : before.childPricePerNightNpr;
-        const quote = computeQuote({
-          nights: nightsBetween(checkIn, checkOut),
-          pricePerNightNpr,
-          childPricePerNightNpr,
-          children,
-        });
+        const quote = computeQuote({ nights: nightsBetween(before.checkIn, before.checkOut), pricePerNightNpr, childPricePerNightNpr, children });
 
         const next = {
           roomTypeId: roomType.id,
           roomId,
-          checkIn,
-          checkOut,
           adults,
           children,
           pricePerNightNpr,
           childPricePerNightNpr,
           totalPriceNpr: quote.totalPriceNpr,
-          specialRequests: flags.guestRequests ? (input.specialRequests ?? null) : before.specialRequests,
-          internalNotes: flags.notes ? (input.internalNotes ?? null) : before.internalNotes,
         } satisfies Prisma.BookingUncheckedUpdateInput;
-
-        const serialize = (v: unknown) => (v instanceof Date ? toDateOnlyString(v) : v);
-        // Free text typed about a guest: the log records that it changed, never the text.
-        const FREE_TEXT: readonly string[] = ["specialRequests", "internalNotes"];
-        const changes: Record<string, { from: unknown; to: unknown } | "edited"> = {};
-        for (const key of Object.keys(next) as (keyof typeof next)[]) {
-          const from = serialize(before[key]);
-          const to = serialize(next[key]);
-          if (from !== to) changes[key] = FREE_TEXT.includes(key) ? "edited" : { from, to };
-        }
+        const changes = diff(before, next);
         if (Object.keys(changes).length === 0) {
           message = "No changes to save.";
           return;
         }
 
         await tx.booking.update({ where: { id: before.id }, data: next });
+        await syncTotal(tx, before.reservationId);
         await logActivity(tx, {
           userId: actor.id,
-          action: "booking.updated",
-          entityType: "Booking",
-          entityId: before.id,
-          details: { bookingNumber: before.bookingNumber, changes: changes as Prisma.InputJsonObject },
+          action: "reservation.roomUpdated",
+          entityType: "Reservation",
+          entityId: before.reservationId,
+          details: { reference: before.reservation.reference, roomType: before.roomType.name, changes: changes as Prisma.InputJsonObject },
         });
         if (quote.totalPriceNpr !== before.totalPriceNpr) {
-          message = `Booking saved. The total is now ${formatNpr(quote.totalPriceNpr)} (was ${formatNpr(before.totalPriceNpr)}).`;
+          message = `Room saved. Its total is now ${formatNpr(quote.totalPriceNpr)} (was ${formatNpr(before.totalPriceNpr)}).`;
         }
       }, BOOKING_TX_OPTIONS);
     } catch (error) {
@@ -233,126 +328,221 @@ export async function updateBooking(_prev: ActionResult | null, formData: FormDa
 
 // ─── Status changes ──────────────────────────────────────────────────────────
 
+type Line = Prisma.BookingGetPayload<{ include: { reservation: { select: { reference: true } } } }>;
+
 /**
- * Moves a booking to the next status inside one transaction. The status is part
+ * Moves one room line to the next status inside one transaction, with its reservation locked. The status is part
  * of the update's WHERE clause, so two people acting at once can't both succeed.
  */
-async function changeStatus(params: {
+async function changeLineStatus(params: {
   bookingId: string;
   to: BookingStatus;
   actor: CurrentUser;
   action: string;
-  prepare?: (tx: Prisma.TransactionClient, booking: Prisma.BookingGetPayload<object>) => Promise<Prisma.BookingUncheckedUpdateManyInput>;
-  details?: (booking: Prisma.BookingGetPayload<object>) => Prisma.InputJsonObject;
-}) {
+  prepare?: (tx: Tx, line: Line) => Promise<Prisma.BookingUncheckedUpdateManyInput>;
+  details?: (line: Line) => Prisma.InputJsonObject;
+}): Promise<string> {
   const { bookingId, to, actor } = params;
   try {
-    await db.$transaction(async (tx) => {
-      const booking = await tx.booking.findUnique({ where: { id: bookingId } });
-      if (!booking) throw new ActionError("That booking no longer exists.");
-      if (!canTransition(booking.status, to)) {
+    return await db.$transaction(async (tx) => {
+      const peek = await tx.booking.findUnique({ where: { id: bookingId }, select: { reservationId: true } });
+      if (!peek) throw new ActionError("That room no longer exists.");
+      await lockReservation(tx, peek.reservationId);
+      const line = await tx.booking.findUnique({ where: { id: bookingId }, include: { reservation: { select: { reference: true } } } });
+      if (!line) throw new ActionError("That room no longer exists.");
+      if (!canTransition(line.status, to)) {
         throw new ActionError(
-          `This booking is ${BOOKING_STATUS_LABELS[booking.status].toLowerCase()}, so it can't be moved to ${BOOKING_STATUS_LABELS[to].toLowerCase()}. Reload the page.`,
+          `This room is ${BOOKING_STATUS_LABELS[line.status].toLowerCase()}, so it can't be moved to ${BOOKING_STATUS_LABELS[to].toLowerCase()}. Reload the page.`,
         );
       }
-      const data = (await params.prepare?.(tx, booking)) ?? {};
-      const updated = await tx.booking.updateMany({ where: { id: bookingId, status: booking.status }, data: { ...data, status: to } });
-      if (updated.count !== 1) throw new ActionError("Someone else just changed this booking. Reload the page and try again.");
+      const data = (await params.prepare?.(tx, line)) ?? {};
+      const updated = await tx.booking.updateMany({ where: { id: bookingId, status: line.status }, data: { ...data, status: to } });
+      if (updated.count !== 1) throw new ActionError("Someone else just changed this room. Reload the page and try again.");
+      await syncTotal(tx, line.reservationId);
       await logActivity(tx, {
         userId: actor.id,
         action: params.action,
-        entityType: "Booking",
-        entityId: bookingId,
-        details: { bookingNumber: booking.bookingNumber, from: booking.status, to, ...params.details?.(booking) },
+        entityType: "Reservation",
+        entityId: line.reservationId,
+        details: { reference: line.reservation.reference, bookingId, from: line.status, to, ...params.details?.(line) },
       });
+      return line.reservationId;
     }, BOOKING_TX_OPTIONS);
   } catch (error) {
     rethrowFriendly(error);
   }
 }
 
-export async function confirmBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function confirmLine(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const actor = await requirePermission(permissionForTransition("CONFIRMED"));
-    const { bookingId, roomId } = parseForm(confirmBookingSchema, formData);
+    const { bookingId, roomId } = parseForm(confirmLineSchema, formData);
 
-    await changeStatus({
+    const reservationId = await changeLineStatus({
       bookingId,
       to: "CONFIRMED",
       actor,
-      action: "booking.confirmed",
+      action: "reservation.roomConfirmed",
       // Re-checked inside the transaction with the room locked: room active, right type, no block, no overlap.
-      prepare: async (tx, booking) => {
-        await assertRoomAssignable(tx, {
-          roomId,
-          roomTypeId: booking.roomTypeId,
-          checkIn: booking.checkIn,
-          checkOut: booking.checkOut,
-          excludeBookingId: booking.id,
-        });
+      prepare: async (tx, line) => {
+        await assertRoomAssignable(tx, { roomId, roomTypeId: line.roomTypeId, checkIn: line.checkIn, checkOut: line.checkOut, excludeBookingId: line.id });
         return { roomId, confirmedAt: new Date() };
       },
       details: () => ({ roomId }),
     });
 
-    const outcome = await sendGuestEmail("confirmed", bookingId);
+    const outcome = await emailIfResolved(reservationId);
     revalidateAdmin();
-    return { ok: true, message: `Booking confirmed.${emailNote(outcome)}` };
+    return { ok: true, message: `Room confirmed.${emailNote(outcome)}` };
   });
 }
 
-export async function checkInBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+/**
+ * Confirms every pending room in one transaction, giving each a free room of its type. All or nothing: if any
+ * type has fewer free rooms than pending lines, nothing is confirmed and the message says which.
+ */
+export async function confirmAllLines(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission(permissionForTransition("CONFIRMED"));
+    const { reservationId } = parseForm(reservationIdSchema, formData);
+    let count = 0;
+
+    try {
+      await db.$transaction(async (tx) => {
+        await lockReservation(tx, reservationId);
+        const reservation = await tx.reservation.findUnique({
+          where: { id: reservationId },
+          include: { bookings: { where: { status: "PENDING" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: { roomType: { select: { name: true } } } } },
+        });
+        if (!reservation) throw new ActionError("That booking no longer exists.");
+        const pending = reservation.bookings;
+        if (pending.length === 0) throw new ActionError("No rooms are waiting for confirmation.");
+
+        // One free room per pending line, distinct within a type.
+        const assignments: { line: (typeof pending)[number]; roomId: string }[] = [];
+        for (const typeId of new Set(pending.map((l) => l.roomTypeId))) {
+          const lines = pending.filter((l) => l.roomTypeId === typeId);
+          const free = await findFreeRooms(tx, typeId, reservation.checkIn, reservation.checkOut);
+          if (free.length < lines.length) {
+            throw new ActionError(
+              `Not enough ${lines[0].roomType.name} rooms are free for these dates: ${lines.length} needed, ${free.length} free. Nothing was confirmed. Confirm the rooms one by one, or change the dates.`,
+            );
+          }
+          lines.forEach((line, i) => assignments.push({ line, roomId: free[i].id }));
+        }
+
+        // Check and write in a fixed room order (the same order every writer locks in).
+        for (const { line, roomId } of [...assignments].sort((a, b) => a.roomId.localeCompare(b.roomId))) {
+          await assertRoomAssignable(tx, { roomId, roomTypeId: line.roomTypeId, checkIn: line.checkIn, checkOut: line.checkOut, excludeBookingId: line.id });
+          const updated = await tx.booking.updateMany({ where: { id: line.id, status: "PENDING" }, data: { status: "CONFIRMED", roomId, confirmedAt: new Date() } });
+          if (updated.count !== 1) throw new ActionError("Someone else just changed this booking. Reload the page and try again.");
+        }
+        count = assignments.length;
+        await syncTotal(tx, reservationId);
+        await logActivity(tx, {
+          userId: actor.id,
+          action: "reservation.allConfirmed",
+          entityType: "Reservation",
+          entityId: reservationId,
+          details: { reference: reservation.reference, rooms: count },
+        });
+      }, BOOKING_TX_OPTIONS);
+    } catch (error) {
+      rethrowFriendly(error);
+    }
+
+    const outcome = await emailIfResolved(reservationId);
+    revalidateAdmin();
+    return { ok: true, message: `${count === 1 ? "1 room" : `${count} rooms`} confirmed.${emailNote(outcome)}` };
+  });
+}
+
+export async function checkInLine(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const actor = await requirePermission(permissionForTransition("CHECKED_IN"));
-    const { bookingId } = parseForm(bookingIdSchema, formData);
-    await changeStatus({
+    const { bookingId } = parseForm(lineIdSchema, formData);
+    await changeLineStatus({
       bookingId,
       to: "CHECKED_IN",
       actor,
-      action: "booking.checkedIn",
-      prepare: async (_tx, booking) => {
-        if (booking.checkIn > todayInResort()) {
-          throw new ActionError(`Check-in opens on ${formatStayDate(booking.checkIn)}.`);
-        }
+      action: "reservation.roomCheckedIn",
+      prepare: async (_tx, line) => {
+        if (line.checkIn > todayInResort()) throw new ActionError(`Check-in opens on ${formatStayDate(line.checkIn)}.`);
         return { checkedInAt: new Date() };
       },
     });
     revalidateAdmin();
-    return { ok: true, message: "Guest checked in." };
+    return { ok: true, message: "Guests checked in." };
   });
 }
 
-export async function checkOutBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function checkOutLine(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     const actor = await requirePermission(permissionForTransition("CHECKED_OUT"));
-    const { bookingId } = parseForm(bookingIdSchema, formData);
-    await changeStatus({
+    const { bookingId } = parseForm(lineIdSchema, formData);
+    await changeLineStatus({
       bookingId,
       to: "CHECKED_OUT",
       actor,
-      action: "booking.checkedOut",
+      action: "reservation.roomCheckedOut",
       prepare: async () => ({ checkedOutAt: new Date() }),
     });
     revalidateAdmin();
-    return { ok: true, message: "Guest checked out." };
+    return { ok: true, message: "Guests checked out." };
   });
 }
 
-export async function cancelBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function cancelLine(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
     // Staff can't cancel: bookings.cancel is Admin and Superuser only.
     const actor = await requirePermission(permissionForTransition("CANCELLED"));
-    const { bookingId, reason } = parseForm(cancelBookingSchema, formData);
-    await changeStatus({
+    const { bookingId, reason } = parseForm(cancelLineSchema, formData);
+    const reservationId = await changeLineStatus({
       bookingId,
       to: "CANCELLED",
       actor,
-      action: "booking.cancelled",
+      action: "reservation.roomCancelled",
       prepare: async () => ({ cancelledAt: new Date(), cancellationReason: reason }),
       details: () => ({ reason }),
     });
-    const outcome = await sendGuestEmail("cancelled", bookingId);
+    const outcome = await emailIfResolved(reservationId);
     revalidateAdmin();
-    return { ok: true, message: `Booking cancelled.${emailNote(outcome)}` };
+    return { ok: true, message: `Room cancelled.${emailNote(outcome)}` };
+  });
+}
+
+/** Cancels every room that can still be cancelled (pending or confirmed) with one reason. */
+export async function cancelReservation(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission(permissionForTransition("CANCELLED"));
+    const { reservationId, reason } = parseForm(cancelReservationSchema, formData);
+    let count = 0;
+
+    await db.$transaction(async (tx) => {
+      await lockReservation(tx, reservationId);
+      const reservation = await tx.reservation.findUnique({
+        where: { id: reservationId },
+        include: { bookings: { where: { status: { in: ["PENDING", "CONFIRMED"] } } } },
+      });
+      if (!reservation) throw new ActionError("That booking no longer exists.");
+      if (reservation.bookings.length === 0) throw new ActionError("No rooms can be cancelled any more.");
+      const updated = await tx.booking.updateMany({
+        where: { id: { in: reservation.bookings.map((b) => b.id) }, status: { in: ["PENDING", "CONFIRMED"] } },
+        data: { status: "CANCELLED", cancelledAt: new Date(), cancellationReason: reason },
+      });
+      count = updated.count;
+      await syncTotal(tx, reservationId);
+      await logActivity(tx, {
+        userId: actor.id,
+        action: "reservation.allCancelled",
+        entityType: "Reservation",
+        entityId: reservationId,
+        details: { reference: reservation.reference, rooms: count, reason },
+      });
+    }, BOOKING_TX_OPTIONS);
+
+    const outcome = await emailIfResolved(reservationId);
+    revalidateAdmin();
+    return { ok: true, message: `${count === 1 ? "1 room" : `${count} rooms`} cancelled.${emailNote(outcome)}` };
   });
 }

@@ -53,12 +53,12 @@ export async function createRoomBlock(_prev: ActionResult | null, formData: Form
           checkIn: { lt: endDate },
           checkOut: { gt: startDate },
         },
-        select: { bookingNumber: true },
+        select: { reservation: { select: { reference: true } } },
       });
       if (clashes.length > 0) {
         throw new ActionError(
           `${room.name} has ${clashes.length === 1 ? "a booking" : "bookings"} on these dates (${clashes
-            .map((c) => c.bookingNumber)
+            .map((c) => c.reservation.reference)
             .join(", ")}). Move or cancel ${clashes.length === 1 ? "it" : "them"} first.`,
         );
       }

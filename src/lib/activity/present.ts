@@ -84,6 +84,7 @@ export function entityHref(params: {
   if (/\.(deleted|removed)$/.test(action)) return null;
   switch (entityType) {
     case "Booking":
+    case "Reservation":
       return entityId ? `/admin/bookings/${entityId}` : null;
     case "InventoryItem":
       return entityId ? `/admin/inventory/${entityId}` : null;
@@ -110,5 +111,5 @@ export function entityHref(params: {
 /** Short name for what the entry is about: booking number, item name, room… */
 export function entityLabel(entityType: string, details: unknown): string {
   const d = isPlainObject(details) ? details : {};
-  return text(d.bookingNumber) ?? text(d.item) ?? text(d.room) ?? text(d.name) ?? humanize(entityType);
+  return text(d.reference) ?? text(d.bookingNumber) ?? text(d.item) ?? text(d.room) ?? text(d.name) ?? humanize(entityType);
 }

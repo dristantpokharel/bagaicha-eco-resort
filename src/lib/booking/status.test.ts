@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ROLE_PERMISSIONS } from "@/lib/auth/permissions";
-import { canTransition, editableFlags, permissionForTransition } from "./status";
+import { canTransition, editableFlags, permissionForTransition, reservationDateFlags } from "./status";
 
 describe("status flow", () => {
   it("allows only the forward flow and cancellation from PENDING/CONFIRMED", () => {
@@ -38,5 +38,21 @@ describe("editableFlags", () => {
     expect(editableFlags("CHECKED_IN")).toMatchObject({ checkIn: false, checkOut: true, roomType: false });
     expect(editableFlags("CHECKED_OUT")).toMatchObject({ checkIn: false, checkOut: false, notes: true });
     expect(editableFlags("CANCELLED").party).toBe(false);
+  });
+});
+
+describe("reservationDateFlags", () => {
+  it("lets dates move while rooms are only pending or confirmed", () => {
+    expect(reservationDateFlags(["PENDING", "CONFIRMED"])).toEqual({ checkIn: true, checkOut: true });
+  });
+  it("locks check-in once a guest has arrived, but check-out can still move", () => {
+    expect(reservationDateFlags(["CHECKED_IN", "CONFIRMED"])).toEqual({ checkIn: false, checkOut: true });
+  });
+  it("locks both once a room has checked out or everything is closed", () => {
+    expect(reservationDateFlags(["CHECKED_OUT", "CHECKED_IN"])).toEqual({ checkIn: false, checkOut: false });
+    expect(reservationDateFlags(["CANCELLED", "CANCELLED"])).toEqual({ checkIn: false, checkOut: false });
+  });
+  it("ignores cancelled rooms", () => {
+    expect(reservationDateFlags(["CANCELLED", "PENDING"])).toEqual({ checkIn: true, checkOut: true });
   });
 });

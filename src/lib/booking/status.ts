@@ -42,3 +42,11 @@ export function editableFlags(status: BookingStatus): EditableFlags {
       return { checkIn: false, checkOut: false, party: false, roomType: false, room: false, guestRequests: false, notes: true };
   }
 }
+
+/** Which reservation dates can still change, from the state of its rooms. */
+export function reservationDateFlags(statuses: BookingStatus[]) {
+  const open = statuses.filter((s) => s !== "CANCELLED" && s !== "CHECKED_OUT");
+  const started = statuses.some((s) => s === "CHECKED_IN" || s === "CHECKED_OUT");
+  const ended = statuses.some((s) => s === "CHECKED_OUT");
+  return { checkIn: open.length > 0 && !started, checkOut: open.length > 0 && !ended };
+}

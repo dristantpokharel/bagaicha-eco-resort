@@ -9,21 +9,25 @@ import { findFreeRooms } from "@/lib/booking/availability";
 import { formatStayDate, nightsBetween, toDateOnlyString } from "@/lib/booking/dates";
 import { BOOKING_SOURCE_LABELS } from "@/lib/booking/labels";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
-import { editableFlags } from "@/lib/booking/status";
+import { deriveReservationStatus } from "@/lib/booking/reservation-status";
+import { editableFlags, reservationDateFlags } from "@/lib/booking/status";
 import { formatNpr } from "@/lib/money";
 import { ContactPhone } from "@/components/admin/contact-phone";
 import { PageHeader } from "@/components/admin/page-header";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { ReservationStatusBadge } from "@/components/admin/status-badge";
 import { FormMessage } from "@/components/ui/form";
-import { BookingActions } from "./booking-actions";
-import { BookingEditForm } from "./booking-edit-form";
+import { LineCard, type LineView } from "./line-card";
+import { ReservationActions } from "./reservation-actions";
+import { ReservationEditForm } from "./reservation-edit-form";
 
 export const metadata = { title: "Booking" };
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-export default async function BookingPage({
+/** One reservation: the stay, every room with its own actions, the guest and the history. The id is the reservation's. */
+export default async function ReservationPage({
   params,
   searchParams,
 }: {
@@ -34,30 +38,42 @@ export default async function BookingPage({
   const { id } = await params;
   const sp = await searchParams;
 
-  const booking = await db.booking.findUnique({
+  const reservation = await db.reservation.findUnique({
     where: { id },
     include: {
       guest: true,
-      roomType: true,
-      room: true,
       createdBy: { select: { name: true } },
+      bookings: {
+        include: { roomType: true, room: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      },
     },
   });
-  if (!booking) notFound();
+  if (!reservation) notFound();
   const terms = await loadStayTerms();
 
-  const flags = editableFlags(booking.status);
+  const status = deriveReservationStatus(reservation.bookings);
   const canSeeLog = can(user.role, "activityLog.view");
-  const needsFreeRooms = booking.status === "PENDING" || (booking.status === "CONFIRMED" && flags.room);
+  const dateFlags = reservationDateFlags(reservation.bookings.map((b) => b.status));
+  const nights = nightsBetween(reservation.checkIn, reservation.checkOut);
 
-  const [freeRooms, roomTypes, history] = await Promise.all([
-    needsFreeRooms
-      ? findFreeRooms(db, booking.roomTypeId, booking.checkIn, booking.checkOut, booking.id)
+  const [freeByLine, roomTypes, history] = await Promise.all([
+    Promise.all(
+      reservation.bookings.map(async (b) => {
+        const f = editableFlags(b.status);
+        if (b.status !== "PENDING" && !(b.status === "CONFIRMED" && f.room)) return [];
+        const free = await findFreeRooms(db, b.roomTypeId, b.checkIn, b.checkOut, b.id);
+        // The room it already has stays selectable even though it overlaps "itself".
+        return b.room && !free.some((r) => r.id === b.room!.id) ? [{ id: b.room.id, name: b.room.name }, ...free] : free;
+      }),
+    ),
+    reservation.bookings.some((b) => editableFlags(b.status).roomType)
+      ? db.roomType.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } })
       : Promise.resolve([]),
-    flags.roomType ? db.roomType.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }) : Promise.resolve([]),
     canSeeLog
       ? db.activityLog.findMany({
-          where: { entityType: "Booking", entityId: booking.id },
+          // Entries written before multi-room used the old booking id, which is this reservation's id.
+          where: { entityType: { in: ["Reservation", "Booking"] }, entityId: reservation.id },
           orderBy: { createdAt: "desc" },
           take: 50,
           select: { id: true, action: true, createdAt: true, user: { select: { name: true } } },
@@ -65,21 +81,38 @@ export default async function BookingPage({
       : Promise.resolve([]),
   ]);
 
-  // The current room stays selectable even though it overlaps "itself".
-  const editRooms =
-    booking.room && !freeRooms.some((r) => r.id === booking.room!.id)
-      ? [{ id: booking.room.id, name: booking.room.name }, ...freeRooms]
-      : freeRooms;
-
-  const nights = nightsBetween(booking.checkIn, booking.checkOut);
-  const quote = computeQuote({
-    nights,
-    pricePerNightNpr: booking.pricePerNightNpr,
-    childPricePerNightNpr: booking.childPricePerNightNpr,
-    children: booking.children,
+  const today = todayInResort();
+  const views: LineView[] = reservation.bookings.map((b, i) => {
+    const quote = computeQuote({
+      nights: nightsBetween(b.checkIn, b.checkOut),
+      pricePerNightNpr: b.pricePerNightNpr,
+      childPricePerNightNpr: b.childPricePerNightNpr,
+      children: b.children,
+    });
+    const flags = editableFlags(b.status);
+    return {
+      id: b.id,
+      number: i + 1,
+      status: b.status,
+      roomTypeId: b.roomTypeId,
+      roomTypeName: b.roomType.name,
+      roomId: b.roomId,
+      roomName: b.room?.name ?? null,
+      adults: b.adults,
+      children: b.children,
+      guestsLabel: `${plural(b.adults, "adult", "adults")}${b.children > 0 ? `, ${plural(b.children, "child", "children")} under ${terms.childUnderAge}` : ""}`,
+      priceLines: quoteLines(quote, formatNpr),
+      totalLabel: `Room total: ${formatNpr(b.totalPriceNpr)}`,
+      cancellationReason: b.cancellationReason,
+      flags: { party: flags.party, roomType: flags.roomType, room: flags.room },
+      rooms: freeByLine[i],
+    };
   });
-  const checkInOpensOn = booking.checkIn > todayInResort() ? formatStayDate(booking.checkIn) : null;
 
+  const pendingCount = reservation.bookings.filter((b) => b.status === "PENDING").length;
+  const cancellableCount = reservation.bookings.filter((b) => b.status === "PENDING" || b.status === "CONFIRMED").length;
+  const checkInOpensOn = reservation.checkIn > today ? formatStayDate(reservation.checkIn) : null;
+  const guests = reservation.bookings.filter((b) => b.status !== "CANCELLED");
   const created = first(sp.created) === "1";
   const emailed = first(sp.emailed);
 
@@ -91,11 +124,11 @@ export default async function BookingPage({
         </Link>
       </p>
       <PageHeader
-        title={booking.bookingNumber}
-        description={`${BOOKING_SOURCE_LABELS[booking.source]} request, received ${formatDateTime(booking.createdAt)}${
-          booking.createdBy ? ` by ${booking.createdBy.name}` : ""
+        title={reservation.reference}
+        description={`${BOOKING_SOURCE_LABELS[reservation.source]} request, received ${formatDateTime(reservation.createdAt)}${
+          reservation.createdBy ? ` by ${reservation.createdBy.name}` : ""
         }`}
-        actions={<StatusBadge status={booking.status} />}
+        actions={<ReservationStatusBadge status={status} />}
       />
 
       {created && (
@@ -114,85 +147,83 @@ export default async function BookingPage({
           <Card title="Stay">
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <Item label="Check-in">
-                {formatStayDate(booking.checkIn)}{terms.checkInTime ? `, from ${terms.checkInTime}` : ""}
+                {formatStayDate(reservation.checkIn)}
+                {terms.checkInTime ? `, from ${terms.checkInTime}` : ""}
               </Item>
               <Item label="Check-out">
-                {formatStayDate(booking.checkOut)}{terms.checkOutTime ? `, by ${terms.checkOutTime}` : ""}
+                {formatStayDate(reservation.checkOut)}
+                {terms.checkOutTime ? `, by ${terms.checkOutTime}` : ""}
               </Item>
               <Item label="Nights">{nights}</Item>
-              <Item label="Guests">
-                {booking.adults} adult{booking.adults === 1 ? "" : "s"}
-                {booking.children > 0 && `, ${booking.children} child${booking.children === 1 ? "" : "ren"} under ${terms.childUnderAge}`}
+              <Item label="Rooms">
+                {plural(reservation.bookings.length, "room", "rooms")}
+                {reservation.bookings.length !== guests.length && ` (${guests.length} not cancelled)`}
               </Item>
-              <Item label="Room type">{booking.roomType.name}</Item>
-              <Item label="Room">{booking.room?.name ?? <span className="text-warning">Not assigned yet</span>}</Item>
-              {booking.specialRequests && <Item label="Special requests" wide>{booking.specialRequests}</Item>}
-              {booking.cancellationReason && <Item label="Cancellation reason" wide>{booking.cancellationReason}</Item>}
+              {reservation.specialRequests && (
+                <Item label="Special requests" wide>
+                  {reservation.specialRequests}
+                </Item>
+              )}
             </dl>
           </Card>
 
-          <Card title="Price (saved with this booking)">
-            <div className="text-sm">
-              {quoteLines(quote, formatNpr).map((line) => (
-                <p key={line} className="text-charcoal-light">
-                  {line}
-                </p>
+          <Card title={`Rooms (${reservation.bookings.length})`}>
+            <ul className="-mx-5 divide-y divide-forest/10 border-y border-forest/10">
+              {views.map((line) => (
+                <LineCard key={`${line.id}-${reservation.updatedAt.toISOString()}`} line={line} roomTypes={roomTypes} canCancel={can(user.role, "bookings.cancel")} checkInOpensOn={checkInOpensOn} childUnderAge={terms.childUnderAge} />
               ))}
-              <p className="mt-2 text-base font-semibold text-charcoal">Total: {formatNpr(booking.totalPriceNpr)}</p>
-            </div>
+            </ul>
+            <p className="mt-4 text-base font-semibold text-charcoal">
+              Total: {formatNpr(reservation.totalPriceNpr)}
+              {reservation.bookings.length !== guests.length && (
+                <span className="ml-2 text-xs font-normal text-charcoal-light">(rooms that are not cancelled; prices saved with each room)</span>
+              )}
+            </p>
           </Card>
 
           <Card title="Edit booking">
-            <BookingEditForm
-              key={booking.updatedAt.toISOString()}
+            <ReservationEditForm
+              key={reservation.updatedAt.toISOString()}
               values={{
-                bookingId: booking.id,
-                roomTypeId: booking.roomTypeId,
-                roomId: booking.roomId,
-                checkIn: toDateOnlyString(booking.checkIn),
-                checkOut: toDateOnlyString(booking.checkOut),
-                adults: booking.adults,
-                children: booking.children,
-                specialRequests: booking.specialRequests ?? "",
-                internalNotes: booking.internalNotes ?? "",
+                reservationId: reservation.id,
+                checkIn: toDateOnlyString(reservation.checkIn),
+                checkOut: toDateOnlyString(reservation.checkOut),
+                specialRequests: reservation.specialRequests ?? "",
+                internalNotes: reservation.internalNotes ?? "",
               }}
-              flags={flags}
-              roomTypes={roomTypes}
-              rooms={editRooms}
-              childUnderAge={terms.childUnderAge}
+              flags={dateFlags}
             />
           </Card>
         </div>
 
         <div className="space-y-6">
           <Card title="Actions">
-            <BookingActions
-              bookingId={booking.id}
-              status={booking.status}
-              freeRooms={freeRooms}
+            <ReservationActions
+              reservationId={reservation.id}
+              pendingCount={pendingCount}
+              cancellableCount={cancellableCount}
               canCancel={can(user.role, "bookings.cancel")}
-              checkInOpensOn={checkInOpensOn}
             />
           </Card>
 
           <Card title="Guest">
             <dl className="space-y-3 text-sm">
               <Item label="Name">
-                <Link href={`/admin/guests/${booking.guest.id}`} className="text-forest underline underline-offset-2">
-                  {booking.guest.name}
+                <Link href={`/admin/guests/${reservation.guest.id}`} className="text-forest underline underline-offset-2">
+                  {reservation.guest.name}
                 </Link>
               </Item>
-              <Item label="Phone">{booking.guest.phone ? <ContactPhone phone={booking.guest.phone} /> : "—"}</Item>
+              <Item label="Phone">{reservation.guest.phone ? <ContactPhone phone={reservation.guest.phone} /> : "—"}</Item>
               <Item label="Email">
-                {booking.guest.email ? (
-                  <a href={`mailto:${booking.guest.email}`} className="break-all underline-offset-2 hover:underline">
-                    {booking.guest.email}
+                {reservation.guest.email ? (
+                  <a href={`mailto:${reservation.guest.email}`} className="break-all underline-offset-2 hover:underline">
+                    {reservation.guest.email}
                   </a>
                 ) : (
                   "—"
                 )}
               </Item>
-              {booking.guest.country && <Item label="Country">{booking.guest.country}</Item>}
+              {reservation.guest.country && <Item label="Country">{reservation.guest.country}</Item>}
             </dl>
           </Card>
 
