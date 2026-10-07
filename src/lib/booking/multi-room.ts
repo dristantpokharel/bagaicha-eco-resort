@@ -169,25 +169,25 @@ export function quoteReservation(
 
 // ─── Combinations ────────────────────────────────────────────────────────────
 
-export type FreeType = { type: RoomTypeForBooking; free: number };
+export type FreeType<T extends Capacity = RoomTypeForBooking> = { type: T; free: number };
 
 /** Every way to pick up to maxRooms rooms, no more of a type than are free. */
-function* selections(types: FreeType[], maxRooms: number): Generator<RoomTypeForBooking[]> {
-  const walk = function* (i: number, picked: RoomTypeForBooking[]): Generator<RoomTypeForBooking[]> {
+function* selections<T extends Capacity>(types: FreeType<T>[], maxRooms: number): Generator<T[]> {
+  const walk = function* (i: number, picked: T[]): Generator<T[]> {
     if (i === types.length) {
       if (picked.length > 0) yield picked;
       return;
     }
     const limit = Math.min(types[i].free, maxRooms - picked.length);
-    for (let n = 0; n <= limit; n++) yield* walk(i + 1, [...picked, ...Array<RoomTypeForBooking>(n).fill(types[i].type)]);
+    for (let n = 0; n <= limit; n++) yield* walk(i + 1, [...picked, ...Array<T>(n).fill(types[i].type)]);
   };
   yield* walk(0, []);
 }
 
 /** True when some combination of the free rooms, within maxRooms, can hold the party. */
-export function canSeatFromFree(
+export function canSeatFromFree<T extends Capacity>(
   party: Party,
-  free: FreeType[],
+  free: FreeType<T>[],
   maxRooms: number = BOOKING.maxRoomsPerRequest,
 ): boolean {
   for (const rooms of selections(free, maxRooms)) if (canSeat(rooms, party)) return true;

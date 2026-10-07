@@ -1,4 +1,6 @@
-import { partyFits, type Capacity, type Party } from "./capacity";
+import { BOOKING } from "@/config/booking";
+import type { Capacity, Party } from "./capacity";
+import { canSeatFromFree } from "./multi-room";
 
 /** Guest counts on the search form. */
 export type { Party };
@@ -6,23 +8,29 @@ export type PartyField = keyof Party;
 
 export const MIN_ADULTS = 1;
 
+/** Room types and how many rooms of each there are; the party may be spread over several (up to the online limit). */
+export type SeatPool = { cap: Capacity; count: number }[];
+
+const seatable = (pool: SeatPool, party: Party) =>
+  canSeatFromFree(party, pool.map(({ cap, count }) => ({ type: cap, free: count })));
+
 /**
- * Which steppers can move. `caps` is the selected room type's limits, or every type's for "Any room":
- * + is allowed while at least one of them would still take the bigger party. − stops at 1 adult / 0 children.
+ * Which steppers can move. `pool` is the selected room type's limits and room count, or every type's for "Any room":
+ * + is allowed while some combination of up to BOOKING.maxRoomsPerRequest rooms would still hold the bigger party.
+ * − stops at 1 adult / 0 children.
  */
-export function partyLimits(party: Party, caps: Capacity[]) {
-  const fitsSome = (p: Party) => caps.some((c) => partyFits(c, p));
+export function partyLimits(party: Party, pool: SeatPool) {
   return {
-    canAddAdult: fitsSome({ ...party, adults: party.adults + 1 }),
+    canAddAdult: seatable(pool, { ...party, adults: party.adults + 1 }),
     canRemoveAdult: party.adults > MIN_ADULTS,
-    canAddChild: fitsSome({ ...party, children: party.children + 1 }),
+    canAddChild: seatable(pool, { ...party, children: party.children + 1 }),
     canRemoveChild: party.children > 0,
   };
 }
 
 /** Moves one count by `delta`, refusing any step past a limit (returns the party unchanged). */
-export function stepParty(party: Party, field: PartyField, delta: 1 | -1, caps: Capacity[]): Party {
-  const limits = partyLimits(party, caps);
+export function stepParty(party: Party, field: PartyField, delta: 1 | -1, pool: SeatPool): Party {
+  const limits = partyLimits(party, pool);
   const allowed =
     field === "adults" ? (delta > 0 ? limits.canAddAdult : limits.canRemoveAdult) : delta > 0 ? limits.canAddChild : limits.canRemoveChild;
   return allowed ? { ...party, [field]: party[field] + delta } : party;
@@ -39,21 +47,21 @@ export function partySummary({ adults, children }: Party): string {
  * A note for a disabled + button, so it never looks broken; null when both + buttons work.
  * `typeName` is set when one room type is selected.
  */
-export function capacityNote(party: Party, caps: Capacity[], typeName?: string): string | null {
-  const { canAddAdult, canAddChild } = partyLimits(party, caps);
+export function capacityNote(party: Party, pool: SeatPool, typeName?: string): string | null {
+  const { canAddAdult, canAddChild } = partyLimits(party, pool);
   if (canAddAdult && canAddChild) return null;
-  const total = party.adults + party.children;
-  const cap = caps.length === 1 ? caps[0] : null;
-  if (!cap) {
-    const largest = Math.max(...caps.map((c) => c.maxGuests));
-    if (!canAddAdult && !canAddChild) return total >= largest ? `Our largest room sleeps ${largest} guests, children included.` : "No room takes a larger group like this.";
-    return canAddAdult ? "No room takes more children with this many adults." : "No room takes more adults with this many children.";
+  const single = pool.length === 1 && pool[0].count === 1 ? pool[0].cap : null;
+  if (single) {
+    const total = party.adults + party.children;
+    const name = typeName ?? "This room";
+    if (total >= single.maxGuests) return `${name} sleeps up to ${single.maxGuests} guests, children included.`;
+    if (!canAddAdult && !canAddChild) return `${name} can't take more of this group.`;
+    if (!canAddAdult) return `${name} takes up to ${plural(single.maxAdults, "adult", "adults")}.`;
+    return `${name} takes up to ${plural(single.maxChildren ?? 0, "child", "children")}.`;
   }
-  const name = typeName ?? "This room";
-  if (total >= cap.maxGuests) return `${name} sleeps up to ${cap.maxGuests} guests, children included.`;
-  if (!canAddAdult && !canAddChild) return `${name} can't take more of this group.`;
-  if (!canAddAdult) return `${name} takes up to ${plural(cap.maxAdults, "adult", "adults")}.`;
-  return `${name} takes up to ${plural(cap.maxChildren ?? 0, "child", "children")}.`;
+  const rooms = BOOKING.maxRoomsPerRequest;
+  if (!canAddAdult && !canAddChild) return `That's the most we can seat online (up to ${rooms} rooms). For a larger group, please send an enquiry.`;
+  return canAddAdult ? "No room combination takes more children with this many adults." : "No room combination takes more adults with this many children.";
 }
 
 /** "0–12" for a child age limit of 13 (children are younger than the limit). */

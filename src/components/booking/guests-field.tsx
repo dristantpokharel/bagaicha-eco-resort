@@ -2,15 +2,15 @@
 
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Capacity } from "@/lib/booking/capacity";
-import { capacityNote, childAgeRange, partyLimits, partySummary, stepParty, type Party, type PartyField } from "@/lib/booking/party";
+import { Stepper } from "@/components/booking/stepper";
+import { capacityNote, childAgeRange, partyLimits, partySummary, stepParty, type Party, type PartyField, type SeatPool } from "@/lib/booking/party";
 import { PopoverSheet, triggerClasses, useIsWide } from "@/components/booking/popover-sheet";
 
 type Props = {
   party: Party;
   onChange: (party: Party) => void;
-  /** The selected room type's limits, or every type's for "Any room". */
-  caps: Capacity[];
+  /** The selected room type's limits and room count, or every type's for "Any room". */
+  pool: SeatPool;
   /** Name of the selected room type, for the capacity note. */
   typeName?: string;
   /** Children are younger than this (Business info); the label shows the range it implies. */
@@ -19,21 +19,21 @@ type Props = {
 };
 
 /** One "Guests" field ("2 adults · 0 children") opening −/+ steppers. Submits through two hidden inputs. */
-export function GuestsField({ party, onChange, caps, typeName, childUnderAge, error }: Props) {
+export function GuestsField({ party, onChange, pool, typeName, childUnderAge, error }: Props) {
   const [open, setOpen] = useState(false);
   const wide = useIsWide();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogId = useId();
-  const limits = partyLimits(party, caps);
-  const note = capacityNote(party, caps, typeName);
+  const limits = partyLimits(party, pool);
+  const note = capacityNote(party, pool, typeName);
 
   const close = (returnFocus = true) => {
     setOpen(false);
     if (returnFocus) triggerRef.current?.focus();
   };
 
-  const step = (field: PartyField, delta: 1 | -1) => onChange(stepParty(party, field, delta, caps));
+  const step = (field: PartyField, delta: 1 | -1) => onChange(stepParty(party, field, delta, pool));
 
   return (
     <div ref={rootRef} className="relative">
@@ -128,9 +128,6 @@ function StepperRow({
   canIncrease: boolean;
   onStep: (delta: 1 | -1) => void;
 }) {
-  const button =
-    "flex size-11 items-center justify-center border border-forest/40 text-forest hover:bg-sage " +
-    "disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent";
   const name = label.split(" (")[0].toLowerCase();
   return (
     <div className="flex items-center justify-between gap-4 py-3" role="group" aria-labelledby={`${id}-stepper-label`}>
@@ -139,21 +136,7 @@ function StepperRow({
           {label}
         </p>
       </div>
-      <div className="flex items-center gap-3">
-        <button type="button" className={button} disabled={!canDecrease} onClick={() => onStep(-1)} aria-label={`Fewer ${name}`}>
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <path d="M4 10h12" />
-          </svg>
-        </button>
-        <output className="w-6 text-center text-base font-semibold text-ink" aria-live="polite" aria-label={`${value} ${name}`}>
-          {value}
-        </output>
-        <button type="button" className={button} disabled={!canIncrease} onClick={() => onStep(1)} aria-label={`More ${name}`}>
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <path d="M4 10h12M10 4v12" />
-          </svg>
-        </button>
-      </div>
+      <Stepper value={value} canDecrease={canDecrease} canIncrease={canIncrease} onStep={onStep} noun={name} />
     </div>
   );
 }

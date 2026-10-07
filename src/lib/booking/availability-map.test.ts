@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildAvailabilityPayload,
   buildIndex,
+  freeCountsByNight,
+  freeRoomCount,
   latestCheckOut,
   nextAvailableRanges,
+  partyCanStay,
   soldOutForSelection,
   soldOutNights,
   suggestAlternatives,
@@ -99,28 +102,58 @@ describe("check-out on a sold-out night", () => {
   });
 });
 
+describe("free rooms for the whole stay", () => {
+  const rooms = [
+    { id: "a", roomTypeId: "std" },
+    { id: "b", roomTypeId: "std" },
+    { id: "c", roomTypeId: "std" },
+  ];
+  it("counts distinct rooms that are free on every night; rooms free on different nights don't add up", () => {
+    // a is busy the first night, b the last night, c is free throughout.
+    const index = buildIndex(rooms, [stay("a", "2026-10-10", "2026-10-11"), stay("b", "2026-10-12", "2026-10-13")]);
+    expect(freeRoomCount(index, "std", d("2026-10-10"), d("2026-10-13"))).toBe(1);
+    expect(freeRoomCount(index, "std", d("2026-10-10"), d("2026-10-12"))).toBe(2);
+    expect(freeCountsByNight(index, "std", d("2026-10-10"), 3)).toEqual([2, 3, 2]);
+  });
+});
+
 describe("soldOutForSelection", () => {
   const rooms = [
     { id: "s1", roomTypeId: "std" },
+    { id: "s2", roomTypeId: "std" },
     { id: "f1", roomTypeId: "fam" },
   ];
-  const index = buildIndex(rooms, [stay("s1", "2026-10-10", "2026-10-12"), stay("f1", "2026-10-11", "2026-10-13")]);
+  const index = buildIndex(rooms, [
+    stay("s1", "2026-10-10", "2026-10-12"),
+    stay("s2", "2026-10-11", "2026-10-13"),
+    stay("f1", "2026-10-11", "2026-10-13"),
+  ]);
   const payload = buildAvailabilityPayload(types, index, d("2026-10-10"), 4);
+  const sold = (slug: string | null, adults: number, children = 0) => [...soldOutForSelection(payload, slug, { adults, children })];
 
-  it("exposes only sold-out nights per type", () => {
+  it("exposes only room counts and free rooms per night, capped", () => {
     expect(payload.types.map((t) => Object.keys(t).sort())).toEqual([
-      ["maxAdults", "maxChildren", "maxGuests", "name", "slug", "soldOut"],
-      ["maxAdults", "maxChildren", "maxGuests", "name", "slug", "soldOut"],
+      ["free", "maxAdults", "maxChildren", "maxGuests", "name", "rooms", "slug"],
+      ["free", "maxAdults", "maxChildren", "maxGuests", "name", "rooms", "slug"],
     ]);
+    expect(payload.types.map((t) => t.free)).toEqual(["1012", "1001"]);
+    const many = buildAvailabilityPayload([standard], buildIndex(Array.from({ length: 7 }, (_, i) => ({ id: `r${i}`, roomTypeId: "std" })), []), d("2026-10-10"), 1);
+    expect(many.types[0].free).toBe("4"); // 7 free, capped at the 4-room limit
   });
-  it("a chosen type uses its own sold-out nights", () => {
-    expect([...soldOutForSelection(payload, "std", { adults: 2, children: 0 })]).toEqual(["2026-10-10", "2026-10-11"]);
+  it("a chosen type, party of 2: sold out when none of its rooms is free", () => {
+    expect(sold("std", 2)).toEqual(["2026-10-11"]); // both Standards are busy that night
+    expect(sold("fam", 2)).toEqual(["2026-10-11", "2026-10-12"]);
   });
-  it("any room, party of 2: sold out only when every type is", () => {
-    expect([...soldOutForSelection(payload, null, { adults: 2, children: 0 })]).toEqual(["2026-10-11"]);
+  it("a chosen type, party that needs two of its rooms: sold out when fewer than two are free", () => {
+    expect(sold("std", 4)).toEqual(["2026-10-10", "2026-10-11", "2026-10-12"]); // Standard sleeps 2: both rooms must be free
   });
-  it("any room, party of 4: only types that sleep the party count", () => {
-    expect([...soldOutForSelection(payload, null, { adults: 4, children: 0 })].sort()).toEqual(["2026-10-11", "2026-10-12"]);
+  it("any room, party of 4: one Family, or two Standards, or a mix, may hold it", () => {
+    // On the 11th nothing is free; on the 12th only s1 (2 guests) is, which can't hold 4.
+    expect(sold(null, 4)).toEqual(["2026-10-11", "2026-10-12"]);
+  });
+  it("a party no combination could ever hold shades nothing (the page explains it)", () => {
+    expect(sold(null, 20)).toEqual([]);
+    expect(sold("std", 5)).toEqual([]);
   });
 });
 
@@ -132,26 +165,21 @@ describe("alternatives", () => {
     { id: "f1", roomTypeId: "fam" },
   ];
 
-  it("offers other fitting types for the same dates with totals, excluding the chosen one", () => {
-    const index = buildIndex(rooms, [stay("s1", "2026-10-10", "2026-10-20")]);
-    const { otherTypes } = suggestAlternatives({
-      ...base, index, chosenTypeId: "std", checkIn: d("2026-10-12"), checkOut: d("2026-10-15"), adults: 2, children: 1,
+  it("suggests a combination that holds a party no single room takes, with the total", () => {
+    const index = buildIndex(rooms, []);
+    const { combination } = suggestAlternatives({
+      ...base, index, chosenTypeId: null, checkIn: d("2026-10-12"), checkOut: d("2026-10-14"), adults: 5, children: 1,
     });
-    expect(otherTypes.map((o) => o.roomType.id)).toEqual(["fam"]);
-    expect(otherTypes[0].quote.totalPriceNpr).toBe(3 * 9000 + 3 * 1 * 500);
+    expect(combination?.lines.map((l) => l.roomTypeId).sort()).toEqual(["fam", "std"]);
+    expect(combination?.quote.totalPriceNpr).toBe(2 * 5000 + 2 * 9000 + 2 * 1 * 500);
   });
 
-  it("skips types that can't sleep the party or have no single free room", () => {
-    const index = buildIndex(rooms, [stay("s1", "2026-10-10", "2026-10-20"), stay("f1", "2026-10-14", "2026-10-15")]);
-    const { otherTypes } = suggestAlternatives({
-      ...base, index, chosenTypeId: "std", checkIn: d("2026-10-12"), checkOut: d("2026-10-16"), adults: 2, children: 0,
+  it("uses only rooms free for the whole stay", () => {
+    const index = buildIndex(rooms, [stay("s1", "2026-10-13", "2026-10-14")]);
+    const { combination } = suggestAlternatives({
+      ...base, index, chosenTypeId: null, checkIn: d("2026-10-12"), checkOut: d("2026-10-15"), adults: 5, children: 0,
     });
-    expect(otherTypes).toEqual([]);
-    const big = suggestAlternatives({
-      ...base, index: buildIndex(rooms, [stay("s1", "2026-10-10", "2026-10-20")]), chosenTypeId: "fam",
-      checkIn: d("2026-10-12"), checkOut: d("2026-10-15"), adults: 3, children: 1,
-    });
-    expect(big.otherTypes).toEqual([]); // std sleeps 2
+    expect(combination).toBeNull(); // Family alone sleeps 4, and the Standard is busy on the 13th
   });
 
   it("suggests the next same-length ranges for the chosen type, distinct and capped", () => {
@@ -168,21 +196,21 @@ describe("alternatives", () => {
 
   it("only suggests ranges within the window", () => {
     const index = buildIndex(rooms, [stay("s1", "2026-10-10", "2027-03-01")]);
-    const found = nextAvailableRanges(index, ["std"], {
+    const found = nextAvailableRanges((a, b) => partyCanStay(index, types, { adults: 2, children: 0 }, a, b, { onlyTypeId: "std" }), {
       after: d("2026-10-12"), nights: 3, withinDays: 60, max: 3, horizon: d("2027-10-06"),
     });
     expect(found).toEqual([]);
   });
 
-  it("returns nothing when no type or range fits, so the page falls back to /enquiry", () => {
+  it("returns nothing when no combination or range fits, so the page falls back to /enquiry", () => {
     const index = buildIndex(rooms, [stay("s1", "2026-10-01", "2027-03-01"), stay("f1", "2026-10-01", "2027-03-01")]);
     const out = suggestAlternatives({
       ...base, index, chosenTypeId: "std", checkIn: d("2026-10-12"), checkOut: d("2026-10-15"), adults: 2, children: 0,
     });
-    expect(out).toEqual({ otherTypes: [], dateRanges: [] });
+    expect(out).toEqual({ combination: null, dateRanges: [] });
   });
 
-  it("with no chosen type, date suggestions use any fitting type", () => {
+  it("with no chosen type, date suggestions use any combination that holds the party", () => {
     const index = buildIndex(rooms, [stay("s1", "2026-10-10", "2026-10-30"), stay("f1", "2026-10-10", "2026-10-25")]);
     const { dateRanges } = suggestAlternatives({
       ...base, index, chosenTypeId: null, checkIn: d("2026-10-12"), checkOut: d("2026-10-14"), adults: 2, children: 0,

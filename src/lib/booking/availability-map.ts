@@ -1,6 +1,7 @@
+import { BOOKING } from "@/config/booking";
 import { addDays, nightsBetween, rangesOverlap, toDateOnlyString } from "./dates";
-import { fittingTypes, type Capacity, type Party } from "./capacity";
-import { computeQuote, type Quote } from "./pricing";
+import type { Capacity, Party } from "./capacity";
+import { canSeatFromFree, suggestCombination, type FreeType, type RoomLine, type ReservationQuote } from "./multi-room";
 
 /**
  * Pure availability rules, shared by the public calendar endpoint, /book's
@@ -32,22 +33,48 @@ function roomIsFree(index: AvailabilityIndex, roomId: string, checkIn: Date, che
   return !(index.busyByRoom.get(roomId) ?? []).some((b) => rangesOverlap(b.start, b.end, checkIn, checkOut));
 }
 
+/** Rooms of the type that are free for every night of [checkIn, checkOut): N here means N distinct rooms. */
+export function freeRoomCount(index: AvailabilityIndex, roomTypeId: string, checkIn: Date, checkOut: Date): number {
+  return (index.roomsByType.get(roomTypeId) ?? []).filter((roomId) => roomIsFree(index, roomId, checkIn, checkOut)).length;
+}
+
 /**
  * Continuity rule: a type can take [checkIn, checkOut) only when ONE room is
  * free for every night. Rooms that are free on different nights don't add up.
  */
 export function typeIsBookable(index: AvailabilityIndex, roomTypeId: string, checkIn: Date, checkOut: Date): boolean {
-  return (index.roomsByType.get(roomTypeId) ?? []).some((roomId) => roomIsFree(index, roomId, checkIn, checkOut));
+  return freeRoomCount(index, roomTypeId, checkIn, checkOut) > 0;
+}
+
+/** Free rooms of the type on each of `days` nights from `from`. */
+export function freeCountsByNight(index: AvailabilityIndex, roomTypeId: string, from: Date, days: number): number[] {
+  return Array.from({ length: days }, (_, i) => freeRoomCount(index, roomTypeId, addDays(from, i), addDays(from, i + 1)));
 }
 
 /** Nights (ISO dates) from `from` for `days` days on which no active room of the type is free. */
 export function soldOutNights(index: AvailabilityIndex, roomTypeId: string, from: Date, days: number): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < days; i++) {
-    const night = addDays(from, i);
-    if (!typeIsBookable(index, roomTypeId, night, addDays(night, 1))) out.push(toDateOnlyString(night));
-  }
-  return out;
+  return freeCountsByNight(index, roomTypeId, from, days).flatMap((n, i) => (n === 0 ? [toDateOnlyString(addDays(from, i))] : []));
+}
+
+/** Types with the rooms free for the whole stay (types with none are left out). */
+export function freeForStay(index: AvailabilityIndex, types: RoomTypeInfo[], checkIn: Date, checkOut: Date): FreeType<RoomTypeInfo>[] {
+  return types.flatMap((type) => {
+    const free = freeRoomCount(index, type.id, checkIn, checkOut);
+    return free > 0 ? [{ type, free }] : [];
+  });
+}
+
+/** True when some combination of rooms free for the whole stay, within the room limit, holds the party. */
+export function partyCanStay(
+  index: AvailabilityIndex,
+  types: RoomTypeInfo[],
+  party: Party,
+  checkIn: Date,
+  checkOut: Date,
+  options: { onlyTypeId?: string | null; maxRooms?: number } = {},
+): boolean {
+  const free = freeForStay(index, options.onlyTypeId ? types.filter((t) => t.id === options.onlyTypeId) : types, checkIn, checkOut);
+  return canSeatFromFree(party, free, options.maxRooms ?? BOOKING.maxRoomsPerRequest);
 }
 
 export type UnavailableReason =
@@ -71,8 +98,11 @@ export type AvailabilityPayload = {
   /** First night covered (ISO date) and how many nights. */
   from: string;
   days: number;
-  /** Per room type: sold-out nights only. No counts, room names or booking details. */
-  types: ({ slug: string; name: string; soldOut: string[] } & Capacity)[];
+  /**
+   * Per room type: how many rooms exist, and free rooms per night as one digit per night (capped at the online
+   * room limit, so "4" means 4 or more). No room names or booking details.
+   */
+  types: ({ slug: string; name: string; rooms: number; free: string } & Capacity)[];
 };
 
 export type RoomTypeInfo = Capacity & {
@@ -98,7 +128,10 @@ export function buildAvailabilityPayload(
       maxGuests: t.maxGuests,
       maxAdults: t.maxAdults,
       maxChildren: t.maxChildren,
-      soldOut: soldOutNights(index, t.id, from, days),
+      rooms: index.roomsByType.get(t.id)?.length ?? 0,
+      free: freeCountsByNight(index, t.id, from, days)
+        .map((n) => Math.min(n, BOOKING.maxRoomsPerRequest))
+        .join(""),
     })),
   };
 }
@@ -106,17 +139,32 @@ export function buildAvailabilityPayload(
 // ─── Calendar rules (used by the browser) ────────────────────────────────────
 
 /**
- * Nights the calendar treats as sold out. A chosen type uses its own nights.
- * "Any room" (slug null): only types that take the party count, and a night is
- * sold out when every one of them is.
+ * Nights the calendar treats as sold out for this party: a night is available when some combination of the
+ * rooms free that night, within the online room limit, can hold the whole party. A chosen type (slug) counts
+ * only its own rooms; "Any room" (null) counts every type. If the party couldn't be seated even with every
+ * room free, nothing is shaded (the page explains that instead).
  */
 export function soldOutForSelection(payload: AvailabilityPayload, slug: string | null, party: Party): Set<string> {
-  if (slug) return new Set(payload.types.find((t) => t.slug === slug)?.soldOut ?? []);
-  const fitting = fittingTypes(payload.types, party);
-  if (fitting.length === 0) return new Set();
-  const counts = new Map<string, number>();
-  for (const t of fitting) for (const night of t.soldOut) counts.set(night, (counts.get(night) ?? 0) + 1);
-  return new Set([...counts].filter(([, n]) => n === fitting.length).map(([night]) => night));
+  const types = slug ? payload.types.filter((t) => t.slug === slug) : payload.types;
+  const max = BOOKING.maxRoomsPerRequest;
+  if (types.length === 0) return new Set();
+  const everyRoomFree = types.map((type) => ({ type, free: type.rooms }));
+  if (!canSeatFromFree(party, everyRoomFree, max)) return new Set();
+
+  const from = new Date(`${payload.from}T00:00:00.000Z`);
+  const verdicts = new Map<string, boolean>(); // free-room pattern → can the party be seated
+  const soldOut = new Set<string>();
+  for (let i = 0; i < payload.days; i++) {
+    const counts = types.map((t) => Number(t.free[i] ?? "0"));
+    const key = counts.join(",");
+    let ok = verdicts.get(key);
+    if (ok === undefined) {
+      ok = canSeatFromFree(party, types.map((type, k) => ({ type, free: counts[k] })), max);
+      verdicts.set(key, ok);
+    }
+    if (!ok) soldOut.add(toDateOnlyString(addDays(from, i)));
+  }
+  return soldOut;
 }
 
 /**
@@ -136,16 +184,14 @@ export function latestCheckOut(soldOut: Set<string>, checkIn: Date, maxNights: n
 // ─── Alternatives ────────────────────────────────────────────────────────────
 
 export type DateRangeSuggestion = { checkIn: Date; checkOut: Date };
-export type TypeSuggestion = { roomType: RoomTypeInfo; quote: Quote };
+export type CombinationSuggestion = { lines: RoomLine[]; quote: ReservationQuote };
 
 /**
- * Next ranges of `nights` nights where one of `roomTypeIds` can take the whole
- * stay, starting after `after` and no later than `withinDays` days after it.
- * Suggestions don't overlap each other, so the chips are genuinely different.
+ * Next ranges of `nights` nights for which `canStay` holds, starting after `after` and no later than
+ * `withinDays` days after it. Suggestions don't overlap each other, so the chips are genuinely different.
  */
 export function nextAvailableRanges(
-  index: AvailabilityIndex,
-  roomTypeIds: string[],
+  canStay: (checkIn: Date, checkOut: Date) => boolean,
   params: { after: Date; nights: number; withinDays: number; max: number; horizon: Date },
 ): DateRangeSuggestion[] {
   const found: DateRangeSuggestion[] = [];
@@ -155,7 +201,7 @@ export function nextAvailableRanges(
     const checkOut = addDays(checkIn, params.nights);
     if (checkOut > params.horizon) break;
     if (checkIn < earliest) continue;
-    if (roomTypeIds.some((id) => typeIsBookable(index, id, checkIn, checkOut))) {
+    if (canStay(checkIn, checkOut)) {
       found.push({ checkIn, checkOut });
       earliest = checkOut;
     }
@@ -164,9 +210,9 @@ export function nextAvailableRanges(
 }
 
 /**
- * What to offer when the chosen type (or any type) can't take the stay.
- * - otherTypes: other types that sleep the party and are bookable for the same dates, with totals.
- * - dateRanges: the next same-length ranges for the chosen type (any fitting type when none was chosen).
+ * What to offer when the party can't be seated for the chosen dates (or the chosen type).
+ * - combination: rooms that hold the whole party for the same dates (fewest rooms, then cheapest), if any.
+ * - dateRanges: the next same-length ranges where the party can stay (in the chosen type only, when one was chosen).
  */
 export function suggestAlternatives(input: {
   index: AvailabilityIndex;
@@ -180,32 +226,24 @@ export function suggestAlternatives(input: {
   withinDays: number;
   maxRanges: number;
   maxDaysAhead: number;
-}): { otherTypes: TypeSuggestion[]; dateRanges: DateRangeSuggestion[] } {
-  const { index, types, chosenTypeId, checkIn, checkOut, adults, children } = input;
+}): { combination: CombinationSuggestion | null; dateRanges: DateRangeSuggestion[] } {
+  const { index, types, chosenTypeId, checkIn, checkOut } = input;
+  const party = { adults: input.adults, children: input.children };
   const nights = nightsBetween(checkIn, checkOut);
-  const fitting = fittingTypes(types, { adults, children });
 
-  const otherTypes = fitting
-    .filter((t) => t.id !== chosenTypeId && typeIsBookable(index, t.id, checkIn, checkOut))
-    .map((roomType) => ({
-      roomType,
-      quote: computeQuote({
-        nights,
-        pricePerNightNpr: roomType.basePriceNpr,
-        childPricePerNightNpr: roomType.childPricePerNightNpr,
-        children,
-      }),
-    }));
+  const combination = suggestCombination(party, freeForStay(index, types, checkIn, checkOut), nights);
 
-  const rangeTypeIds = chosenTypeId ? fitting.filter((t) => t.id === chosenTypeId).map((t) => t.id) : fitting.map((t) => t.id);
   // The last bookable check-out: check-in is limited to maxDaysAhead and a stay can't run past it.
   const horizon = addDays(input.today, input.maxDaysAhead);
-  const dateRanges = nextAvailableRanges(index, rangeTypeIds, {
-    after: checkIn < input.today ? input.today : checkIn,
-    nights,
-    withinDays: input.withinDays,
-    max: input.maxRanges,
-    horizon,
-  });
-  return { otherTypes, dateRanges };
+  const dateRanges = nextAvailableRanges(
+    (from, to) => partyCanStay(index, types, party, from, to, { onlyTypeId: chosenTypeId }),
+    {
+      after: checkIn < input.today ? input.today : checkIn,
+      nights,
+      withinDays: input.withinDays,
+      max: input.maxRanges,
+      horizon,
+    },
+  );
+  return { combination, dateRanges };
 }

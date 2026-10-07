@@ -7,14 +7,15 @@ import { Input } from "@/components/ui/form";
 import { DateRangeField } from "@/components/booking/date-range-field";
 import { GuestsField } from "@/components/booking/guests-field";
 import { RoomTypePills } from "@/components/booking/room-type-pills";
-import { describeCapacity, partyFits, type Capacity } from "@/lib/booking/capacity";
+import { describeCapacity, type Capacity } from "@/lib/booking/capacity";
+import { canSeatFromFree } from "@/lib/booking/multi-room";
 import { addDays, parseDateOnly } from "@/lib/booking/dates";
 import { latestCheckOut, soldOutForSelection, type AvailabilityPayload } from "@/lib/booking/availability-map";
 
 type Props = {
   today: string;
   childUnderAge: number;
-  roomTypes: (Capacity & { slug: string; name: string })[];
+  roomTypes: (Capacity & { slug: string; name: string; rooms: number })[];
   defaults: { checkIn: string; checkOut: string; adults: number; children: number };
   errors?: Record<string, string>;
   /** Room type slug chosen on /stay or in a previous search; "" means any room. */
@@ -45,8 +46,8 @@ export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, 
   );
 
   const selectedType = roomTypes.find((r) => r.slug === room);
-  const tooSmall = selectedType && !partyFits(selectedType, party);
-  const caps = selectedType ? [selectedType] : roomTypes;
+  const pool = (selectedType ? [selectedType] : roomTypes).map((t) => ({ cap: t, count: t.rooms }));
+  const tooSmall = selectedType && !canSeatFromFree(party, [{ type: selectedType, free: selectedType.rooms }]);
 
   const inDate = parseDateOnly(checkIn);
   const outDate = parseDateOnly(checkOut);
@@ -61,7 +62,7 @@ export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, 
         roomTypes={roomTypes}
         value={room}
         onChange={setRoom}
-        hint={tooSmall ? `${selectedType.name} doesn't fit this group: ${describeCapacity(selectedType).toLowerCase()}.` : undefined}
+        hint={tooSmall ? `${selectedType.name} can't hold this group, even with several rooms (${describeCapacity(selectedType).toLowerCase()} each).` : undefined}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] lg:items-start">
@@ -85,7 +86,7 @@ export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, 
             </div>
           </noscript>
         </div>
-        <GuestsField party={party} onChange={setParty} caps={caps} typeName={selectedType?.name} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
+        <GuestsField party={party} onChange={setParty} pool={pool} typeName={selectedType?.name} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
         <div>
           {/* Same height as the labels beside it, so the button's top lines up with the fields. */}
           {/* Decorative spacer, hidden from assistive tech. */}
