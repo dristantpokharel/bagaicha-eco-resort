@@ -117,10 +117,10 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  bookingsCreated Booking[]       @relation("BookingCreatedBy")
-  roomBlocks      RoomBlock[]
-  stockMovements  StockMovement[]
-  activityLogs    ActivityLog[]
+  reservationsCreated Reservation[]   @relation("ReservationCreatedBy")
+  roomBlocks          RoomBlock[]
+  stockMovements      StockMovement[]
+  activityLogs        ActivityLog[]
 
   @@map("users")
 }
@@ -221,36 +221,60 @@ model Guest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bookings Booking[]
+  reservations Reservation[]
 
   @@index([email])
   @@index([phone])
   @@map("guests")
 }
 
+/// One guest request or stay: one or more rooms for the same dates. The guest-facing reference lives here.
+/// Its status is never stored; it is derived from its room lines (src/lib/booking/reservation-status.ts).
+model Reservation {
+  id              String        @id @default(cuid())
+  /// e.g. BG-2026-000123, from booking_number_seq.
+  reference       String        @unique
+  guestId         String
+  checkIn         DateTime      @db.Date
+  checkOut        DateTime      @db.Date
+  source          BookingSource
+  specialRequests String?
+  internalNotes   String?
+  /// Sum of the non-cancelled room lines, whole NPR. Kept in step in the same transaction as any line change.
+  totalPriceNpr   Int
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  createdBy User?     @relation("ReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  bookings  Booking[]
+
+  @@index([guestId])
+  @@index([checkIn, checkOut])
+  @@index([createdAt])
+  @@map("reservations")
+}
+
+/// One room line of a reservation: its own room, guests and price snapshot.
 model Booking {
   id                    String        @id @default(cuid())
-  /// e.g. BG-2026-000123
-  bookingNumber         String        @unique
-  guestId               String
+  reservationId         String
   roomTypeId            String
   /// Assigned on confirm.
   roomId                String?
+  /// Copies of the reservation's dates; the room-overlap exclusion constraint needs them on this table.
   checkIn               DateTime      @db.Date
   checkOut              DateTime      @db.Date
   adults                Int
   children              Int           @default(0)
   status                BookingStatus @default(PENDING)
-  source                BookingSource
   /// Price snapshot at booking time, whole NPR.
   pricePerNightNpr      Int
   /// Per-child nightly rate at booking time (children under the age limit).
   childPricePerNightNpr Int           @default(0)
   totalPriceNpr         Int
   currency              String        @default("NPR")
-  specialRequests       String?
-  internalNotes         String?
-  createdById           String?
   confirmedAt           DateTime?
   checkedInAt           DateTime?
   checkedOutAt          DateTime?
@@ -259,17 +283,16 @@ model Booking {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
-  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  roomType  RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  room      Room?    @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  createdBy User?    @relation("BookingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  roomType    RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  room        Room?       @relation(fields: [roomId], references: [id], onDelete: Restrict)
 
   stockMovements StockMovement[]
 
   @@index([status])
   @@index([checkIn, checkOut])
   @@index([roomId])
-  @@index([guestId])
+  @@index([reservationId])
   @@map("bookings")
 }
 
