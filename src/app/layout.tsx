@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat, Red_Hat_Display, Source_Sans_3 } from "next/font/google";
-import { SITE } from "@/config/site";
+import { DEFAULT_OG_IMAGE, SITE } from "@/config/site";
 import "./globals.css";
 
 // Brochure fonts (docs/design-tokens.md §2). Seravek isn't licensed for web, so
@@ -13,7 +13,16 @@ export const metadata: Metadata = {
   metadataBase: SITE.url,
   title: { default: SITE.name, template: `%s · ${SITE.name}` },
   description: SITE.description,
-  openGraph: { siteName: SITE.name, type: "website", locale: "en" },
+  icons: {
+    icon: [
+      { url: "/brand/logo-only.svg", type: "image/svg+xml" },
+      { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: { url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+  },
+  openGraph: { siteName: SITE.name, type: "website", locale: "en", images: [DEFAULT_OG_IMAGE] },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

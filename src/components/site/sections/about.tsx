@@ -12,20 +12,22 @@ export function About({ photos }: { photos: PublicMedia[] }) {
   return (
     <section aria-labelledby="about-heading" className="relative overflow-hidden pb-section-sm md:pb-section">
       <div className="container-page grid items-center gap-y-20 md:grid-cols-12 md:gap-x-10">
-        <Reveal className="relative md:col-span-7">
-          {main && <MediaPhoto media={main} sizes="(min-width: 768px) 55vw, 90vw" className="aspect-[4/3] w-[88%]" />}
-          {second && (
-            <div className="absolute right-0 -bottom-16 w-[42%] outline-8 outline-cream md:-bottom-20">
-              <MediaPhoto media={second} sizes="(min-width: 768px) 25vw, 45vw" className="aspect-[4/5]" />
-            </div>
-          )}
-          {third && (
-            <div className="absolute -top-10 right-[4%] hidden w-[26%] outline-8 outline-cream md:block">
-              <MediaPhoto media={third} sizes="18vw" className="aspect-square" />
-            </div>
-          )}
-        </Reveal>
-        <Reveal className="md:col-span-5" delay={150}>
+        {main && (
+          <Reveal className="relative md:col-span-7">
+            <MediaPhoto media={main} sizes="(min-width: 768px) 55vw, 90vw" className="aspect-[4/3] w-[88%]" />
+            {second && (
+              <div className="absolute right-0 -bottom-16 w-[42%] outline-8 outline-cream md:-bottom-20">
+                <MediaPhoto media={second} sizes="(min-width: 768px) 25vw, 45vw" className="aspect-[4/5]" />
+              </div>
+            )}
+            {third && (
+              <div className="absolute -top-10 right-[4%] hidden w-[26%] outline-8 outline-cream md:block">
+                <MediaPhoto media={third} sizes="18vw" className="aspect-square" />
+              </div>
+            )}
+          </Reveal>
+        )}
+        <Reveal className={main ? "md:col-span-5" : "md:col-span-12"} delay={150}>
           <SectionHeading id="about-heading" strong={HOME.about.strong} soft={HOME.about.soft} />
           <p className="text-body mt-6 max-w-md">{HOME.about.body}</p>
         </Reveal>

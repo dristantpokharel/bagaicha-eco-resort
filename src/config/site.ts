@@ -20,3 +20,11 @@ export const SITE = {
   address: "Khairi, Gulariya-3, Bardiya, Nepal",
   url: siteUrl,
 } as const;
+
+/** Share-card fallback (the logo on cream, 1200x630) for pages without their own photo. */
+export const DEFAULT_OG_IMAGE = {
+  url: "/brand/og-default.jpg",
+  width: 1200,
+  height: 630,
+  alt: `${SITE.name} logo`,
+} as const;

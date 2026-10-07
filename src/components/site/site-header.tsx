@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Logo } from "@/components/brand/logo";
 import { buttonClasses } from "@/components/ui/button";
 
 type NavItem = { label: string; href: string };
@@ -47,12 +47,12 @@ export function SiteHeader({ name, nav, bookingHref }: { name: string; nav: read
       <div className="container-page flex h-18 items-center justify-between gap-6 md:h-20">
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
+          aria-label={`${name}, home`}
+          className="flex items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current sm:gap-3"
         >
-          <span className="block size-12 shrink-0 rounded-full bg-cream p-0.5 md:size-14">
-            <Image src="/logo-mark.png" alt="" width={56} height={56} className="size-full" />
-          </span>
-          <span className="font-display text-lg leading-tight font-semibold italic">{name}</span>
+          <Logo art="emblem" className="size-12 shrink-0 md:size-14" />
+          {/* The dark wordmark disappears into the transparent-over-hero header, so swap to white there. */}
+          <Logo art={solid ? "wordmark" : "wordmark-white"} className="h-12 w-auto md:h-14" />
         </Link>
 
         <nav aria-label="Main" className="hidden lg:block">

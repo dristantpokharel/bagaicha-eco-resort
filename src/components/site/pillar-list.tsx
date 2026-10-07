@@ -18,9 +18,10 @@ type Pillar = {
  */
 export function PillarList({ pillars }: { pillars: readonly Pillar[] }) {
   const [active, setActive] = useState(0);
+  const hasImages = pillars.some((p) => p.image);
 
   return (
-    <div className="grid items-center gap-8 md:grid-cols-[1fr_1.1fr] md:gap-16">
+    <div className={`grid items-center gap-8 md:gap-16 ${hasImages ? "md:grid-cols-[1fr_1.1fr]" : ""}`}>
       <ul className="border-t border-ink/20">
         {pillars.map((p, i) => (
           <li key={p.word} className="border-b border-ink/20">
@@ -53,19 +54,21 @@ export function PillarList({ pillars }: { pillars: readonly Pillar[] }) {
         ))}
       </ul>
 
-      <div className="relative hidden aspect-[4/5] overflow-hidden bg-sage md:block" aria-hidden="true">
-        {pillars.map((p, i) =>
-          p.image ? (
-            <MediaImage
-              key={p.word}
-              media={p.image}
-              alt=""
-              sizes="(min-width: 768px) 50vw, 0px"
-              className={`object-cover transition-opacity duration-700 ease-calm ${active === i ? "opacity-100" : "opacity-0"}`}
-            />
-          ) : null,
-        )}
-      </div>
+      {hasImages && (
+        <div className="relative hidden aspect-[4/5] overflow-hidden bg-sage md:block" aria-hidden="true">
+          {pillars.map((p, i) =>
+            p.image ? (
+              <MediaImage
+                key={p.word}
+                media={p.image}
+                alt=""
+                sizes="(min-width: 768px) 50vw, 0px"
+                className={`object-cover transition-opacity duration-700 ease-calm ${active === i ? "opacity-100" : "opacity-0"}`}
+              />
+            ) : null,
+          )}
+        </div>
+      )}
     </div>
   );
 }

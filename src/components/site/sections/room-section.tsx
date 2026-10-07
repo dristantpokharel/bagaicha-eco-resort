@@ -19,20 +19,22 @@ export function RoomSection({ room, flip = false }: { room: PublicRoomType; flip
   return (
     <section id={room.slug} aria-labelledby={`${room.slug}-heading`} className="py-8 md:py-14">
       <div className="container-page grid items-center gap-8 md:grid-cols-12 md:gap-14">
-        <Reveal className={`md:col-span-7 ${flip ? "md:order-2" : ""}`}>
-          {main && <MediaPhoto media={main} sizes="(min-width: 768px) 58vw, 100vw" className="aspect-[4/3]" />}
-          {details.length > 0 && (
-            <ul className="mt-3 grid grid-cols-3 gap-3 md:mt-4 md:gap-4">
-              {details.slice(0, 3).map((d) => (
-                <li key={d.url}>
-                  <MediaPhoto media={d} sizes="(min-width: 768px) 20vw, 33vw" className="aspect-square md:aspect-[4/3]" />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Reveal>
+        {main && (
+          <Reveal className={`md:col-span-7 ${flip ? "md:order-2" : ""}`}>
+            <MediaPhoto media={main} sizes="(min-width: 768px) 58vw, 100vw" className="aspect-[4/3]" />
+            {details.length > 0 && (
+              <ul className="mt-3 grid grid-cols-3 gap-3 md:mt-4 md:gap-4">
+                {details.slice(0, 3).map((d) => (
+                  <li key={d.url}>
+                    <MediaPhoto media={d} sizes="(min-width: 768px) 20vw, 33vw" className="aspect-square md:aspect-[4/3]" />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Reveal>
+        )}
 
-        <Reveal className={`md:col-span-5 ${flip ? "md:order-1" : ""}`} delay={150}>
+        <Reveal className={`${main ? "md:col-span-5" : "md:col-span-12"} ${flip ? "md:order-1" : ""}`} delay={150}>
           <SectionHeading as="h2" id={`${room.slug}-heading`} strong={room.name} />
           <div className="mt-6 space-y-5">
             <ContentText text={room.description} flagged={flagged("description")} />

@@ -5,6 +5,7 @@ import { formatShortDate, formatStayDate } from "@/lib/booking/dates";
 import { quoteLines, type Quote } from "@/lib/booking/pricing";
 import { formatNpr } from "@/lib/money";
 import { escapeHtml as esc, singleLine } from "./escape";
+import { emailLogoUrl, EMAIL_LOGO_WIDTH } from "./logo";
 
 /** Everything a booking email shows. Built from the booking's own snapshots. */
 export type BookingEmailData = {
@@ -60,10 +61,17 @@ function priceBlock(b: BookingEmailData) {
   return { html, text };
 }
 
+/** Logo image (PNG; mail apps drop SVG) or, when Cloudinary isn't configured, the plain name. */
+function header(): string {
+  const logo = emailLogoUrl();
+  if (!logo) return `<div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:${COLORS.forest}">${esc(SITE.name)}</div>`;
+  return `<img src="${esc(logo)}" width="${EMAIL_LOGO_WIDTH}" alt="${esc(SITE.name)}" style="display:block;border:0;height:auto;width:${EMAIL_LOGO_WIDTH}px">`;
+}
+
 function layout(title: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="margin:0;background:${COLORS.cream};font-family:Arial,Helvetica,sans-serif;color:${COLORS.ink}">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
-<div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:${COLORS.forest}">${esc(SITE.name)}</div>
+${header()}
 <h1 style="font-size:22px;color:${COLORS.forest};margin:12px 0 16px">${esc(title)}</h1>
 ${bodyHtml}
 <hr style="border:none;border-top:1px solid ${COLORS.line};margin:24px 0 12px">

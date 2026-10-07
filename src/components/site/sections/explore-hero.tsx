@@ -36,7 +36,7 @@ export function ExploreHero({
     }).props;
 
   return (
-    <section aria-labelledby="explore-hero-heading" className="relative h-[78svh] min-h-[30rem] overflow-hidden bg-forest text-cream md:h-[70svh]">
+    <section aria-labelledby="explore-hero-heading" className={`relative overflow-hidden bg-forest text-cream ${desktopPhoto ? "h-[78svh] min-h-[30rem] md:h-[70svh]" : "pt-32 md:pt-40"}`}>
       {desktopPhoto && mobilePhoto && (
         <picture>
           <source media="(min-width: 768px)" srcSet={props(desktopPhoto).srcSet} />
@@ -50,7 +50,7 @@ export function ExploreHero({
           DEV PLACEHOLDER: a flagged hero photo (rights unconfirmed). Hidden on the live site.
         </p>
       )}
-      <div className="container-page relative flex h-full flex-col justify-end pb-24 md:pb-32">
+      <div className={`container-page relative flex flex-col justify-end pb-24 md:pb-32 ${desktopPhoto ? "h-full" : ""}`}>
         <h1 id="explore-hero-heading">
           <span className="text-display block animate-fade-up">{strong}</span>
           <span className="text-heading-soft mt-2 block animate-fade-up [animation-delay:150ms]">{soft}</span>

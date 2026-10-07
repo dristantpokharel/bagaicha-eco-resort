@@ -17,7 +17,7 @@ export function RoomsTeaser({ rooms }: { rooms: PublicRoomType[] }) {
     <section aria-labelledby="stay-heading" className="bg-cream-dark py-section-sm md:py-section">
       <div className="container-page">
         <div className="grid gap-8 md:grid-cols-12 md:gap-10">
-          <Reveal className="flex flex-col gap-6 md:col-span-4 md:gap-10">
+          <Reveal className={`flex flex-col gap-6 md:gap-10 ${main ? "md:col-span-4" : "md:col-span-12"}`}>
             <Kicker words={copy.kicker} />
             <SectionHeading id="stay-heading" lead={copy.lead} accent={copy.accent} soft={copy.soft} />
             <p className="text-body">{copy.line}</p>
@@ -42,8 +42,8 @@ export function RoomsTeaser({ rooms }: { rooms: PublicRoomType[] }) {
               </Link>
             </div>
           </Reveal>
-          <Reveal className="md:col-span-8" delay={150}>
-            {main && (
+          {main && (
+            <Reveal className="md:col-span-8" delay={150}>
               <div className="relative">
                 <MediaPhoto media={main} sizes="(min-width: 768px) 60vw, 100vw" className="aspect-[4/3]" />
                 <div className="relative -mt-12 ml-auto max-w-[17rem] rounded-tl-organic bg-forest px-7 pt-8 pb-6 text-right text-cream md:absolute md:right-0 md:bottom-0 md:mt-0 md:max-w-xs">
@@ -52,8 +52,8 @@ export function RoomsTeaser({ rooms }: { rooms: PublicRoomType[] }) {
                   <p className="mt-2 text-sm leading-relaxed md:text-base">{copy.overlay.body}</p>
                 </div>
               </div>
-            )}
-          </Reveal>
+            </Reveal>
+          )}
         </div>
         {details.length > 0 && (
           <ul className="mt-3 grid grid-cols-3 gap-3 md:mt-4 md:gap-4">

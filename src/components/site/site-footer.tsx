@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { buttonClasses } from "@/components/ui/button";
 import type { Business } from "@/lib/content/queries";
 import { formatWhatsapp, instagramHandle, mailHref, telHref, whatsappHref } from "@/lib/content/contact";
@@ -23,11 +23,11 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
       <div className="bg-forest pb-10 text-cream">
         <div className="container-page grid gap-8 pt-6 md:gap-12 md:pt-4 md:grid-cols-[1.3fr_1fr_1fr]">
           <div>
-            <span className="block size-20 rounded-full bg-cream p-1">
-              <Image src="/logo-mark.png" alt="" width={80} height={80} className="size-full" />
-            </span>
-            <p className="mt-5 font-display text-3xl font-bold italic">{business.name}</p>
-            {business.tagline && <p className="mt-1 font-display text-xl font-light italic text-sage">{business.tagline}</p>}
+            <Link href="/" aria-label={`${business.name}, home`} className="inline-block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream">
+              <Logo art="emblem" className="size-28 md:size-32" />
+              <Logo art="wordmark-white" className="mt-4 h-auto w-48 md:w-56" />
+            </Link>
+            {business.tagline && <p className="mt-4 font-display text-xl font-light italic text-sage">{business.tagline}</p>}
             <Link href={bookingHref} className={buttonClasses({ variant: "brand-light", size: "lg", className: "mt-8" })}>
               Book Your Stay
             </Link>

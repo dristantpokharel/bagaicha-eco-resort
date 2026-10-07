@@ -35,7 +35,7 @@ export function Reveal({
     <div
       ref={ref}
       data-visible={visible}
-      className={`reveal ${className}`}
+      className={`reveal empty:hidden ${className}`}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >
       {children}

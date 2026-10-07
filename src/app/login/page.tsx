@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SITE } from "@/config/site";
 import { getCurrentUser, safeCallbackUrl } from "@/lib/auth";
+import { Logo } from "@/components/brand/logo";
 import { FormMessage } from "@/components/ui/form";
 import { LoginForm } from "./login-form";
 
@@ -25,7 +26,7 @@ export default async function LoginPage({
     <main className="flex flex-1 items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="font-display text-3xl text-forest">{SITE.name}</p>
+          <Logo art="wordmark" alt={SITE.name} className="mx-auto mb-3 h-28 w-auto" />
           <p className="mt-2 text-sm text-charcoal-light">Staff sign in</p>
         </div>
         <div className="space-y-4 rounded-lg border border-forest/10 bg-white p-6 shadow-subtle">

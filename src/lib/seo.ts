@@ -2,7 +2,7 @@ import "server-only";
 import type { Metadata } from "next";
 import { deliveryUrl } from "@/lib/cloudinary/delivery";
 import { getHomepageSlots } from "@/lib/content/queries";
-import { SITE } from "@/config/site";
+import { DEFAULT_OG_IMAGE, SITE } from "@/config/site";
 
 /**
  * Per-page metadata: title, description, canonical URL (relative to
@@ -19,12 +19,12 @@ export async function pageMetadata({
 }): Promise<Metadata> {
   const slots = await getHomepageSlots();
   const hero = slots.HERO_DESKTOP?.[0] ?? slots.HERO_MOBILE?.[0];
-  const images = hero ? [{ url: deliveryUrl(hero.url, 1200), alt: hero.altText || SITE.name }] : undefined;
+  const images = hero ? [{ url: deliveryUrl(hero.url, 1200), alt: hero.altText || SITE.name }] : [DEFAULT_OG_IMAGE];
   return {
     title,
     description,
     alternates: { canonical: path },
     openGraph: { title: `${title} · ${SITE.name}`, description, url: path, type: "website", images },
-    twitter: { card: images ? "summary_large_image" : "summary", title: `${title} · ${SITE.name}`, description, images: images?.map((i) => i.url) },
+    twitter: { card: images ? "summary_large_image" : "summary", title: `${title} · ${SITE.name}`, description, images: images.map((i) => i.url) },
   };
 }

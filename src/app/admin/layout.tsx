@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SITE } from "@/config/site";
 import { can, requirePageUser, ROLE_LABELS } from "@/lib/auth";
 import { ADMIN_SECTIONS, type AdminSection } from "@/lib/admin-nav";
+import { Logo } from "@/components/brand/logo";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "./actions";
@@ -21,8 +22,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="admin-shell flex min-h-full flex-1 flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-forest/10 bg-white px-4 py-3 md:px-6">
-        <Link href="/admin" className="font-display text-lg text-forest">
-          {SITE.name}
+        <Link
+          href="/admin"
+          aria-label={`${SITE.name}, admin home`}
+          className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
+        >
+          <Logo art="wordmark" className="h-10 w-auto md:h-12" />
         </Link>
         <div className="flex items-center gap-3">
           <Link
