@@ -29,7 +29,7 @@ export default async function NewBookingPage() {
           ← All bookings
         </Link>
       </p>
-      <PageHeader title="New booking" description="For phone calls and walk-ins. The price is worked out from the room type's current rates." />
+      <PageHeader title="New booking" description="For phone calls and walk-ins. Add as many rooms as the guest needs. Each room's price is worked out from its type's current rates." />
       {roomTypes.length === 0 ? (
         <p className="rounded-md border border-dashed border-forest/30 bg-white px-4 py-6 text-sm text-charcoal-light">
           There are no active room types yet. Add one under Rooms first.

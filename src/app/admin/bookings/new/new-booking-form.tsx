@@ -2,7 +2,7 @@
 
 import { describeCapacityShort } from "@/lib/booking/capacity";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
@@ -18,7 +18,10 @@ type RoomTypeOption = {
   rooms: { id: string; name: string }[];
 };
 
-/** Phone / walk-in booking. Only name and phone are required for the guest. */
+type Row = { key: string; roomTypeId: string; roomId: string; adults: number; children: number };
+const blankRow = (key: string, roomTypeId: string): Row => ({ key, roomTypeId, roomId: "", adults: 2, children: 0 });
+
+/** Phone / walk-in booking for one or more rooms. Only name and phone are required for the guest. */
 export function NewBookingForm({
   roomTypes,
   defaultCountryCode,
@@ -29,13 +32,14 @@ export function NewBookingForm({
   childUnderAge: number;
 }) {
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(createManualBooking, null);
-  const [roomTypeId, setRoomTypeId] = useState(roomTypes[0]?.id ?? "");
+  const [rows, setRows] = useState<Row[]>(() => [blankRow("row-0", roomTypes[0]?.id ?? "")]);
+  const rowCount = useRef(1);
+  const update = (key: string, patch: Partial<Row>) => setRows((all) => all.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const errors = result && !result.ok ? result.fieldErrors : undefined;
   const a11y = (name: string) => ({
     "aria-invalid": errors?.[name] ? true : undefined,
     "aria-describedby": errors?.[name] ? `new-${name}-error` : undefined,
   });
-  const rooms = roomTypes.find((rt) => rt.id === roomTypeId)?.rooms ?? [];
 
   return (
     <form action={action} className="max-w-3xl space-y-6" noValidate>
@@ -44,42 +48,70 @@ export function NewBookingForm({
       <fieldset className="space-y-4 rounded-lg border border-forest/10 bg-white p-5">
         <legend className="px-1 font-display text-lg text-forest">Stay</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="new-roomTypeId" label="Room type" error={errors?.roomTypeId}>
-            <Select id="new-roomTypeId" name="roomTypeId" value={roomTypeId} onChange={(e) => setRoomTypeId(e.target.value)} {...a11y("roomTypeId")}>
-              {roomTypes.map((rt) => (
-                <option key={rt.id} value={rt.id}>
-                  {rt.name} ({describeCapacityShort(rt)})
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            id="new-roomId"
-            label="Assign a room (optional)"
-            hint="Leave empty to save as a pending request. Choosing a room confirms the booking."
-          >
-            <Select id="new-roomId" name="roomId" defaultValue="" key={roomTypeId}>
-              <option value="">Not yet: keep pending</option>
-              {rooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
           <Field id="new-checkIn" label="Check-in" error={errors?.checkIn}>
             <Input id="new-checkIn" name="checkIn" type="date" required {...a11y("checkIn")} />
           </Field>
           <Field id="new-checkOut" label="Check-out" error={errors?.checkOut}>
             <Input id="new-checkOut" name="checkOut" type="date" required {...a11y("checkOut")} />
           </Field>
-          <Field id="new-adults" label={`Adults (incl. children ${childUnderAge}+)`} error={errors?.adults}>
-            <Input id="new-adults" name="adults" type="number" min={1} max={20} defaultValue={2} {...a11y("adults")} />
-          </Field>
-          <Field id="new-children" label={`Children under ${childUnderAge}`} error={errors?.children}>
-            <Input id="new-children" name="children" type="number" min={0} max={20} defaultValue={0} {...a11y("children")} />
-          </Field>
         </div>
+      </fieldset>
+
+      <fieldset className="space-y-4 rounded-lg border border-forest/10 bg-white p-5">
+        <legend className="px-1 font-display text-lg text-forest">Rooms</legend>
+        <input type="hidden" name="rooms" value={JSON.stringify(rows.map(({ roomTypeId, roomId, adults, children }) => ({ roomTypeId, roomId: roomId || null, adults, children })))} />
+        <p className="text-xs text-charcoal-light">
+          Every room is for the dates above. Choosing a room confirms that room straight away; leave it empty to keep it pending.
+        </p>
+        {errors?.rooms && (
+          <p className="text-sm text-error" role="alert">
+            {errors.rooms}
+          </p>
+        )}
+        <ul className="space-y-4">
+          {rows.map((row, i) => {
+            const type = roomTypes.find((rt) => rt.id === row.roomTypeId);
+            return (
+              <li key={row.key} className="grid gap-3 border border-forest/10 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field id={`new-type-${row.key}`} label={`Room ${i + 1} type`}>
+                  <Select id={`new-type-${row.key}`} value={row.roomTypeId} onChange={(e) => update(row.key, { roomTypeId: e.target.value, roomId: "" })}>
+                    {roomTypes.map((rt) => (
+                      <option key={rt.id} value={rt.id}>
+                        {rt.name} ({describeCapacityShort(rt)})
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field id={`new-room-${row.key}`} label="Assign a room (optional)">
+                  <Select id={`new-room-${row.key}`} value={row.roomId} onChange={(e) => update(row.key, { roomId: e.target.value })}>
+                    <option value="">Not yet: keep pending</option>
+                    {(type?.rooms ?? []).map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field id={`new-adults-${row.key}`} label="Adults">
+                  <Input id={`new-adults-${row.key}`} type="number" min={1} max={20} value={row.adults} onChange={(e) => update(row.key, { adults: Number(e.target.value) })} />
+                </Field>
+                <Field id={`new-children-${row.key}`} label={`Children under ${childUnderAge}`}>
+                  <div className="flex items-start gap-2">
+                    <Input id={`new-children-${row.key}`} type="number" min={0} max={20} value={row.children} onChange={(e) => update(row.key, { children: Number(e.target.value) })} />
+                    {rows.length > 1 && (
+                      <Button type="button" variant="ghost" size="md" onClick={() => setRows((all) => all.filter((r) => r.key !== row.key))} aria-label={`Remove room ${i + 1}`}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </Field>
+              </li>
+            );
+          })}
+        </ul>
+        <Button type="button" variant="secondary" onClick={() => setRows((all) => [...all, blankRow(`row-${rowCount.current++}`, roomTypes[0]?.id ?? "")])}>
+          Add another room
+        </Button>
       </fieldset>
 
       <fieldset className="space-y-4 rounded-lg border border-forest/10 bg-white p-5">
