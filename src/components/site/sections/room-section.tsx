@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { describeCapacity } from "@/lib/booking/capacity";
 import { buttonClasses } from "@/components/ui/button";
 import type { PublicRoomType } from "@/lib/content/queries";
 import { formatNpr } from "@/lib/money";
@@ -44,7 +45,7 @@ export function RoomSection({ room, childUnderAge, flip = false }: { room: Publi
               </div>
               <div>
                 <dt className="text-label text-ink-muted">Sleeps</dt>
-                <dd className="mt-1 text-ink">Up to {room.maxGuests}, children included</dd>
+                <dd className="mt-1 text-ink">{describeCapacity(room, { childrenIncluded: true })}</dd>
               </div>
               <div className="col-span-2">
                 <dt className="text-label text-ink-muted">Children under {childUnderAge}</dt>

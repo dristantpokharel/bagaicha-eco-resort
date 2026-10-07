@@ -2,35 +2,38 @@
 
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { partyLimits, partySummary, stepParty, type Party, type PartyField } from "@/lib/booking/party";
+import type { Capacity } from "@/lib/booking/capacity";
+import { capacityNote, childAgeRange, partyLimits, partySummary, stepParty, type Party, type PartyField } from "@/lib/booking/party";
 import { PopoverSheet, triggerClasses, useIsWide } from "@/components/booking/popover-sheet";
 
 type Props = {
   party: Party;
   onChange: (party: Party) => void;
-  /** Largest room type's capacity; adults + children can't exceed it. */
-  maxGuests: number;
-  /** Children below this age pay the per-child rate; from it they count as adults (Business info). */
+  /** The selected room type's limits, or every type's for "Any room". */
+  caps: Capacity[];
+  /** Name of the selected room type, for the capacity note. */
+  typeName?: string;
+  /** Children are younger than this (Business info); the label shows the range it implies. */
   childUnderAge: number;
   error?: string;
 };
 
 /** One "Guests" field ("2 adults · 0 children") opening −/+ steppers. Submits through two hidden inputs. */
-export function GuestsField({ party, onChange, maxGuests, childUnderAge, error }: Props) {
+export function GuestsField({ party, onChange, caps, typeName, childUnderAge, error }: Props) {
   const [open, setOpen] = useState(false);
   const wide = useIsWide();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogId = useId();
-  const limits = partyLimits(party, maxGuests);
+  const limits = partyLimits(party, caps);
+  const note = capacityNote(party, caps, typeName);
 
   const close = (returnFocus = true) => {
     setOpen(false);
     if (returnFocus) triggerRef.current?.focus();
   };
 
-  const step = (field: PartyField, delta: 1 | -1) => onChange(stepParty(party, field, delta, maxGuests));
-  const full = !limits.canAddAdult && !limits.canAddChild;
+  const step = (field: PartyField, delta: 1 | -1) => onChange(stepParty(party, field, delta, caps));
 
   return (
     <div ref={rootRef} className="relative">
@@ -81,7 +84,6 @@ export function GuestsField({ party, onChange, maxGuests, childUnderAge, error }
           <StepperRow
             id="adults"
             label="Adults"
-            hint={`Age ${childUnderAge} and over`}
             value={party.adults}
             canDecrease={limits.canRemoveAdult}
             canIncrease={limits.canAddAdult}
@@ -89,16 +91,15 @@ export function GuestsField({ party, onChange, maxGuests, childUnderAge, error }
           />
           <StepperRow
             id="children"
-            label={`Children (under ${childUnderAge})`}
-            hint="Counts toward the room's capacity"
+            label={`Children (${childAgeRange(childUnderAge)})`}
             value={party.children}
             canDecrease={limits.canRemoveChild}
             canIncrease={limits.canAddChild}
             onStep={(d) => step("children", d)}
           />
         </div>
-        <p className="mt-3 text-xs text-ink-muted" aria-live="polite">
-          {full ? `Our largest room sleeps ${maxGuests} guests, children included.` : `Up to ${maxGuests} guests per room, children included.`}
+        <p className="mt-3 min-h-4 text-xs text-ink-muted" aria-live="polite">
+          {note}
         </p>
         {wide && (
           <div className="mt-4 flex justify-end">
@@ -115,7 +116,6 @@ export function GuestsField({ party, onChange, maxGuests, childUnderAge, error }
 function StepperRow({
   id,
   label,
-  hint,
   value,
   canDecrease,
   canIncrease,
@@ -123,7 +123,6 @@ function StepperRow({
 }: {
   id: string;
   label: string;
-  hint: string;
   value: number;
   canDecrease: boolean;
   canIncrease: boolean;
@@ -139,7 +138,6 @@ function StepperRow({
         <p id={`${id}-stepper-label`} className="text-sm font-medium text-ink-heading">
           {label}
         </p>
-        <p className="text-xs text-ink-muted">{hint}</p>
       </div>
       <div className="flex items-center gap-3">
         <button type="button" className={button} disabled={!canDecrease} onClick={() => onStep(-1)} aria-label={`Fewer ${name}`}>

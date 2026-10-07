@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/form";
 import { DateRangeField } from "@/components/booking/date-range-field";
 import { GuestsField } from "@/components/booking/guests-field";
 import { RoomTypePills } from "@/components/booking/room-type-pills";
+import { describeCapacity, partyFits, type Capacity } from "@/lib/booking/capacity";
 import { addDays, parseDateOnly } from "@/lib/booking/dates";
 import { latestCheckOut, soldOutForSelection, type AvailabilityPayload } from "@/lib/booking/availability-map";
 
 type Props = {
   today: string;
-  maxGuests: number;
   childUnderAge: number;
-  roomTypes: { slug: string; name: string; maxGuests: number }[];
+  roomTypes: (Capacity & { slug: string; name: string })[];
   defaults: { checkIn: string; checkOut: string; adults: number; children: number };
   errors?: Record<string, string>;
   /** Room type slug chosen on /stay or in a previous search; "" means any room. */
@@ -22,7 +22,7 @@ type Props = {
 };
 
 /** Room type + dates + party. Plain GET form, so results are a normal, shareable URL. */
-export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, defaults, errors, room: initialRoom }: Props) {
+export function SearchForm({ today, childUnderAge, roomTypes, defaults, errors, room: initialRoom }: Props) {
   const [checkIn, setCheckIn] = useState(defaults.checkIn);
   const [checkOut, setCheckOut] = useState(defaults.checkOut);
   const [room, setRoom] = useState(roomTypes.some((r) => r.slug === initialRoom) ? (initialRoom as string) : "");
@@ -39,14 +39,14 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
     return () => controller.abort();
   }, []);
 
-  const partySize = party.adults + party.children;
   const soldOut = useMemo(
-    () => (payload ? soldOutForSelection(payload, room || null, partySize) : new Set<string>()),
-    [payload, room, partySize],
+    () => (payload ? soldOutForSelection(payload, room || null, party) : new Set<string>()),
+    [payload, room, party],
   );
 
   const selectedType = roomTypes.find((r) => r.slug === room);
-  const tooSmall = selectedType && selectedType.maxGuests < partySize;
+  const tooSmall = selectedType && !partyFits(selectedType, party);
+  const caps = selectedType ? [selectedType] : roomTypes;
 
   const inDate = parseDateOnly(checkIn);
   const outDate = parseDateOnly(checkOut);
@@ -61,7 +61,7 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
         roomTypes={roomTypes}
         value={room}
         onChange={setRoom}
-        hint={tooSmall ? `${selectedType.name} sleeps up to ${selectedType.maxGuests} guests, children included.` : undefined}
+        hint={tooSmall ? `${selectedType.name} doesn't fit this group: ${describeCapacity(selectedType).toLowerCase()}.` : undefined}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] lg:items-end">
@@ -85,7 +85,7 @@ export function SearchForm({ today, maxGuests, childUnderAge, roomTypes, default
             </div>
           </noscript>
         </div>
-        <GuestsField party={party} onChange={setParty} maxGuests={maxGuests} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
+        <GuestsField party={party} onChange={setParty} caps={caps} typeName={selectedType?.name} childUnderAge={childUnderAge} error={errors?.adults ?? errors?.children} />
         <Button type="submit" variant="brand" size="lg" className="min-h-14 w-full lg:w-auto lg:px-8">
           Check availability
         </Button>

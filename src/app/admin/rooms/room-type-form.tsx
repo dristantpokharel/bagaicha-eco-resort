@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
+import { capacityErrors, describeCapacity } from "@/lib/booking/capacity";
 import { createRoomType, updateRoomType } from "./actions";
 
 export type RoomTypeValues = {
@@ -15,6 +16,8 @@ export type RoomTypeValues = {
   basePriceNpr: number;
   childPricePerNightNpr: number;
   maxGuests: number;
+  maxAdults: number;
+  maxChildren: number | null;
   amenities: string[];
   sortOrder: number;
 };
@@ -26,10 +29,20 @@ export function RoomTypeForm({ roomType, childUnderAge }: { roomType?: RoomTypeV
     null,
   );
   const errors = result && !result.ok ? result.fieldErrors : undefined;
+  const [guests, setGuests] = useState(String(roomType?.maxGuests ?? 2));
+  const [adults, setAdults] = useState(String(roomType?.maxAdults ?? roomType?.maxGuests ?? 2));
+  const [children, setChildren] = useState(roomType?.maxChildren == null ? "" : String(roomType.maxChildren));
+  const cap = { maxGuests: Number(guests), maxAdults: Number(adults), maxChildren: children === "" ? null : Number(children) };
+  const capIssues = capacityErrors(cap);
+  const capValid =
+    Number.isInteger(cap.maxGuests) && cap.maxGuests > 0 && Number.isInteger(cap.maxAdults) && cap.maxAdults > 0 &&
+    (cap.maxChildren === null || Number.isInteger(cap.maxChildren)) && Object.keys(capIssues).length === 0;
+  const capProblem = capIssues.maxAdults ? `Maximum adults: ${capIssues.maxAdults}` : capIssues.maxChildren ? `Maximum children: ${capIssues.maxChildren}` : null;
   const a11y = (name: string, hint = false) => ({
     "aria-invalid": errors?.[name] ? true : undefined,
     "aria-describedby": errors?.[name] ? `rt-${name}-error` : hint ? `rt-${name}-hint` : undefined,
   });
+  const capA11y = (name: string) => ({ ...a11y(name), "aria-describedby": errors?.[name] ? `rt-${name}-error` : "rt-capacity-hint" });
 
   return (
     <form action={action} className="space-y-4" noValidate>
@@ -99,29 +112,65 @@ export function RoomTypeForm({ roomType, childUnderAge }: { roomType?: RoomTypeV
             {...a11y("childPricePerNightNpr", true)}
           />
         </Field>
-        <Field id="rt-guests" label="Maximum guests" error={errors?.maxGuests}>
-          <Input
-            id="rt-guests"
-            name="maxGuests"
-            type="number"
-            min={1}
-            max={20}
-            required
-            defaultValue={roomType?.maxGuests ?? 2}
-            {...a11y("maxGuests")}
-          />
-        </Field>
-        <Field id="rt-sort" label="Display order" error={errors?.sortOrder} hint="Lower numbers show first.">
-          <Input
-            id="rt-sort"
-            name="sortOrder"
-            type="number"
-            min={0}
-            max={999}
-            defaultValue={roomType?.sortOrder ?? 0}
-            {...a11y("sortOrder", true)}
-          />
-        </Field>
+        <div className="sm:col-span-2 lg:col-span-4">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <Field id="rt-guests" label="Maximum guests" error={errors?.maxGuests}>
+              <Input
+                id="rt-guests"
+                name="maxGuests"
+                type="number"
+                min={1}
+                max={20}
+                required
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+                {...capA11y("maxGuests")}
+              />
+            </Field>
+            <Field id="rt-adults" label="Maximum adults" error={errors?.maxAdults}>
+              <Input
+                id="rt-adults"
+                name="maxAdults"
+                type="number"
+                min={1}
+                max={20}
+                required
+                value={adults}
+                onChange={(e) => setAdults(e.target.value)}
+                {...capA11y("maxAdults")}
+              />
+            </Field>
+            <Field id="rt-children" label="Maximum children (optional)" error={errors?.maxChildren}>
+              <Input
+                id="rt-children"
+                name="maxChildren"
+                type="number"
+                min={0}
+                max={20}
+                placeholder="No limit"
+                value={children}
+                onChange={(e) => setChildren(e.target.value)}
+                {...capA11y("maxChildren")}
+              />
+            </Field>
+          <Field id="rt-sort" label="Display order" error={errors?.sortOrder} hint="Lower numbers show first.">
+            <Input
+              id="rt-sort"
+              name="sortOrder"
+              type="number"
+              min={0}
+              max={999}
+              defaultValue={roomType?.sortOrder ?? 0}
+              {...a11y("sortOrder", true)}
+            />
+          </Field>
+          </div>
+          <p id="rt-capacity-hint" className="mt-2 text-xs text-charcoal-light" aria-live="polite">
+            {capValid
+              ? `Guests will see: ${describeCapacity(cap)}. Children count toward the total.`
+              : (capProblem ?? "Maximum guests is the total, children included.")}
+          </p>
+        </div>
       </div>
 
       <Field id="rt-amenities" label="Amenities" error={errors?.amenities} hint="One per line.">

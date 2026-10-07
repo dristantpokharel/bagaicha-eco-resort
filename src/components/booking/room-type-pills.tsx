@@ -1,6 +1,8 @@
 "use client";
 
-type RoomTypeOption = { slug: string; name: string; maxGuests: number };
+import { describeCapacityShort, type Capacity } from "@/lib/booking/capacity";
+
+type RoomTypeOption = Capacity & { slug: string; name: string };
 
 /**
  * Room type as a radio group styled as pills: "Any room" then each type. Native radios, so arrow keys,
@@ -17,7 +19,7 @@ export function RoomTypePills({
   onChange: (slug: string) => void;
   hint?: string;
 }) {
-  const options = [{ slug: "", label: "Any room" }, ...roomTypes.map((r) => ({ slug: r.slug, label: `${r.name} · up to ${r.maxGuests}` }))];
+  const options = [{ slug: "", label: "Any room" }, ...roomTypes.map((r) => ({ slug: r.slug, label: `${r.name} · ${describeCapacityShort(r)}` }))];
   return (
     <fieldset aria-describedby={hint ? "room-hint" : undefined}>
       <legend className="mb-1.5 block text-sm font-medium text-charcoal">Room type</legend>

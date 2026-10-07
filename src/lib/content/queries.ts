@@ -314,6 +314,8 @@ export type PublicRoomType = {
   basePriceNpr: number;
   childPricePerNightNpr: number;
   maxGuests: number;
+  maxAdults: number;
+  maxChildren: number | null;
   amenities: string[];
   photos: PublicMedia[];
   placeholderFields: string[];
@@ -333,6 +335,8 @@ export const getRoomTypes = cached(async (): Promise<PublicRoomType[]> => {
     basePriceNpr: r.basePriceNpr,
     childPricePerNightNpr: r.childPricePerNightNpr,
     maxGuests: r.maxGuests,
+    maxAdults: r.maxAdults,
+    maxChildren: r.maxChildren,
     amenities: r.placeholderFields.includes("amenities") && !showPlaceholders ? [] : r.amenities,
     photos: shownMedia(r.media.map((m) => m.media)),
     placeholderFields: showPlaceholders ? r.placeholderFields : [],

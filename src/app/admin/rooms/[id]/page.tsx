@@ -71,6 +71,8 @@ export default async function EditRoomTypePage({
               basePriceNpr: roomType.basePriceNpr,
               childPricePerNightNpr: roomType.childPricePerNightNpr,
               maxGuests: roomType.maxGuests,
+              maxAdults: roomType.maxAdults,
+              maxChildren: roomType.maxChildren,
               amenities: roomType.amenities,
               sortOrder: roomType.sortOrder,
             }}

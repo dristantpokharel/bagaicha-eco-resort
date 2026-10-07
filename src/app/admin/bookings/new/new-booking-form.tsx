@@ -1,5 +1,7 @@
 "use client";
 
+import { describeCapacityShort } from "@/lib/booking/capacity";
+
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
@@ -11,6 +13,8 @@ type RoomTypeOption = {
   id: string;
   name: string;
   maxGuests: number;
+  maxAdults: number;
+  maxChildren: number | null;
   rooms: { id: string; name: string }[];
 };
 
@@ -44,7 +48,7 @@ export function NewBookingForm({
             <Select id="new-roomTypeId" name="roomTypeId" value={roomTypeId} onChange={(e) => setRoomTypeId(e.target.value)} {...a11y("roomTypeId")}>
               {roomTypes.map((rt) => (
                 <option key={rt.id} value={rt.id}>
-                  {rt.name} (up to {rt.maxGuests})
+                  {rt.name} ({describeCapacityShort(rt)})
                 </option>
               ))}
             </Select>

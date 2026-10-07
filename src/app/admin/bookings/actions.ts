@@ -67,7 +67,7 @@ export async function createManualBooking(_prev: ActionResult | null, formData: 
     const roomType = await db.roomType.findUnique({ where: { id: input.roomTypeId } });
     if (!roomType?.isActive) throw new ActionError("Choose an active room type.", { roomTypeId: "Choose a room type." });
 
-    const stay = validateStay(input, { today: todayInResort(), publicRequest: false, maxGuests: roomType.maxGuests });
+    const stay = validateStay(input, { today: todayInResort(), publicRequest: false, capacity: roomType });
     if (!stay.ok) throw new ActionError(Object.values(stay.errors)[0], stay.errors);
 
     try {
@@ -149,7 +149,7 @@ export async function updateBooking(_prev: ActionResult | null, formData: FormDa
 
         const stay = validateStay(
           { checkIn: checkInStr, checkOut: checkOutStr, adults, children },
-          { today: todayInResort(), publicRequest: false, maxGuests: roomType.maxGuests },
+          { today: todayInResort(), publicRequest: false, capacity: roomType },
         );
         // Closed bookings (checked out / cancelled) only take notes, so skip stay rules for them.
         const closed = !flags.checkIn && !flags.checkOut;

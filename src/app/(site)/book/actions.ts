@@ -53,7 +53,7 @@ export async function submitBookingRequest(
     const roomType = await db.roomType.findFirst({ where: { id: input.roomTypeId, isActive: true } });
     if (!roomType) return fail("That room type isn't available any more. Please start again.");
 
-    const stay = validateStay(input, { today: todayInResort(), publicRequest: true, maxGuests: roomType.maxGuests });
+    const stay = validateStay(input, { today: todayInResort(), publicRequest: true, capacity: roomType });
     if (!stay.ok) return fail(Object.values(stay.errors)[0], stay.errors);
 
     const ip = clientIpFromHeaders(await headers());

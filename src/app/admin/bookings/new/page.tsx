@@ -16,6 +16,8 @@ export default async function NewBookingPage() {
       id: true,
       name: true,
       maxGuests: true,
+      maxAdults: true,
+      maxChildren: true,
       rooms: { where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } },
     },
   });

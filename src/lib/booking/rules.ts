@@ -1,4 +1,5 @@
 import { BOOKING } from "@/config/booking";
+import { partyProblem, type Capacity } from "./capacity";
 import { addDays, nightsBetween, parseDateOnly } from "./dates";
 
 export type StayInput = {
@@ -15,11 +16,11 @@ export type StayValidation =
 /**
  * Date and party rules. `today` is the date in Asia/Kathmandu (todayInResort()).
  * `publicRequest` adds the limits guests face; staff may book past dates or
- * longer stays. `maxGuests` is the room type's capacity (children count too).
+ * longer stays. `capacity` is the room type's occupancy limits (capacity.ts).
  */
 export function validateStay(
   input: StayInput,
-  options: { today: Date; publicRequest: boolean; maxGuests?: number },
+  options: { today: Date; publicRequest: boolean; capacity?: Capacity },
 ): StayValidation {
   const errors: Record<string, string> = {};
   const checkIn = parseDateOnly(input.checkIn);
@@ -45,13 +46,9 @@ export function validateStay(
 
   if (!Number.isInteger(input.adults) || input.adults < 1) errors.adults = "At least 1 adult is needed.";
   if (!Number.isInteger(input.children) || input.children < 0) errors.children = "Enter 0 or more children.";
-  if (
-    options.maxGuests !== undefined &&
-    !errors.adults &&
-    !errors.children &&
-    input.adults + input.children > options.maxGuests
-  ) {
-    errors.adults = `This room sleeps up to ${options.maxGuests} guests, children included.`;
+  if (options.capacity && !errors.adults && !errors.children) {
+    const problem = partyProblem(options.capacity, { adults: input.adults, children: input.children });
+    if (problem) errors[problem.field] = problem.message;
   }
 
   if (Object.keys(errors).length || !checkIn || !checkOut) return { ok: false, errors };

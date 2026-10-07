@@ -1,3 +1,4 @@
+import { describeCapacity } from "@/lib/booking/capacity";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requirePagePermission } from "@/lib/auth";
@@ -18,6 +19,8 @@ export default async function RoomsPage() {
       name: true,
       basePriceNpr: true,
       maxGuests: true,
+      maxAdults: true,
+      maxChildren: true,
       isActive: true,
       rooms: { select: { isActive: true } },
       _count: { select: { media: true } },
@@ -79,7 +82,7 @@ export default async function RoomsPage() {
                       </Link>
                     </td>
                     <td className="py-3 pr-4">{formatNpr(rt.basePriceNpr)}</td>
-                    <td className="py-3 pr-4">Up to {rt.maxGuests}</td>
+                    <td className="py-3 pr-4">{describeCapacity(rt)}</td>
                     <td className="py-3 pr-4">
                       {activeRooms}
                       {rt.rooms.length > activeRooms && (

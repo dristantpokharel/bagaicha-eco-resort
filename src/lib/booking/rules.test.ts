@@ -3,7 +3,7 @@ import { parseDateOnly } from "./dates";
 import { validateStay } from "./rules";
 
 const today = parseDateOnly("2026-10-06")!;
-const pub = { today, publicRequest: true, maxGuests: 2 };
+const pub = { today, publicRequest: true, capacity: { maxGuests: 2, maxAdults: 2, maxChildren: null } };
 const stay = (o: Partial<Parameters<typeof validateStay>[0]> = {}) => ({
   checkIn: "2026-10-10",
   checkOut: "2026-10-12",

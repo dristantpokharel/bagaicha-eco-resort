@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { ActionError } from "@/lib/actions";
+import { fittingTypes, type Party } from "./capacity";
 
 type Client = Prisma.TransactionClient;
 
@@ -40,16 +41,13 @@ export function findFreeRooms(
   });
 }
 
-/** Active room types that sleep the party and have at least one free room. */
-export function findAvailableRoomTypes(client: Client, checkIn: Date, checkOut: Date, partySize: number) {
-  return client.roomType.findMany({
-    where: {
-      isActive: true,
-      maxGuests: { gte: partySize },
-      rooms: { some: freeRoomWhere(checkIn, checkOut) },
-    },
+/** Active room types that take the party (see capacity.ts) and have at least one free room. */
+export async function findAvailableRoomTypes(client: Client, checkIn: Date, checkOut: Date, party: Party) {
+  const types = await client.roomType.findMany({
+    where: { isActive: true, rooms: { some: freeRoomWhere(checkIn, checkOut) } },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
+  return fittingTypes(types, party);
 }
 
 /**

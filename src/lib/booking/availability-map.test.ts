@@ -15,11 +15,13 @@ import {
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const stay = (roomId: string, a: string, b: string): Occupancy => ({ roomId, start: d(a), end: d(b) });
 
-const type = (id: string, maxGuests: number, price: number): RoomTypeInfo => ({
+const type = (id: string, maxGuests: number, price: number, maxAdults = maxGuests, maxChildren: number | null = null): RoomTypeInfo => ({
   id,
   slug: id,
   name: id.toUpperCase(),
   maxGuests,
+  maxAdults,
+  maxChildren,
   basePriceNpr: price,
   childPricePerNightNpr: 500,
 });
@@ -106,18 +108,18 @@ describe("soldOutForSelection", () => {
 
   it("exposes only sold-out nights per type", () => {
     expect(payload.types.map((t) => Object.keys(t).sort())).toEqual([
-      ["maxGuests", "name", "slug", "soldOut"],
-      ["maxGuests", "name", "slug", "soldOut"],
+      ["maxAdults", "maxChildren", "maxGuests", "name", "slug", "soldOut"],
+      ["maxAdults", "maxChildren", "maxGuests", "name", "slug", "soldOut"],
     ]);
   });
   it("a chosen type uses its own sold-out nights", () => {
-    expect([...soldOutForSelection(payload, "std", 2)]).toEqual(["2026-10-10", "2026-10-11"]);
+    expect([...soldOutForSelection(payload, "std", { adults: 2, children: 0 })]).toEqual(["2026-10-10", "2026-10-11"]);
   });
   it("any room, party of 2: sold out only when every type is", () => {
-    expect([...soldOutForSelection(payload, null, 2)]).toEqual(["2026-10-11"]);
+    expect([...soldOutForSelection(payload, null, { adults: 2, children: 0 })]).toEqual(["2026-10-11"]);
   });
   it("any room, party of 4: only types that sleep the party count", () => {
-    expect([...soldOutForSelection(payload, null, 4)].sort()).toEqual(["2026-10-11", "2026-10-12"]);
+    expect([...soldOutForSelection(payload, null, { adults: 4, children: 0 })].sort()).toEqual(["2026-10-11", "2026-10-12"]);
   });
 });
 

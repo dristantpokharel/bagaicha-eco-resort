@@ -153,7 +153,12 @@ model RoomType {
   basePriceNpr          Int
   /// Extra per night for each child under the age limit (src/config/booking.ts). 0 = free.
   childPricePerNightNpr Int      @default(0)
+  /// Total guests, children included.
   maxGuests             Int
+  /// Most adults the type takes (at most maxGuests).
+  maxAdults             Int
+  /// Most children the type takes; null = no limit beyond maxGuests.
+  maxChildren           Int?
   amenities             String[]
   isActive              Boolean  @default(true)
   sortOrder             Int      @default(0)

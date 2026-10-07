@@ -12,6 +12,7 @@ import { toDateOnlyString } from "@/lib/booking/dates";
 import { findAvailableRoomTypes } from "@/lib/booking/availability";
 import { loadAvailability } from "@/lib/booking/availability-data";
 import { suggestAlternatives, type DateRangeSuggestion, type TypeSuggestion } from "@/lib/booking/availability-map";
+import { describeCapacity, fittingTypes, partyFits, type Capacity } from "@/lib/booking/capacity";
 import { addDays, formatCompactDate } from "@/lib/booking/dates";
 import { computeQuote, quoteLines } from "@/lib/booking/pricing";
 import { validateStay } from "@/lib/booking/rules";
@@ -34,15 +35,10 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const today = todayInResort();
 
-  // Largest party any bookable room sleeps; drives the guest pickers.
-  const capacity = await db.roomType.aggregate({
-    where: { isActive: true, rooms: { some: { isActive: true } } },
-    _max: { maxGuests: true },
-  });
-  const maxGuests = capacity._max.maxGuests;
+  // Bookable types with their occupancy limits; drive the room pills, the steppers and the "fits" checks.
   const bookableTypes = await db.roomType.findMany({
     where: { isActive: true, rooms: { some: { isActive: true } } },
-    select: { slug: true, name: true, maxGuests: true },
+    select: { slug: true, name: true, maxGuests: true, maxAdults: true, maxChildren: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   // Public copy of each room (placeholder text is hidden in production) and the room picked on /stay.
@@ -61,14 +57,14 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   let content: React.ReactNode = null;
   let formErrors: Record<string, string> | undefined;
 
-  if (searched && maxGuests) {
+  if (searched && bookableTypes.length > 0) {
     const stay = validateStay(defaults, { today, publicRequest: true });
     if (!stay.ok) {
       formErrors = stay.errors;
-    } else if (defaults.adults + defaults.children > maxGuests) {
-      content = <TooManyGuests maxGuests={maxGuests} />;
+    } else if (fittingTypes(bookableTypes, defaults).length === 0) {
+      content = <TooManyGuests />;
     } else {
-      const available = await findAvailableRoomTypes(db, stay.checkIn, stay.checkOut, defaults.adults + defaults.children);
+      const available = await findAvailableRoomTypes(db, stay.checkIn, stay.checkOut, defaults);
       const withQuotes = available.map((roomType) => ({
         roomType,
         quote: computeQuote({
@@ -125,13 +121,13 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
           maxRanges: 3,
           maxDaysAhead: BOOKING.maxDaysAhead,
         });
-        const tooSmall = requested && requested.maxGuests < defaults.adults + defaults.children;
+        const tooSmall = requested && !partyFits(requested, defaults);
         content = (
           <Unavailable
             heading={
               requested
                 ? tooSmall
-                  ? `The ${requested.name} sleeps up to ${requested.maxGuests} guests`
+                  ? `The ${requested.name} doesn't fit this group (${describeCapacity(requested).toLowerCase()})`
                   : `The ${requested.name} isn't available for those dates`
                 : "Nothing available for those dates"
             }
@@ -153,7 +149,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
                 <RoomOption
                   key={roomType.id}
                   name={roomType.name}
-                  maxGuests={roomType.maxGuests}
+                  capacity={roomType}
                   description={publicRooms.get(roomType.slug)?.description}
                   quote={quote}
                   href={roomHref(stringParams(defaults), roomType.slug)}
@@ -194,11 +190,10 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
         </p>
       )}
 
-      {maxGuests ? (
+      {bookableTypes.length > 0 ? (
         <div className="border border-forest/20 bg-white p-5">
           <SearchForm
             today={toDateOnlyString(today)}
-            maxGuests={maxGuests}
             childUnderAge={terms.childUnderAge}
             roomTypes={bookableTypes}
             defaults={defaults}
@@ -232,14 +227,14 @@ const roomHref = (params: Record<string, string>, slug: string) => `/book?${new 
 
 function RoomOption({
   name,
-  maxGuests,
+  capacity,
   description,
   quote,
   href,
   cta,
 }: {
   name: string;
-  maxGuests: number;
+  capacity: Capacity;
   description?: string | null;
   quote: TypeSuggestion["quote"];
   href: string;
@@ -248,7 +243,7 @@ function RoomOption({
   return (
     <li className="flex flex-col border border-forest/20 bg-white p-5">
       <h3 className="font-display text-xl font-semibold italic text-ink-heading">{name}</h3>
-      <p className="mt-1 text-sm text-ink-muted">Sleeps up to {maxGuests}, children included</p>
+      <p className="mt-1 text-sm text-ink-muted">{describeCapacity(capacity, { childrenIncluded: true })}</p>
       {description && <p className="mt-3 text-sm text-ink">{description}</p>}
       <div className="mt-4 text-sm">
         {quoteLines(quote, formatNpr).map((line) => (
@@ -298,7 +293,7 @@ function Unavailable({
               <RoomOption
                 key={roomType.id}
                 name={roomType.name}
-                maxGuests={roomType.maxGuests}
+                capacity={roomType}
                 description={descriptions.get(roomType.slug)?.description}
                 quote={quote}
                 href={roomHref(params, roomType.slug)}
@@ -351,11 +346,11 @@ function backToResults(d: Parameters<typeof stringParams>[0]) {
   return `/book?${new URLSearchParams(stringParams(d))}`;
 }
 
-function TooManyGuests({ maxGuests }: { maxGuests: number }) {
+function TooManyGuests() {
   return (
     <p className="border border-forest/20 bg-white p-5 text-ink">
-      Our largest room sleeps {maxGuests} guests, and each booking is for one room. For a bigger group, please make separate
-      bookings or{" "}
+      None of our rooms takes a group like this in one room, and each booking is for one room. For a bigger group, please make
+      separate bookings or{" "}
       <Link href="/enquiry" className="text-forest underline underline-offset-4">
         send us an enquiry
       </Link>

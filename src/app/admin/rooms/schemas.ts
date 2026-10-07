@@ -1,3 +1,4 @@
+import { capacityErrors } from "@/lib/booking/capacity";
 import { z } from "zod";
 
 const id = z.string().trim().min(1).max(64);
@@ -48,6 +49,21 @@ export const roomTypeSchema = z
       .int({ error: "Use a whole number." })
       .min(1, { error: "At least 1 guest." })
       .max(20, { error: "At most 20 guests." }),
+    maxAdults: z.coerce
+      .number({ error: "Enter the maximum number of adults." })
+      .int({ error: "Use a whole number." })
+      .min(1, { error: "At least 1 adult." })
+      .max(20, { error: "At most 20 adults." }),
+    /** Blank = no limit beyond the total. */
+    maxChildren: z.preprocess(
+      (value) => (value === "" || value == null ? null : value),
+      z.coerce
+        .number({ error: "Enter a number, or leave blank for no limit." })
+        .int({ error: "Use a whole number." })
+        .min(0, { error: "Can't be negative." })
+        .max(20, { error: "At most 20 children." })
+        .nullable(),
+    ),
     /** One per line in the form. */
     amenities: z
       .string()
@@ -68,6 +84,9 @@ export const roomTypeSchema = z
           .max(30, { error: "List at most 30 amenities." }),
       ),
     sortOrder: z.coerce.number().int().min(0).max(999).optional().default(0),
+  })
+  .superRefine((input, ctx) => {
+    for (const [path, message] of Object.entries(capacityErrors(input))) ctx.addIssue({ code: "custom", path: [path], message });
   })
   .transform((input) => ({ ...input, slug: input.slug || slugify(input.name) }))
   .refine((input) => SLUG_PATTERN.test(input.slug), {

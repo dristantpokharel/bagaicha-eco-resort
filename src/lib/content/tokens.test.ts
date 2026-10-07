@@ -8,8 +8,8 @@ const ctx: TokenContext = {
   cancellationPolicy: "Tell us 24 hours ahead.",
   childUnderAge: 8,
   rooms: [
-    { name: "Family Room", maxGuests: 6, childPricePerNightNpr: 0 },
-    { name: "Deluxe Room", maxGuests: 2, childPricePerNightNpr: 500 },
+    { name: "Family Room", maxGuests: 6, maxAdults: 6, maxChildren: null, childPricePerNightNpr: 0 },
+    { name: "Deluxe Room", maxGuests: 3, maxAdults: 2, maxChildren: null, childPricePerNightNpr: 500 },
   ],
   nearby: [{ name: "Nepalgunj", distance: "~40 km", travelTime: "53 mins" }],
 };
@@ -25,7 +25,7 @@ describe("fillTokens", () => {
 
   it("describes rooms and per-room child rates from the database values", () => {
     expect(fillTokens("{{rooms}}", ctx).text).toBe(
-      "Family Room (up to 6 guests, children included) and Deluxe Room (up to 2 guests, children included)",
+      "Family Room (up to 6 guests, children included) and Deluxe Room (up to 3 guests, children included, max 2 adults)",
     );
     expect(fillTokens("{{childRates}}", ctx).text).toBe(
       "Family Room: children stay free; Deluxe Room: NPR 500 per child per night",

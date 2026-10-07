@@ -27,7 +27,7 @@ export async function loadAvailability(from: Date, to: Date): Promise<{ types: R
   const [types, rooms] = await Promise.all([
     db.roomType.findMany({
       where: { isActive: true, rooms: { some: { isActive: true } } },
-      select: { id: true, slug: true, name: true, maxGuests: true, basePriceNpr: true, childPricePerNightNpr: true },
+      select: { id: true, slug: true, name: true, maxGuests: true, maxAdults: true, maxChildren: true, basePriceNpr: true, childPricePerNightNpr: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     db.room.findMany({ where: { isActive: true, roomType: { isActive: true } }, select: { id: true, roomTypeId: true } }),

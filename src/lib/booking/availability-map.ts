@@ -1,4 +1,5 @@
 import { addDays, nightsBetween, rangesOverlap, toDateOnlyString } from "./dates";
+import { fittingTypes, type Capacity, type Party } from "./capacity";
 import { computeQuote, type Quote } from "./pricing";
 
 /**
@@ -56,14 +57,13 @@ export type AvailabilityPayload = {
   from: string;
   days: number;
   /** Per room type: sold-out nights only. No counts, room names or booking details. */
-  types: { slug: string; name: string; maxGuests: number; soldOut: string[] }[];
+  types: ({ slug: string; name: string; soldOut: string[] } & Capacity)[];
 };
 
-export type RoomTypeInfo = {
+export type RoomTypeInfo = Capacity & {
   id: string;
   slug: string;
   name: string;
-  maxGuests: number;
   basePriceNpr: number;
   childPricePerNightNpr: number;
 };
@@ -81,6 +81,8 @@ export function buildAvailabilityPayload(
       slug: t.slug,
       name: t.name,
       maxGuests: t.maxGuests,
+      maxAdults: t.maxAdults,
+      maxChildren: t.maxChildren,
       soldOut: soldOutNights(index, t.id, from, days),
     })),
   };
@@ -90,12 +92,12 @@ export function buildAvailabilityPayload(
 
 /**
  * Nights the calendar treats as sold out. A chosen type uses its own nights.
- * "Any room" (slug null): only types that sleep the party count, and a night is
+ * "Any room" (slug null): only types that take the party count, and a night is
  * sold out when every one of them is.
  */
-export function soldOutForSelection(payload: AvailabilityPayload, slug: string | null, party: number): Set<string> {
+export function soldOutForSelection(payload: AvailabilityPayload, slug: string | null, party: Party): Set<string> {
   if (slug) return new Set(payload.types.find((t) => t.slug === slug)?.soldOut ?? []);
-  const fitting = payload.types.filter((t) => t.maxGuests >= party);
+  const fitting = fittingTypes(payload.types, party);
   if (fitting.length === 0) return new Set();
   const counts = new Map<string, number>();
   for (const t of fitting) for (const night of t.soldOut) counts.set(night, (counts.get(night) ?? 0) + 1);
@@ -165,9 +167,8 @@ export function suggestAlternatives(input: {
   maxDaysAhead: number;
 }): { otherTypes: TypeSuggestion[]; dateRanges: DateRangeSuggestion[] } {
   const { index, types, chosenTypeId, checkIn, checkOut, adults, children } = input;
-  const party = adults + children;
   const nights = nightsBetween(checkIn, checkOut);
-  const fitting = types.filter((t) => t.maxGuests >= party);
+  const fitting = fittingTypes(types, { adults, children });
 
   const otherTypes = fitting
     .filter((t) => t.id !== chosenTypeId && typeIsBookable(index, t.id, checkIn, checkOut))

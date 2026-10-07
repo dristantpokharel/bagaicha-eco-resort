@@ -1,3 +1,4 @@
+import { describeCapacity, type Capacity } from "@/lib/booking/capacity";
 import { formatNpr } from "@/lib/money";
 
 /**
@@ -16,14 +17,12 @@ export type TokenContext = {
   address: string | null;
   cancellationPolicy: string | null;
   childUnderAge: number;
-  rooms: { name: string; maxGuests: number; childPricePerNightNpr: number }[];
+  rooms: (Capacity & { name: string; childPricePerNightNpr: number })[];
   nearby: { name: string; distance: string | null; travelTime: string | null }[];
 };
 
 export const TOKEN_HELP =
   "You can use {{checkInTime}}, {{checkOutTime}}, {{address}}, {{cancellationPolicy}}, {{childUnderAge}}, {{childRates}}, {{rooms}} and {{nearby:Place name}} to insert saved facts.";
-
-const guests = (n: number) => `${n} guest${n === 1 ? "" : "s"}`;
 
 function resolve(name: string, arg: string | undefined, ctx: TokenContext): string | null {
   switch (name) {
@@ -49,7 +48,7 @@ function resolve(name: string, arg: string | undefined, ctx: TokenContext): stri
         : null;
     case "rooms":
       return ctx.rooms.length
-        ? ctx.rooms.map((r) => `${r.name} (up to ${guests(r.maxGuests)}, children included)`).join(" and ")
+        ? ctx.rooms.map((r) => `${r.name} (${describeCapacity(r, { childrenIncluded: true }).toLowerCase()})`).join(" and ")
         : null;
     case "nearby": {
       const place = ctx.nearby.find((n) => n.name.toLowerCase() === (arg ?? "").trim().toLowerCase());
