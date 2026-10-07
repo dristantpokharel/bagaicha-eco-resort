@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateAvailability } from "@/lib/booking/availability-data";
 import { remainingPlaceholders } from "@/lib/content/placeholder";
 import { revalidatePublicSite } from "@/lib/content/revalidate";
 import { redirect } from "next/navigation";
@@ -21,6 +22,7 @@ function isUniqueViolation(error: unknown) {
 }
 
 function revalidateRooms(roomTypeId?: string) {
+  revalidateAvailability();
   revalidatePath(ROOMS_PATH);
   if (roomTypeId) revalidatePath(`${ROOMS_PATH}/${roomTypeId}`);
   revalidatePublicSite();

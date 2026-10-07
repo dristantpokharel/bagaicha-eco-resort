@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateAvailability } from "@/lib/booking/availability-data";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@/generated/prisma/client";
 import type { BookingStatus } from "@/generated/prisma/enums";
@@ -27,6 +28,7 @@ import {
 } from "./schemas";
 
 function revalidateAdmin() {
+  revalidateAvailability();
   revalidatePath("/admin", "layout");
 }
 

@@ -247,3 +247,93 @@ body {
   outline: 2px solid var(--color-forest);
   outline-offset: 2px;
 }
+
+/* ─── Date-range calendar (/book). react-day-picker, mapped to our tokens ─── */
+.dp.rdp-root {
+  --rdp-accent-color: var(--color-forest);
+  --rdp-accent-background-color: var(--color-sage);
+  --rdp-day-height: 44px;
+  --rdp-day-width: 44px;
+  --rdp-day_button-height: 44px;
+  --rdp-day_button-width: 44px;
+  --rdp-day_button-border-radius: 0;
+  --rdp-selected-border: 0;
+  --rdp-today-color: var(--color-forest);
+  --rdp-disabled-opacity: 0.35;
+  --rdp-range_middle-background-color: var(--color-sage);
+  --rdp-range_middle-color: var(--color-ink-heading);
+  --rdp-range_start-color: var(--color-cream);
+  --rdp-range_end-color: var(--color-cream);
+  --rdp-range_start-date-background-color: var(--color-forest);
+  --rdp-range_end-date-background-color: var(--color-forest);
+  --rdp-months-gap: 2rem;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+.dp .rdp-month_caption {
+  font-family: var(--font-label);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-heading);
+}
+.dp .rdp-weekday {
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+.dp .rdp-day_button {
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+.dp .rdp-day_button:disabled {
+  cursor: not-allowed;
+}
+.dp .rdp-day_button:hover:not(:disabled) {
+  background-color: var(--color-cream-dark);
+}
+.dp .rdp-selected .rdp-day_button:hover:not(:disabled) {
+  background-color: transparent;
+}
+.dp .rdp-today:not(.rdp-selected) .rdp-day_button {
+  box-shadow: inset 0 0 0 1px var(--color-forest);
+  font-weight: 700;
+}
+.dp .rdp-button_next,
+.dp .rdp-button_previous {
+  color: var(--color-forest);
+}
+/* Sold-out nights: struck through and hatched, whether or not they can be clicked (a check-out may land on one). */
+.dp .dp-soldout .rdp-day_button {
+  text-decoration: line-through;
+  color: var(--color-ink-muted);
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--color-ink) 12%, transparent) 5px 6px);
+}
+.dp .dp-soldout.rdp-disabled:not(.rdp-selected) {
+  opacity: 0.7;
+}
+.dp .rdp-range_start .rdp-day_button,
+.dp .rdp-range_end .rdp-day_button {
+  background-image: none;
+  color: var(--color-cream);
+}
+@media (max-width: 639px) {
+  .dp.rdp-root {
+    width: 100%;
+    --rdp-day-height: 52px;
+    --rdp-day_button-height: 52px;
+    --rdp-day_button-width: 100%;
+  }
+  .dp .rdp-months,
+  .dp .rdp-month,
+  .dp .rdp-month_grid {
+    width: 100%;
+    max-width: none;
+  }
+  .dp .rdp-day {
+    width: calc(100% / 7);
+  }
+}

@@ -36,6 +36,7 @@
     "next-auth": "^5.0.0-beta.32",
     "prisma": "^7.10.0",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.2",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "zod": "^4.6.5"

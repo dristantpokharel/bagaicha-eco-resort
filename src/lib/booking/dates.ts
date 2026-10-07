@@ -46,3 +46,8 @@ export function formatStayDate(date: Date): string {
 export function formatShortDate(date: Date): string {
   return formatInTimeZone(date, "UTC", "d MMM");
 }
+
+/** "12 Oct 2026" for the date-range field. */
+export function formatCompactDate(date: Date): string {
+  return formatInTimeZone(date, "UTC", "d MMM yyyy");
+}

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 export const RATE_LIMITS = {
   booking: { limit: 5, windowSeconds: 60 * 60 },
   enquiry: { limit: 5, windowSeconds: 60 * 60 },
+  availability: { limit: 60, windowSeconds: 10 * 60 },
   loginIp: { limit: 10, windowSeconds: 15 * 60 },
   loginEmail: { limit: 5, windowSeconds: 15 * 60 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;

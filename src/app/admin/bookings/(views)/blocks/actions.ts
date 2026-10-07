@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateAvailability } from "@/lib/booking/availability-data";
 import { z } from "zod";
 import { BOOKING_TX_OPTIONS, db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
@@ -19,6 +20,7 @@ const createBlockSchema = z.object({
 });
 
 function revalidateAdmin() {
+  revalidateAvailability();
   revalidatePath("/admin", "layout");
 }
 
