@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { NavLink } from "./admin-nav";
+
+export type NavLink = { href: string; label: string };
 
 /** Tabs for pages inside one admin section (exact path match). */
 export function SubNav({ label, links }: { label: string; links: NavLink[] }) {

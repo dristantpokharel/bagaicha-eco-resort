@@ -55,7 +55,7 @@ export default async function EnquiriesPage({
       ) : (
         <ul className="space-y-4">
           {enquiries.map((e) => (
-            <li key={e.id} className="rounded-lg border border-forest/10 bg-white p-5">
+            <li key={e.id} id={`enquiry-${e.id}`} className="scroll-mt-4 rounded-lg border border-forest/10 bg-white p-5 target:ring-2 target:ring-forest/40">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="font-medium text-charcoal">{e.name}</h2>
