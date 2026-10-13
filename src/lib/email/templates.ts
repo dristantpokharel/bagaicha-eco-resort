@@ -225,6 +225,19 @@ export function bookingCancelledEmail(b: ReservationEmailData): RenderedEmail {
   });
 }
 
+/** The stay's dates or rooms changed: the current details in full (every room, the new dates, the new total). */
+export function bookingModifiedEmail(b: ReservationEmailData): RenderedEmail {
+  const current = kept(b);
+  return compose(b, {
+    subject: `Your booking has been updated ${b.reference}`,
+    title: "Your booking has been updated",
+    intro: `Hello ${b.guestName}, the details of your booking ${b.reference} have changed. Here is your stay as it now stands (${countRooms(current.length)}).`,
+    sections: [{ heading: null, lines: current, price: true, unassigned: "Room assigned on confirmation" }],
+    total: { label: "Total", lines: current },
+    outro: "If anything here doesn't look right, please contact us.",
+  });
+}
+
 /** Alert to the resort team. `adminUrl` points at the reservation in the admin portal. */
 export function newRequestAlertEmail(b: ReservationEmailData, adminUrl: string): RenderedEmail {
   const sections: Section[] = [{ heading: null, lines: b.lines, price: true, unassigned: "Room not assigned yet" }];

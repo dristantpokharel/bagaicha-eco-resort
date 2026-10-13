@@ -9,6 +9,7 @@ import { sendEmail, type EmailMessage, type SendResult } from "./send";
 import {
   bookingCancelledEmail,
   bookingConfirmedEmail,
+  bookingModifiedEmail,
   bookingPartiallyConfirmedEmail,
   newEnquiryAlertEmail,
   newRequestAlertEmail,
@@ -17,7 +18,7 @@ import {
   type ReservationEmailData,
 } from "./templates";
 
-export type ReservationEmailKind = "received" | "confirmed" | "partial" | "cancelled";
+export type ReservationEmailKind = "received" | "confirmed" | "partial" | "cancelled" | "modified";
 
 /** What happened, for the caller to report. Emails never roll back the booking. */
 export type NotifyOutcome = {
@@ -100,7 +101,7 @@ async function deliver(
 
 /**
  * Sends the emails for a reservation event, after the change is committed.
- * received → guest receipt + resort alert; confirmed / partial / cancelled → guest only.
+ * received → guest receipt + resort alert; confirmed / partial / cancelled / modified → guest only.
  */
 export async function notifyReservation(kind: ReservationEmailKind, reservationId: string): Promise<NotifyOutcome> {
   const data = await loadReservationEmailData(reservationId);
@@ -113,6 +114,7 @@ export async function notifyReservation(kind: ReservationEmailKind, reservationI
       confirmed: bookingConfirmedEmail,
       partial: bookingPartiallyConfirmedEmail,
       cancelled: bookingCancelledEmail,
+      modified: bookingModifiedEmail,
     }[kind];
     guest = (await deliver(data.guestEmail, render(data), "Reservation", reservationId, `guest.${kind}`)) ? "sent" : "failed";
   }

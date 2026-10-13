@@ -24,6 +24,7 @@ import {
   confirmLineInRoom,
   linkToNewGuest,
   lockReservation,
+  moveOpenLines,
   syncTotal,
   transitionLine,
   updateGuestFromSnapshot,
@@ -192,24 +193,7 @@ export async function updateReservation(_prev: ActionResult | null, formData: Fo
         const checkOut = stay.ok ? stay.checkOut : before.checkOut;
         const datesChanged = checkIn.getTime() !== before.checkIn.getTime() || checkOut.getTime() !== before.checkOut.getTime();
 
-        const nights = nightsBetween(checkIn, checkOut);
-        const open = before.bookings.filter((b) => b.status !== "CANCELLED" && b.status !== "CHECKED_OUT");
-        if (datesChanged) {
-          // Every open room must still be free (and unblocked) for the new dates; rooms are locked in a fixed order.
-          const withRoom = open.filter((b) => b.roomId && (b.status === "CONFIRMED" || b.status === "CHECKED_IN"));
-          for (const b of [...withRoom].sort((x, y) => x.roomId!.localeCompare(y.roomId!))) {
-            await assertRoomAssignable(tx, { roomId: b.roomId!, roomTypeId: b.roomTypeId, checkIn, checkOut, excludeBookingId: b.id });
-          }
-          for (const b of open) {
-            const quote = computeQuote({
-              nights,
-              pricePerNightNpr: b.pricePerNightNpr,
-              childPricePerNightNpr: b.childPricePerNightNpr,
-              children: b.children,
-            });
-            await tx.booking.update({ where: { id: b.id }, data: { checkIn, checkOut, totalPriceNpr: quote.totalPriceNpr } });
-          }
-        }
+        if (datesChanged) await moveOpenLines(tx, before.bookings, checkIn, checkOut);
 
         const next = {
           checkIn,

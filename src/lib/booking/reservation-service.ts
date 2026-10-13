@@ -5,6 +5,8 @@ import { assertRoomAssignable, findFreeRooms } from "./availability";
 import { snapshotDiff, snapshotOf } from "./guest-snapshot";
 import { BOOKING_STATUS_LABELS } from "./labels";
 import { canTransition } from "./status";
+import { nightsBetween } from "./dates";
+import { computeQuote } from "./pricing";
 
 type Tx = Prisma.TransactionClient;
 
@@ -24,6 +26,38 @@ export async function syncTotal(tx: Tx, reservationId: string) {
   const kept = lines.filter((l) => l.status !== "CANCELLED");
   if (kept.length === 0) return;
   await tx.reservation.update({ where: { id: reservationId }, data: { totalPriceNpr: kept.reduce((n, l) => n + l.totalPriceNpr, 0) } });
+}
+
+/**
+ * Gives every open room of a reservation the same new dates (and, optionally, a different physical room for some
+ * of them), repricing each from its own snapshot rates. Every room that holds a physical room is locked in a fixed
+ * order and re-checked with `assertRoomAssignable` (free, unblocked, right type) before anything is written.
+ * Run inside a transaction with the reservation locked. The caller keeps the reservation row and total in step.
+ */
+export async function moveOpenLines(
+  tx: Tx,
+  lines: readonly Prisma.BookingGetPayload<object>[],
+  checkIn: Date,
+  checkOut: Date,
+  roomOverrides: ReadonlyMap<string, string> = new Map(),
+) {
+  const nights = nightsBetween(checkIn, checkOut);
+  const open = lines.filter((b) => b.status !== "CANCELLED" && b.status !== "CHECKED_OUT");
+  const roomOf = (b: (typeof open)[number]) => roomOverrides.get(b.id) ?? b.roomId;
+  const withRoom = open.filter((b) => roomOf(b) && (b.status === "CONFIRMED" || b.status === "CHECKED_IN"));
+  for (const b of [...withRoom].sort((x, y) => roomOf(x)!.localeCompare(roomOf(y)!))) {
+    await assertRoomAssignable(tx, { roomId: roomOf(b)!, roomTypeId: b.roomTypeId, checkIn, checkOut, excludeBookingId: b.id });
+  }
+  for (const b of open) {
+    const quote = computeQuote({
+      nights,
+      pricePerNightNpr: b.pricePerNightNpr,
+      childPricePerNightNpr: b.childPricePerNightNpr,
+      children: b.children,
+    });
+    const roomId = roomOverrides.get(b.id);
+    await tx.booking.update({ where: { id: b.id }, data: { checkIn, checkOut, totalPriceNpr: quote.totalPriceNpr, ...(roomId ? { roomId } : {}) } });
+  }
 }
 
 export type Line = Prisma.BookingGetPayload<{ include: { reservation: { select: { reference: true } } } }>;

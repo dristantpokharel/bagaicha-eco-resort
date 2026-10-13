@@ -6,6 +6,7 @@ import { applyDevRedirect, sendEmail } from "./send";
 import {
   bookingCancelledEmail,
   bookingConfirmedEmail,
+  bookingModifiedEmail,
   bookingPartiallyConfirmedEmail,
   newRequestAlertEmail,
   requestReceivedEmail,
@@ -223,5 +224,37 @@ describe("dev redirect", () => {
     vi.stubEnv("EMAIL_FROM", "from@example.com");
     vi.stubGlobal("fetch", async () => new Response("{}", { status: 422 }));
     expect(await sendEmail(msg)).toEqual({ ok: false, reason: "rejected", status: 422 });
+  });
+});
+
+describe("bookingModifiedEmail", () => {
+  it("lists every room that is still booked, the new dates and the new total", () => {
+    const email = bookingModifiedEmail(
+      reservation({
+        checkIn: parseDateOnly("2026-11-11")!,
+        checkOut: parseDateOnly("2026-11-14")!,
+        nights: 3,
+        lines: [
+          deluxeLine({ roomName: "201", status: "CONFIRMED", quote: computeQuote({ nights: 3, pricePerNightNpr: 3000, childPricePerNightNpr: 500, children: 0 }) }),
+          line({ roomName: null, status: "PENDING", quote: computeQuote({ nights: 3, pricePerNightNpr: 4500, childPricePerNightNpr: 500, children: 1 }) }),
+          deluxeLine({ status: "CANCELLED", cancellationReason: "x" }),
+        ],
+      }),
+    );
+    expect(email.subject).toBe("Your booking has been updated BG-2026-000007");
+    expect(email.text).toContain("Check-in: Wed, 11 Nov 2026");
+    expect(email.text).toContain("Check-out: Sat, 14 Nov 2026");
+    expect(email.text).toContain("Room 1: Deluxe Room (201)");
+    expect(email.text).toContain("Room 2: Family Room");
+    expect(email.text).toContain("Room assigned on confirmation");
+    expect(email.text).not.toContain("Reason: x");
+    // 3 nights × 3,000 + (3 × 4,500 + 3 × 1 × 500)
+    expect(email.text).toMatch(/Total: .*24,?000/);
+  });
+
+  it("escapes the guest's name", () => {
+    const email = bookingModifiedEmail(reservation({ guestName: "<b>Sita</b>" }));
+    expect(email.html).not.toContain("<b>Sita</b>");
+    expect(email.html).toContain("&lt;b&gt;Sita&lt;/b&gt;");
   });
 });
