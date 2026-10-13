@@ -7,11 +7,18 @@ import { parse } from "dotenv";
  * host as `.env.local` (the dev database). Values are never printed.
  */
 export function loadMigrationTestEnv(): { databaseUrl: string; directUrl: string } | null {
-  if (process.env.RUN_DB_TESTS !== "1" || !existsSync(".env.migration-test")) return null;
+  if (process.env.RUN_DB_TESTS !== "1") return null;
+  if (!existsSync(".env.migration-test")) {
+    console.warn("Skipping database tests: .env.migration-test not found (see docs/migration-test-branch.md).");
+    return null;
+  }
   const test = parse(readFileSync(".env.migration-test"));
   const databaseUrl = test.DATABASE_URL?.trim();
   const directUrl = test.DIRECT_URL?.trim();
-  if (!databaseUrl || !directUrl) return null;
+  if (!databaseUrl || !directUrl) {
+    console.warn("Skipping database tests: .env.migration-test needs DATABASE_URL and DIRECT_URL.");
+    return null;
+  }
   if (existsSync(".env.local")) {
     const dev = parse(readFileSync(".env.local"));
     const same = (a?: string, b?: string) => Boolean(a && b) && new URL(a!.trim()).host === new URL(b!.trim()).host;

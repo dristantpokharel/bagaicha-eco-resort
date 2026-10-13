@@ -4,13 +4,17 @@
 // (never in the shell, which can echo the lines). It refuses to run if those URLs point at the same host as
 // .env.local (the dev database), and it masks URLs and hosts in the command's output. No value is printed.
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const { parse } = createRequire(root + "package.json")("dotenv");
 
+if (!existsSync(root + ".env.migration-test")) {
+  console.warn("Skipping: .env.migration-test not found (see docs/migration-test-branch.md).");
+  process.exit(0);
+}
 const test = parse(readFileSync(root + ".env.migration-test"));
 const dev = parse(readFileSync(root + ".env.local"));
 const clean = (v) => (v ?? "").trim();
