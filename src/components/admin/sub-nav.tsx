@@ -9,7 +9,7 @@ export type NavLink = { href: string; label: string };
 export function SubNav({ label, links }: { label: string; links: NavLink[] }) {
   const pathname = usePathname();
   return (
-    <nav aria-label={label} className="mb-6 border-b border-forest/10">
+    <nav aria-label={label} className="mb-6 border-b border-forest/10 print:hidden">
       <ul className="-mb-px flex gap-1 overflow-x-auto">
         {links.map((link) => {
           const active = pathname === link.href;

@@ -18,6 +18,8 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
   let svc: typeof import("./service");
   let status: typeof import("./room-status");
   let extras: typeof import("./extras-service");
+  let overview: typeof import("@/lib/inventory/overview");
+  let inventory: typeof import("@/lib/inventory/service");
   let reservations: typeof import("@/lib/booking/reservation-service");
   let locations: typeof import("@/lib/inventory/locations");
   let todayInResort: typeof import("@/lib/dates").todayInResort;
@@ -138,6 +140,8 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
     svc = await import("./service");
     status = await import("./room-status");
     extras = await import("./extras-service");
+    overview = await import("@/lib/inventory/overview");
+    inventory = await import("@/lib/inventory/service");
     reservations = await import("@/lib/booking/reservation-service");
     locations = await import("@/lib/inventory/locations");
     ({ todayInResort } = await import("@/lib/dates"));
@@ -413,6 +417,42 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
           tx.bookingExtra.create({ data: { bookingId: f.booking.id, itemId: f.towel.id, quantity: "0", addedById: f.user.id } }),
         );
         expect(error).not.toBeNull();
+      });
+    });
+  });
+
+  describe("owner overview", () => {
+    it("the grid shows a room short of par; to-buy counts arrivals the store can't cover, including pending extras", async () => {
+      await inRollback(async (tx, f) => {
+        await locations.setBalance(tx, f.towel.id, f.store.id, "1");
+        await tx.inventoryItem.update({ where: { id: f.towel.id }, data: { quantity: "1" } });
+
+        let o = await overview.loadOverview(new Date(), tx);
+        const row = o.grid.rows.find((r) => r.roomId === f.room.id)!;
+        expect(row.cells[f.towel.id]).toEqual({ have: "0", par: "2", state: "short" });
+        // The arrival tomorrow needs 2 towels; only 1 is on hand.
+        expect(o.toBuy.find((r) => r.itemId === f.towel.id)).toMatchObject({ arrivalsShort: "1", buy: "1" });
+
+        await dirty(tx, f);
+        await extras.addExtra(tx, { bookingId: f.booking.id, itemId: f.towel.id, quantity: "2", note: null, userId: f.user.id });
+        o = await overview.loadOverview(new Date(), tx);
+        expect(o.toBuy.find((r) => r.itemId === f.towel.id)).toMatchObject({ arrivalsShort: "3", buy: "3" });
+        // The kettle is covered by the store, so it isn't listed.
+        expect(o.toBuy.find((r) => r.itemId === f.kettle.id)).toBeUndefined();
+      });
+    });
+
+    it("lost items this month are costed when the unit cost is known", async () => {
+      await inRollback(async (tx, f) => {
+        await tx.inventoryItem.update({ where: { id: f.kettle.id }, data: { unitCostNpr: 300 } });
+        await locations.setBalance(tx, f.kettle.id, f.roomLoc.id, "1");
+        await inventory.writeOffStock(tx, { itemId: f.kettle.id, userId: f.user.id, kind: "LOST", fromLocationId: f.roomLoc.id, amount: "1", note: "guest took it", bookingId: f.booking.id });
+        await inventory.writeOffStock(tx, { itemId: f.towel.id, userId: f.user.id, kind: "DAMAGED", fromLocationId: f.store.id, amount: "1", note: "torn", bookingId: null });
+
+        const o = await overview.loadOverview(new Date(), tx);
+        expect(o.losses.items.find((i) => i.itemId === f.kettle.id)).toMatchObject({ lost: "1", damaged: "0", costNpr: 300 });
+        expect(o.losses.items.find((i) => i.itemId === f.towel.id)).toMatchObject({ damaged: "1", costNpr: null });
+        expect(o.losses.details.find((d) => d.item === `${tag}-kettle`)).toMatchObject({ where: f.room.name, note: "guest took it" });
       });
     });
   });

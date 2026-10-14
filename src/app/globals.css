@@ -381,3 +381,15 @@ body {
     width: calc(100% / 7);
   }
 }
+
+/* Printing an admin page (e.g. the inventory overview): just the content, no navigation. */
+@media print {
+  .admin-shell > header,
+  .admin-shell aside,
+  .admin-shell nav.fixed {
+    display: none !important;
+  }
+  .admin-shell main {
+    padding: 0 !important;
+  }
+}
