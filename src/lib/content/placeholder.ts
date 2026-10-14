@@ -7,6 +7,20 @@ import { showPlaceholders } from "@/lib/site-env";
 
 export { showPlaceholders };
 
+/**
+ * Fields that no longer exist in the admin or on the site but may still be named in old
+ * `placeholderFields` arrays (their columns are kept). These flags never count and never hide anything.
+ */
+const RETIRED_FIELDS: Record<string, readonly string[]> = {
+  activities: ["summary", "duration", "season", "bestTime", "bestFor", "highlights", "whatToExpect", "howWeHelp", "tip"],
+};
+
+/** A row's placeholder flags without the retired fields of its collection. */
+export function activeFlags(collection: string, flags: readonly string[] | null | undefined): string[] {
+  const retired = RETIRED_FIELDS[collection] ?? [];
+  return (flags ?? []).filter((f) => !retired.includes(f));
+}
+
 type Flagged = { placeholderFields?: readonly string[] | null };
 
 export function isPlaceholder(row: Flagged, field: string): boolean {

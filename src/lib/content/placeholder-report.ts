@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { activeFlags } from "./placeholder";
 
 export type PlaceholderEntry = { section: string; title: string; fields: string[]; href: string };
 
@@ -25,7 +26,11 @@ export async function listPlaceholders(): Promise<PlaceholderEntry[]> {
   };
   add("Business info", "/admin/content", business.map((r) => ({ title: r.name, placeholderFields: r.placeholderFields })));
   for (const r of rooms) out.push({ section: "Rooms", title: r.name, fields: r.placeholderFields, href: `/admin/rooms/${r.id}` });
-  add("Activities", "/admin/content/activities", activities.map((r) => ({ title: r.title, placeholderFields: r.placeholderFields })));
+  add(
+    "Activities",
+    "/admin/content/activities",
+    activities.map((r) => ({ title: r.title, placeholderFields: activeFlags("activities", r.placeholderFields) })).filter((r) => r.placeholderFields.length > 0),
+  );
   add("Dining", "/admin/content/dining", dining.map((r) => ({ title: r.title, placeholderFields: r.placeholderFields })));
   add("Dining", "/admin/content/dining", items.map((r) => ({ title: r.name, placeholderFields: r.placeholderFields })));
   add("Event types", "/admin/content/events", events.map((r) => ({ title: r.name, placeholderFields: r.placeholderFields })));

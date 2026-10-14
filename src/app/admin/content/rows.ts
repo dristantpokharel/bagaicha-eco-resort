@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { activeFlags } from "@/lib/content/placeholder";
 import { COLLECTIONS, type CollectionKey } from "@/lib/content/collections";
 import type { ContentRow, Option } from "./content-form";
 
@@ -16,7 +17,7 @@ export function toContentRow(key: CollectionKey, raw: Raw): ContentRow {
   return {
     id: typeof raw.id === "string" ? raw.id : undefined,
     values,
-    placeholderFields: raw.placeholderFields ?? [],
+    placeholderFields: activeFlags(key, raw.placeholderFields),
     sortOrder: raw.sortOrder ?? 0,
     isActive: raw.isActive ?? true,
   };

@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { buildSchema, COLLECTIONS, isCollectionKey, type CollectionKey } from "@/lib/content/collections";
-import { remainingPlaceholders } from "@/lib/content/placeholder";
+import { activeFlags, remainingPlaceholders } from "@/lib/content/placeholder";
 import { revalidatePublicSite } from "@/lib/content/revalidate";
 import { slugify } from "@/app/admin/rooms/schemas";
 import { revalidatePath } from "next/cache";
@@ -83,7 +83,7 @@ export async function saveContentItem(_prev: ActionResult | null, formData: Form
         const reviewed = formData.get("markReviewed") === "on";
         const data = {
           ...input,
-          placeholderFields: reviewed ? [] : remainingPlaceholders(previous, input, previous?.placeholderFields ?? []),
+          placeholderFields: reviewed ? [] : remainingPlaceholders(previous, input, activeFlags(key, previous?.placeholderFields)),
         };
         const saved = previous ? await model.update({ where, data }) : await model.create({ data });
         await logActivity(tx, {

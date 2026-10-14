@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasPlaceholderIn, isPlaceholder, mediaVisible, remainingPlaceholders } from "./placeholder";
+import { activeFlags, hasPlaceholderIn, isPlaceholder, mediaVisible, remainingPlaceholders } from "./placeholder";
 
 describe("placeholder flags", () => {
   const row = { placeholderFields: ["overview", "duration"] };
@@ -39,5 +39,16 @@ describe("placeholder flags", () => {
     expect(mediaVisible({ isPlaceholder: true }, false)).toBe(false);
     expect(mediaVisible({ isPlaceholder: true }, true)).toBe(true);
     expect(mediaVisible({ isPlaceholder: false }, false)).toBe(true);
+  });
+});
+
+describe("retired activity fields", () => {
+  it("never count as flags", () => {
+    expect(activeFlags("activities", ["overview", "duration", "tip", "category"])).toEqual(["overview", "category"]);
+    expect(activeFlags("activities", null)).toEqual([]);
+  });
+
+  it("leave other collections alone", () => {
+    expect(activeFlags("faqs", ["answer", "duration"])).toEqual(["answer", "duration"]);
   });
 });

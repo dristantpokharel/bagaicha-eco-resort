@@ -6,7 +6,7 @@ import type { MediaImageData } from "@/components/media/media-image";
 import { CONTENT_TAG } from "./revalidate";
 import { loadStayTerms } from "./stay-terms";
 import { fillTokens, type TokenContext } from "./tokens";
-import { hasPlaceholderIn, liveValue, mediaVisible, showPlaceholders } from "./placeholder";
+import { activeFlags, hasPlaceholderIn, liveValue, mediaVisible, showPlaceholders } from "./placeholder";
 
 /**
  * Every public page reads content through here: one cached read per kind, all
@@ -149,7 +149,7 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
           : null,
         photos,
         cover: photos[0] ?? null,
-        placeholderFields: showPlaceholders ? r.placeholderFields : [],
+        placeholderFields: showPlaceholders ? activeFlags("activities", r.placeholderFields) : [],
       };
     });
 }, "activities");
