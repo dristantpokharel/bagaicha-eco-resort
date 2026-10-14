@@ -5,10 +5,10 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/auth";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
-import { completeInspection, completePrep, HOUSEKEEPING_TX_OPTIONS } from "@/lib/housekeeping/service";
+import { completeInspection, completePrep, HOUSEKEEPING_TX_OPTIONS, skipInspection } from "@/lib/housekeeping/service";
 import { setRoomStatus } from "@/lib/housekeeping/room-status";
 import { savePar, type ParScope } from "@/lib/housekeeping/par-service";
-import { fieldsWithPrefix, inspectionEntries, inspectionSchema, prepSchema, saveParSchema, setStatusSchema } from "@/lib/housekeeping/schemas";
+import { fieldsWithPrefix, inspectionEntries, inspectionSchema, prepSchema, saveParSchema, setStatusSchema, skipInspectionSchema } from "@/lib/housekeeping/schemas";
 
 function revalidateHousekeeping() {
   revalidatePath("/admin/housekeeping");
@@ -45,6 +45,19 @@ export async function completeInspectionAction(_prev: ActionResult | null, formD
     const entries = inspectionEntries(formData);
     const result = await db
       .$transaction((tx) => completeInspection(tx, { roomId, cycle, userId: actor.id, entries }), HOUSEKEEPING_TX_OPTIONS)
+      .catch(friendlyConflict);
+    revalidateHousekeeping();
+    return { ok: true, message: result.summary };
+  });
+}
+
+/** Admin and up: skip a checkout inspection, with a reason. */
+export async function skipInspectionAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("housekeeping.skipInspection");
+    const { roomId, cycle, reason } = parseForm(skipInspectionSchema, formData);
+    const result = await db
+      .$transaction((tx) => skipInspection(tx, { roomId, cycle, userId: actor.id, reason }), HOUSEKEEPING_TX_OPTIONS)
       .catch(friendlyConflict);
     revalidateHousekeeping();
     return { ok: true, message: result.summary };

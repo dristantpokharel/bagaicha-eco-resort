@@ -12,7 +12,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 // Any use of the database is a failure of the guard: it must be refused before data is read or changed.
 vi.mock("@/lib/db", () => ({ db: new Proxy({}, { get: () => dbTouched() }) }));
 
-import { completeInspectionAction, completePrepAction, saveParAction, setRoomStatusAction } from "./actions";
+import { completeInspectionAction, completePrepAction, saveParAction, setRoomStatusAction, skipInspectionAction } from "./actions";
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData();
@@ -24,6 +24,7 @@ const cases = [
   ["completePrepAction", completePrepAction, "housekeeping.work", { roomId: "r", cycle: "1" }],
   ["completeInspectionAction", completeInspectionAction, "housekeeping.work", { roomId: "r", cycle: "1" }],
   ["setRoomStatusAction", setRoomStatusAction, "housekeeping.work", { roomId: "r", status: "DIRTY" }],
+  ["skipInspectionAction", skipInspectionAction, "housekeeping.skipInspection", { roomId: "r", cycle: "1", reason: "no time" }],
   ["saveParAction", saveParAction, "inventory.managePar", { roomTypeId: "t" }],
 ] as const;
 

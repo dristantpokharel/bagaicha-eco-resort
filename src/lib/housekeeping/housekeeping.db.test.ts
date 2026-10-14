@@ -288,6 +288,27 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
     });
   });
 
+  it("skipping an inspection needs a reason, is logged, moves no stock, and leaves the room Dirty for prep", async () => {
+    await inRollback(async (tx, f) => {
+      await locations.setBalance(tx, f.towel.id, f.roomLoc.id, "2");
+      await checkIn(tx, f);
+      await checkOut(tx, f);
+      const cycle = await cycleOf(tx, f.room.id);
+
+      await expect(svc.skipInspection(tx, { roomId: f.room.id, cycle, userId: f.user.id, reason: "  " })).rejects.toThrow(/why/);
+      await svc.skipInspection(tx, { roomId: f.room.id, cycle, userId: f.user.id, reason: "Guest left at 5am, will count later" });
+
+      expect(await roomOf(tx, f)).toMatchObject({ status: "DIRTY", inspectBookingId: null });
+      expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("2");
+      const log = await tx.activityLog.findFirstOrThrow({ where: { entityId: f.room.id, action: "room.inspectionSkipped" } });
+      expect(log.details).toMatchObject({ reason: "Guest left at 5am, will count later" });
+      // Neither a real inspection nor a second skip can follow in the same cycle.
+      await expect(svc.skipInspection(tx, { roomId: f.room.id, cycle, userId: f.other.id, reason: "again" })).rejects.toThrow(/already finished/);
+      await prep(tx, f, { quantities: { [f.kettle.id]: "1", [f.soap.id]: "2" } });
+      expect((await roomOf(tx, f)).status).toBe("READY");
+    });
+  });
+
   it("a second person completing the same prep is turned away; the same person repeating is a no-op", async () => {
     await inRollback(async (tx, f) => {
       await dirty(tx, f);

@@ -14,6 +14,12 @@ const cycle = z.coerce.number().int().min(0).max(1_000_000);
 export const prepSchema = z.object({ roomId: id, cycle, acknowledgeShortfall: checkbox });
 export const inspectionSchema = z.object({ roomId: id, cycle });
 
+export const skipInspectionSchema = z.object({
+  roomId: id,
+  cycle,
+  reason: z.string().trim().min(3, { error: "Say why (at least a few words)." }).max(300, { error: "At most 300 characters." }),
+});
+
 export const setStatusSchema = z.object({
   roomId: id,
   status: z.enum(["DIRTY", "READY", "OUT_OF_ORDER"], { error: "Choose a status." }),

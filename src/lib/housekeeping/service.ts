@@ -339,3 +339,41 @@ export async function completeInspection(
   const lost = missing.length ? ` Written off: ${missing.map((l) => `${l.name} (${formatQuantityWithUnit(l.missing, l.unit)})`).join(", ")}.` : "";
   return { duplicate: false, summary: `${room.name} inspected. It stays Dirty until it is prepared.${lost}`, plan };
 }
+
+/**
+ * Admin override: marks a checkout inspection as skipped, with a reason. The stay's room stays Dirty and can
+ * be prepared. Takes the same room lock and writes the same (room, INSPECTION, cycle) row as a real
+ * inspection, so a skip and an inspection can't both happen. No stock moves.
+ */
+export async function skipInspection(
+  tx: Tx,
+  params: { roomId: string; cycle: number; userId: string; reason: string },
+): Promise<{ summary: string }> {
+  const { roomId, cycle, userId } = params;
+  const reason = params.reason.trim();
+  if (!reason) throw new ActionError("Say why the inspection is being skipped.", { reason: "Required." });
+  await lockRoom(tx, roomId);
+
+  const existing = await tx.roomTask.findUnique({
+    where: { roomId_kind_cycle: { roomId, kind: "INSPECTION", cycle } },
+    select: { completedBy: { select: { name: true } }, completedAt: true },
+  });
+  if (existing) throw new ActionError(`${existing.completedBy.name} already finished this inspection at ${formatDateTime(existing.completedAt)}. Reload the page.`);
+
+  const room = await loadRoom(tx, roomId);
+  if (room.dirtyCycle !== cycle) throw new ActionError("This room was updated since you opened the page. Reload the page.");
+  if (room.status !== "DIRTY" || !room.inspectBookingId) throw new ActionError(`${room.name} has no checked-out stay waiting to be inspected.`);
+
+  await tx.roomTask.create({
+    data: { roomId, kind: "INSPECTION", cycle, bookingId: room.inspectBookingId, completedById: userId, lines: { skipped: true, reason } },
+  });
+  await tx.room.update({ where: { id: roomId }, data: { inspectBookingId: null } });
+  await logActivity(tx, {
+    userId,
+    action: "room.inspectionSkipped",
+    entityType: "Room",
+    entityId: roomId,
+    details: { room: room.name, bookingId: room.inspectBookingId, reason },
+  });
+  return { summary: `Inspection skipped for ${room.name}. It is Dirty and ready to be prepared.` };
+}

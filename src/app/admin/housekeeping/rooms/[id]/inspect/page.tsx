@@ -2,16 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requirePagePermission } from "@/lib/auth";
+import { can } from "@/lib/auth/permissions";
 import { ActionError } from "@/lib/actions";
 import { loadInspectionChecklist } from "@/lib/housekeeping/service";
 import { PageHeader } from "@/components/admin/page-header";
 import { RoomStatusBadge } from "@/components/admin/room-status-badge";
 import { InspectForm } from "./inspect-form";
+import { SkipInspection } from "./skip-inspection";
 
 export const metadata = { title: "Inspect room" };
 
 export default async function InspectPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePagePermission("housekeeping.work");
+  const user = await requirePagePermission("housekeeping.work");
   const { id } = await params;
   const checklist = await loadInspectionChecklist(db, id).catch((error) => {
     if (error instanceof ActionError) return null;
@@ -34,6 +36,7 @@ export default async function InspectPage({ params }: { params: Promise<{ id: st
       </div>
       <div className="max-w-2xl">
         <InspectForm key={`${room.id}:${room.dirtyCycle}`} roomId={room.id} cycle={room.dirtyCycle} lines={lines} blocked={blocked} />
+        {!blocked && can(user.role, "housekeeping.skipInspection") && <SkipInspection key={`skip:${room.dirtyCycle}`} roomId={room.id} cycle={room.dirtyCycle} />}
       </div>
     </>
   );

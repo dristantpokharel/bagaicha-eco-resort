@@ -14,6 +14,12 @@ describe("housekeeping permissions", () => {
     }
   });
 
+  it("only Admin and up can skip an inspection", () => {
+    expect(can("STAFF", "housekeeping.skipInspection")).toBe(false);
+    expect(can("ADMIN", "housekeeping.skipInspection")).toBe(true);
+    expect(can("SUPERUSER", "housekeeping.skipInspection")).toBe(true);
+  });
+
   it("puts Housekeeping in the Front desk group for everyone who can work on it", () => {
     expect(ADMIN_SECTIONS.housekeeping.permission).toBe("housekeeping.work");
     for (const role of ["STAFF", "ADMIN", "SUPERUSER"] as const) {
