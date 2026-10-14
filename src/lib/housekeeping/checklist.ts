@@ -164,6 +164,9 @@ export function planInspection(
   lines: readonly InspectionLine[],
   submitted: Readonly<Record<string, InspectionEntry>>,
 ): InspectionPlanLine[] {
+  if (lines.length === 0 && Object.keys(submitted).length > 0) {
+    throw new ActionError("The system has no reusable items recorded in this room, so there is nothing to count. Reload the page.");
+  }
   const known = new Set(lines.map((l) => l.itemId));
   for (const itemId of Object.keys(submitted)) {
     if (!known.has(itemId)) throw new ActionError("The room's contents have changed. Reload the page and count again.");

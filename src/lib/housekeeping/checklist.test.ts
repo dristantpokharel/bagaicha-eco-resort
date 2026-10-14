@@ -84,6 +84,11 @@ describe("planPrep", () => {
 });
 
 describe("planInspection", () => {
+  it("says so plainly when the room holds nothing to inspect", () => {
+    expect(() => planInspection([], { towel: { counted: "1" } })).toThrow(/nothing to count/);
+    expect(planInspection([], {})).toEqual([]);
+  });
+
   const lines: InspectionLine[] = [
     { itemId: "towel", name: "Towel", unit: "pcs", isFixedInRoom: false, expected: "3" },
     { itemId: "kettle", name: "Kettle", unit: "pcs", isFixedInRoom: true, expected: "1" },

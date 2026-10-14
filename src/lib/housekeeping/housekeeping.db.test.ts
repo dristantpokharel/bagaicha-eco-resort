@@ -57,8 +57,8 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
 
     const item = (suffix: string, data: { isConsumable?: boolean; isFixedInRoom?: boolean; quantity: string }) =>
       tx.inventoryItem.create({ data: { name: `${tag}-${suffix}`, category: "Test", unit: "pcs", ...data } });
-    const towel = await item("towel", { quantity: "5" });
-    const kettle = await item("kettle", { quantity: "2", isFixedInRoom: true });
+    const towel = await item("towel", { quantity: "5", isConsumable: false });
+    const kettle = await item("kettle", { quantity: "2", isConsumable: false, isFixedInRoom: true });
     const soap = await item("soap", { quantity: "10", isConsumable: true });
     await locations.setBalance(tx, towel.id, store.id, "5");
     await locations.setBalance(tx, kettle.id, store.id, "2");
