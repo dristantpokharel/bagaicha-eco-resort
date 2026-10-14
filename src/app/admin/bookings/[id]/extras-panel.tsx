@@ -1,14 +1,28 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionMessage } from "@/components/ui/action-message";
 import { Field, Input, Select } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
-import { addExtraAction, removeExtraAction } from "../extras-actions";
+import { newSubmissionId } from "@/lib/inventory/submission-id";
+import { addExtraAction, applyExtraAction, removeExtraAction } from "../extras-actions";
 
 export type ExtraView = { id: string; label: string; note: string | null; placed: boolean };
 export type ExtraItemOption = { id: string; name: string; unit: string; isConsumable: boolean };
+
+function ApplyExtra({ extra }: { extra: ExtraView }) {
+  const [result, action, pending] = useActionState<ActionResult | null, FormData>(applyExtraAction, null);
+  return (
+    <form action={action}>
+      <input type="hidden" name="extraId" value={extra.id} />
+      <Button type="submit" variant="secondary" size="sm" className="min-h-11" disabled={pending} aria-label={`Place ${extra.label} in the room now`}>
+        {pending ? "Placing…" : "Apply now"}
+      </Button>
+      {result && !result.ok && <p className="text-xs text-error">{result.error}</p>}
+    </form>
+  );
+}
 
 function RemoveExtra({ extra }: { extra: ExtraView }) {
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(removeExtraAction, null);
@@ -24,8 +38,31 @@ function RemoveExtra({ extra }: { extra: ExtraView }) {
 }
 
 /** Extras for one booking line: what has been added, and (for staff) a form to add more. */
-export function ExtrasPanel({ bookingId, extras, items }: { bookingId: string; extras: ExtraView[]; items: ExtraItemOption[] | null }) {
-  const [result, action, pending] = useActionState<ActionResult | null, FormData>(addExtraAction, null);
+export function ExtrasPanel({
+  bookingId,
+  extras,
+  items,
+  canApplyNow,
+}: {
+  bookingId: string;
+  extras: ExtraView[];
+  items: ExtraItemOption[] | null;
+  /** The room is Ready (or the guest is in): waiting extras can be placed now. */
+  canApplyNow: boolean;
+}) {
+  // One token per attempt: kept after a failure or a lost response so tapping Add again can't add it twice; cleared once added.
+  const submissionId = useRef<string | null>(null);
+  const [result, action, pending] = useActionState<ActionResult | null, FormData>(async (prev, formData) => {
+    submissionId.current ??= newSubmissionId();
+    formData.set("submissionId", submissionId.current);
+    try {
+      const outcome = await addExtraAction(prev, formData);
+      if (outcome.ok) submissionId.current = null;
+      return outcome;
+    } catch {
+      return { ok: false, error: "Couldn't reach the server, so we can't tell if this was added. Check the list, or tap Add again: it won't be added twice." };
+    }
+  }, null);
   const errors = result && !result.ok ? result.fieldErrors : undefined;
   if (extras.length === 0 && !items) return null;
 
@@ -43,7 +80,12 @@ export function ExtrasPanel({ bookingId, extras, items }: { bookingId: string; e
                 {extra.note && <span className="text-charcoal-light"> · {extra.note}</span>}
                 <span className={`ml-2 text-xs ${extra.placed ? "text-forest" : "text-warning"}`}>{extra.placed ? "In the room" : "Waiting for room prep"}</span>
               </span>
-              {!extra.placed && items && <RemoveExtra extra={extra} />}
+              {!extra.placed && items && (
+                <span className="flex flex-wrap gap-1">
+                  {canApplyNow && <ApplyExtra extra={extra} />}
+                  <RemoveExtra extra={extra} />
+                </span>
+              )}
             </li>
           ))}
         </ul>

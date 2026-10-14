@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUBMISSION_ID_PATTERN } from "@/lib/inventory/submission-id";
 import type { InspectionEntry } from "./checklist";
 
 const id = z.string().trim().min(1).max(64);
@@ -53,6 +54,8 @@ export const saveParSchema = z
 
 export const addExtraSchema = z.object({
   bookingId: id,
+  /** One per form attempt (see submission-id.ts); a repeat is added once. */
+  submissionId: z.string().regex(SUBMISSION_ID_PATTERN, { error: "Reload the page and try again." }),
   itemId: z.string().trim().min(1, { error: "Choose an item." }).max(64),
   quantity: z
     .string()
@@ -68,3 +71,4 @@ export const addExtraSchema = z.object({
 });
 
 export const removeExtraSchema = z.object({ extraId: id });
+export const applyExtraSchema = z.object({ extraId: id });

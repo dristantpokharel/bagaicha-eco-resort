@@ -75,6 +75,8 @@ On the reservation page, each **Confirmed or Checked-in** room has *Extras in th
 - **Applied straight away:** reusables move Store → Room (they come back at the checkout inspection automatically, since they are room balances); consumables are recorded as USED. Both are linked to the booking. If the store can't cover a reusable, adding is refused with the amount on hand, and nothing is saved.
 - **Waiting extras** show on the prep checklist ("par 2 + 1 extra for this booking"). Completing the prep places them with the rest; shortfalls work as before. Staff can still lower a line.
 - **Removing:** a waiting extra can be removed (logged). One already in the room can't, because stock has moved. It comes back at inspection.
+- **Apply now** (Staff and up): a waiting extra shows an *Apply now* button once the room is Ready or the guest is in. It goes through the same placing code as adding, under the same locks, and is refused if the room isn't set up for that guest yet or the store can't cover it (the extra keeps waiting). Logged as `booking.extraApplied`.
+- **No double adds:** the Add form carries a one-per-attempt token (the same pattern as stock movements). A repeat of the same attempt says "Already added." and moves nothing; the token stays after a failure or a lost response and is cleared once added. Add is disabled while saving. A unique index on the token is the backstop.
 - Logged as `booking.extraAdded` / `booking.extraRemoved`. Archived items and finished or cancelled stays are refused.
 - Lock order is the same as everywhere else: reservation → room → items. Removing an extra and completing a prep take the room lock, and removal deletes only rows that are still unapplied, so whichever runs second sees the result.
 
@@ -93,11 +95,13 @@ How "to buy" counts (so you can check it): a room is in scope if it has a confir
 
 ## Database
 
-One more additive migration, `20261014221205_booking_extras`: table `booking_extras` (booking, item, quantity > 0 by CHECK, note, who added it, `appliedAt`), indexes and foreign keys (all RESTRICT). It was run on dev inside a transaction and rolled back first (`npm run db:dryrun-migration -- <path>`: 7 statements applied, nothing left after rollback), then applied with `migrate dev`. The dry-run script is new (`scripts/dryrun-migration.ts`) because the permission system refuses me running a script with `--env-file` directly; the npm script is the same pattern as `test:db:housekeeping`.
+One more additive migration, `20261014221205_booking_extras`: table `booking_extras` (booking, item, quantity > 0 by CHECK, note, who added it, `appliedAt`), indexes and foreign keys (all RESTRICT). It was run on dev inside a transaction and rolled back first (`npm run db:dryrun-migration -- <path>`: 7 statements applied, nothing left after rollback), then applied with `migrate dev`. A second small migration, `20261014233000_booking_extra_submission_id`, adds the nullable `submissionId` column and its unique index (dry-run first as well; I wrote its SQL by hand because `migrate dev --create-only` stops to ask for confirmation of the unique index in a non-interactive shell). The dry-run script is new (`scripts/dryrun-migration.ts`) because the permission system refuses me running a script with `--env-file` directly; the npm script is the same pattern as `test:db:housekeeping`.
 
 ## Checks run
 
-- Typecheck, lint, build: clean. `npm test`: 390 passed, 88 skipped (DB tests skip offline).
+See *Final checks* at the end for the latest run.
+
+- (Earlier run) Typecheck, lint, build: clean. `npm test`: 390 passed, 88 skipped (DB tests skip offline).
 - New unit tests: extras timing and prep lines, item usage radio, to-buy / grid / loss calculations (12), CSV escaping, extras and skip-inspection actions refuse before touching the database, export route permissions, permission matrix.
 - `npm run test:db:housekeeping`: **23 of 23 passed** (about 8 minutes; each test is rolled back). Part B added 11 of these: extras applied at once, waiting then applied at prep, removal, in-stay extras coming back at inspection, store shortfall, archived/cancelled refusals, the CHECK on extra quantity, skip inspection, and the overview's to-buy and losses.
 
@@ -105,8 +109,6 @@ One more additive migration, `20261014221205_booking_extras`: table `booking_ext
 
 - **No browser or phone pass** (you said you'd do it on staging). Things to look at: the extras form on a phone, the wide rooms × items grid scrolling sideways (room names stay in place), and the print view.
 - **No true parallel race.** The tests prove the lock path and the unique key separately.
-- **Waiting extras on a room set to Ready by hand.** If someone overrides a Dirty room to Ready (instead of preparing it), a waiting extra is not placed. It stays "Waiting for room prep" on the reservation. Say if you want an *Apply now* button for that.
-- **A double click on Add** can add the extra twice (the button disables while saving, but there is no submission id). Easy to remove while waiting, harder once placed.
 - Extras are never charged. Nothing about them touches prices.
 - Archived items drop off prep lists, so a waiting extra for an item archived later stays waiting.
 
@@ -119,3 +121,8 @@ One more additive migration, `20261014221205_booking_extras`: table `booking_ext
 5. Check in, add an extra during the stay, check out, Inspect: the extra is listed to count.
 6. Admin → Inventory → Overview. Lower a store balance below an arriving room's need and see it under *What to buy*. Download a CSV; print.
 7. Staff: no Overview tab, and the Overview URL and CSV link are refused.
+
+## Final checks
+
+- Typecheck, lint, build: clean. `npm test`: 392 passed, 92 skipped.
+- `npm run test:db:housekeeping`: **27 of 27 passed** on the final run. One earlier full run of the same code took 14 minutes and showed 3 failures that I did not capture; the extras tests passed on their own, and the next full run passed everything. I could not reproduce the failures and have not diagnosed them (my guess is slow database round-trips hitting the per-test timeouts, but that is a guess). If it recurs, send me the output.

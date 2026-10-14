@@ -11,7 +11,7 @@ vi.mock("@/lib/auth", () => ({ requirePermission }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db: new Proxy({}, { get: () => dbTouched() }) }));
 
-import { addExtraAction, removeExtraAction } from "./extras-actions";
+import { addExtraAction, applyExtraAction, removeExtraAction } from "./extras-actions";
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData();
@@ -20,7 +20,8 @@ const form = (fields: Record<string, string>) => {
 };
 
 const cases = [
-  ["addExtraAction", addExtraAction, { bookingId: "b", itemId: "i", quantity: "1" }],
+  ["addExtraAction", addExtraAction, { bookingId: "b", itemId: "i", quantity: "1", submissionId: "0123456789abcdef-token" }],
+  ["applyExtraAction", applyExtraAction, { extraId: "e" }],
   ["removeExtraAction", removeExtraAction, { extraId: "e" }],
 ] as const;
 

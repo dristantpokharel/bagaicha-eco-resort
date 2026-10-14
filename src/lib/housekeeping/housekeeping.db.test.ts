@@ -411,6 +411,70 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
       });
     });
 
+    it("the same form attempt submitted twice adds one extra and moves stock once; another attempt is a new extra", async () => {
+      await inRollback(async (tx, f) => {
+        const attempt = { bookingId: f.booking.id, itemId: f.towel.id, quantity: "1", note: null, userId: f.user.id, submissionId: `${tag}-attempt-1-aaaa` };
+        const first = await extras.addExtra(tx, attempt);
+        const again = await extras.addExtra(tx, attempt);
+        expect(first.duplicate).toBe(false);
+        expect(again).toMatchObject({ duplicate: true, summary: "Already added." });
+        expect(await tx.bookingExtra.count({ where: { bookingId: f.booking.id } })).toBe(1);
+        expect(await movesFor(tx, f, f.towel.id)).toHaveLength(1);
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("1");
+
+        await expect(extras.addExtra(tx, { ...attempt, userId: f.other.id })).rejects.toThrow(/already used/);
+        await extras.addExtra(tx, { ...attempt, submissionId: `${tag}-attempt-2-aaaa` });
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("2");
+      });
+    });
+
+    it("the database refuses a repeated submission id", async () => {
+      await inRollback(async (tx, f) => {
+        const data = { bookingId: f.booking.id, itemId: f.towel.id, quantity: "1", addedById: f.user.id, submissionId: `${tag}-dup-token-aaaa` };
+        await tx.bookingExtra.create({ data });
+        expect(await rejected(tx, () => tx.bookingExtra.create({ data }))).toMatchObject({ code: "P2002" });
+      });
+    });
+
+    it("Apply now places a waiting extra once the room is Ready, through the same path, and only once", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        await add(tx, f, f.towel.id);
+        await add(tx, f, f.soap.id);
+        const [towelExtra, soapExtra] = await Promise.all(
+          [f.towel.id, f.soap.id].map((itemId) => tx.bookingExtra.findFirstOrThrow({ where: { bookingId: f.booking.id, itemId } })),
+        );
+        // The room is Dirty: not yet.
+        await expect(extras.applyExtra(tx, { extraId: towelExtra.id, userId: f.user.id })).rejects.toThrow(/isn't ready/);
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("0");
+
+        // Staff set the room Ready by hand instead of preparing it.
+        await status.setRoomStatus(tx, { roomId: f.room.id, to: "READY", note: null, userId: f.user.id });
+        await extras.applyExtra(tx, { extraId: towelExtra.id, userId: f.user.id });
+        await extras.applyExtra(tx, { extraId: soapExtra.id, userId: f.user.id });
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("1");
+        expect(await balance(tx, f.towel.id, f.store.id)).toBe("4");
+        expect((await tx.inventoryItem.findUniqueOrThrow({ where: { id: f.soap.id } })).quantity.toString()).toBe("9");
+        expect(await movesFor(tx, f, f.towel.id)).toHaveLength(1);
+        expect(await tx.activityLog.count({ where: { entityId: f.booking.id, action: "booking.extraApplied" } })).toBe(2);
+
+        await expect(extras.applyExtra(tx, { extraId: towelExtra.id, userId: f.user.id })).rejects.toThrow(/already in the room/);
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("1");
+      });
+    });
+
+    it("Apply now refuses when the store can't cover it, and the extra keeps waiting", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        await add(tx, f, f.towel.id, "2");
+        await status.setRoomStatus(tx, { roomId: f.room.id, to: "READY", note: null, userId: f.user.id });
+        await locations.setBalance(tx, f.towel.id, f.store.id, "1");
+        const extra = await tx.bookingExtra.findFirstOrThrow({ where: { bookingId: f.booking.id } });
+        await expect(extras.applyExtra(tx, { extraId: extra.id, userId: f.user.id })).rejects.toThrow(/Only 1/);
+        expect((await tx.bookingExtra.findUniqueOrThrow({ where: { id: extra.id } })).appliedAt).toBeNull();
+      });
+    });
+
     it("the database refuses a zero or negative extra", async () => {
       await inRollback(async (tx, f) => {
         const error = await rejected(tx, () =>

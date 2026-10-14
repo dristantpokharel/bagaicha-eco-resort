@@ -118,6 +118,7 @@ export default async function ReservationPage({
       totalLabel: `Room total: ${formatNpr(b.totalPriceNpr)}`,
       cancellationReason: b.cancellationReason,
       flags: { party: flags.party, roomType: flags.roomType, room: flags.room },
+      extrasApplicable: b.status === "CHECKED_IN" || (b.status === "CONFIRMED" && b.room?.status === "READY"),
       extras: b.extras.map((e) => ({
         id: e.id,
         label: `${formatQuantityWithUnit(e.quantity.toString(), e.item.unit)} ${e.item.name}`,

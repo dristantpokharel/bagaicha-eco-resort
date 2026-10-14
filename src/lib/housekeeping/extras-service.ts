@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
+import type { RoomStatus } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/actions";
 import { logActivity } from "@/lib/activity-log";
 import { lockRoom } from "@/lib/booking/availability";
@@ -36,27 +37,28 @@ async function lockBooking(tx: Tx, bookingId: string): Promise<BookingFacts> {
   return booking;
 }
 
-export type AddExtraResult = { timing: ExtraTiming; summary: string };
+export type AddExtraResult = { timing: ExtraTiming; summary: string; duplicate: boolean };
 
-/**
- * Adds an extra to one booking line. Applied at once when the room is already set up for the guest: reusables
- * move Store → Room (and come back at inspection), consumables are recorded as used. Otherwise it is saved and
- * shows on the prep checklist.
- */
-export async function addExtra(
+type RoomFacts = { name: string; status: RoomStatus; stockLocation: { id: string } | null };
+
+/** Puts stock into the room for a booking: reusables Store → Room, consumables recorded as used. The one placing path. */
+async function placeStock(
   tx: Tx,
-  params: { bookingId: string; itemId: string; quantity: Quantity; note: string | null; userId: string },
-): Promise<AddExtraResult> {
-  const { bookingId, itemId, userId, note } = params;
-  const booking = await lockBooking(tx, bookingId);
+  p: { bookingId: string; itemId: string; isConsumable: boolean; quantity: string; note: string | null; userId: string; room: RoomFacts | null },
+) {
+  if (!p.room?.stockLocation) throw new ActionError(`${p.room?.name ?? "The room"} has no stock location. Contact an admin.`);
+  await lockItem(tx, p.itemId);
+  const stockNote = `Extra for ${p.room.name}${p.note ? `: ${p.note}` : ""}`;
+  if (p.isConsumable) {
+    await recordStockMovement(tx, { itemId: p.itemId, userId: p.userId, type: "USED", amount: p.quantity, note: stockNote, bookingId: p.bookingId });
+  } else {
+    const store = await loadFixedLocation(tx, "STORE");
+    await transferStock(tx, { itemId: p.itemId, userId: p.userId, fromLocationId: store.id, toLocationId: p.room.stockLocation.id, amount: p.quantity, note: stockNote, bookingId: p.bookingId });
+  }
+}
 
-  const item = await tx.inventoryItem.findUnique({ where: { id: itemId }, select: { name: true, unit: true, isActive: true, isConsumable: true } });
-  if (!item) throw new ActionError("That item no longer exists.", { itemId: "Choose an item." });
-  if (!item.isActive) throw new ActionError(`${item.name} is archived, so it can't be added.`, { itemId: "Archived." });
-  const quantity = toDecimal(params.quantity);
-  if (quantity.lessThanOrEqualTo(0)) throw new ActionError("Enter an amount above zero.", { quantity: "Enter an amount above zero." });
-  assertAmountFitsUnit(quantity, item.unit, "quantity");
-
+/** Is the room set up for this guest right now? The same rule whether an extra is added or applied later. */
+async function timingFor(tx: Tx, booking: BookingFacts) {
   const room = booking.roomId
     ? await tx.room.findUnique({ where: { id: booking.roomId }, select: { name: true, status: true, stockLocation: { select: { id: true } } } })
     : null;
@@ -69,21 +71,44 @@ export async function addExtra(
         })
       : null;
   const timing = planExtraTiming({ bookingStatus: booking.status, hasRoom: Boolean(room), roomStatus: room?.status ?? null, isNextArrival: next?.id === booking.id });
+  return { room, timing };
+}
 
-  if (timing === "NOW") {
-    if (!room?.stockLocation) throw new ActionError(`${room?.name ?? "The room"} has no stock location. Contact an admin.`);
-    await lockItem(tx, itemId);
-    const stockNote = `Extra for ${room.name}${note ? `: ${note}` : ""}`;
-    if (item.isConsumable) {
-      await recordStockMovement(tx, { itemId, userId, type: "USED", amount: quantity.toString(), note: stockNote, bookingId });
-    } else {
-      const store = await loadFixedLocation(tx, "STORE");
-      await transferStock(tx, { itemId, userId, fromLocationId: store.id, toLocationId: room.stockLocation.id, amount: quantity.toString(), note: stockNote, bookingId });
+/**
+ * Adds an extra to one booking line. Applied at once when the room is already set up for the guest: reusables
+ * move Store → Room (and come back at inspection), consumables are recorded as used. Otherwise it is saved and
+ * shows on the prep checklist. `submissionId` makes a repeat of the same form attempt a no-op.
+ */
+export async function addExtra(
+  tx: Tx,
+  params: { bookingId: string; itemId: string; quantity: Quantity; note: string | null; userId: string; submissionId?: string },
+): Promise<AddExtraResult> {
+  const { bookingId, itemId, userId, note, submissionId } = params;
+  const booking = await lockBooking(tx, bookingId);
+
+  // The booking lock makes this check reliable; the unique index is the backstop.
+  if (submissionId) {
+    const prior = await tx.bookingExtra.findUnique({ where: { submissionId }, select: { bookingId: true, itemId: true, addedById: true, appliedAt: true } });
+    if (prior) {
+      if (prior.bookingId !== bookingId || prior.itemId !== itemId || prior.addedById !== userId) {
+        throw new ActionError("That submission was already used. Reload the page and try again.");
+      }
+      return { timing: prior.appliedAt ? "NOW" : "LATER", summary: "Already added.", duplicate: true };
     }
   }
 
+  const item = await tx.inventoryItem.findUnique({ where: { id: itemId }, select: { name: true, unit: true, isActive: true, isConsumable: true } });
+  if (!item) throw new ActionError("That item no longer exists.", { itemId: "Choose an item." });
+  if (!item.isActive) throw new ActionError(`${item.name} is archived, so it can't be added.`, { itemId: "Archived." });
+  const quantity = toDecimal(params.quantity);
+  if (quantity.lessThanOrEqualTo(0)) throw new ActionError("Enter an amount above zero.", { quantity: "Enter an amount above zero." });
+  assertAmountFitsUnit(quantity, item.unit, "quantity");
+
+  const { room, timing } = await timingFor(tx, booking);
+  if (timing === "NOW") await placeStock(tx, { bookingId, itemId, isConsumable: item.isConsumable, quantity: quantity.toString(), note, userId, room });
+
   const extra = await tx.bookingExtra.create({
-    data: { bookingId, itemId, quantity: quantity.toString(), note, addedById: userId, appliedAt: timing === "NOW" ? new Date() : null },
+    data: { bookingId, itemId, quantity: quantity.toString(), note, addedById: userId, submissionId, appliedAt: timing === "NOW" ? new Date() : null },
   });
   const amount = formatQuantityWithUnit(quantity.toString(), item.unit);
   await logActivity(tx, {
@@ -95,6 +120,7 @@ export async function addExtra(
   });
   return {
     timing,
+    duplicate: false,
     summary:
       timing === "NOW"
         ? `${amount} of ${item.name} ${item.isConsumable ? "recorded as used" : `placed in ${room?.name}`}.`
@@ -124,4 +150,47 @@ export async function removeExtra(tx: Tx, params: { extraId: string; userId: str
     details: { item: extra.item.name, amount: extra.quantity.toString(), unit: extra.item.unit },
   });
   return { summary: `${extra.item.name} removed.` };
+}
+
+/**
+ * Places a waiting extra now, through the same path as adding one. Only when the room is set up for the guest
+ * (in-house, or Ready and this is its next arrival); otherwise it keeps waiting for the prep.
+ */
+export async function applyExtra(tx: Tx, params: { extraId: string; userId: string }): Promise<{ summary: string }> {
+  const extra = await tx.bookingExtra.findUnique({ where: { id: params.extraId }, select: { bookingId: true } });
+  if (!extra) throw new ActionError("That extra was removed.");
+  const booking = await lockBooking(tx, extra.bookingId);
+
+  // Re-read under the locks: a prep or another apply that ran first has already placed it.
+  const current = await tx.bookingExtra.findUnique({
+    where: { id: params.extraId },
+    select: { itemId: true, quantity: true, note: true, appliedAt: true, item: { select: { name: true, unit: true, isConsumable: true, isActive: true } } },
+  });
+  if (!current) throw new ActionError("That extra was removed.");
+  if (current.appliedAt) throw new ActionError("That extra is already in the room.");
+  if (!current.item.isActive) throw new ActionError(`${current.item.name} is archived, so it can't be placed.`);
+
+  const { room, timing } = await timingFor(tx, booking);
+  if (timing !== "NOW") {
+    throw new ActionError(`${room?.name ?? "The room"} isn't ready for this guest yet. The extra will be placed when the room is prepared.`);
+  }
+  await placeStock(tx, {
+    bookingId: extra.bookingId,
+    itemId: current.itemId,
+    isConsumable: current.item.isConsumable,
+    quantity: current.quantity.toString(),
+    note: current.note,
+    userId: params.userId,
+    room,
+  });
+  await tx.bookingExtra.update({ where: { id: params.extraId }, data: { appliedAt: new Date() } });
+  const amount = formatQuantityWithUnit(current.quantity.toString(), current.item.unit);
+  await logActivity(tx, {
+    userId: params.userId,
+    action: "booking.extraApplied",
+    entityType: "Booking",
+    entityId: extra.bookingId,
+    details: { extraId: params.extraId, item: current.item.name, amount: current.quantity.toString(), unit: current.item.unit, room: room?.name },
+  });
+  return { summary: `${amount} of ${current.item.name} ${current.item.isConsumable ? "recorded as used" : `placed in ${room?.name}`}.` };
 }

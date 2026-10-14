@@ -29,6 +29,8 @@ export type LineView = {
   cancellationReason: string | null;
   flags: Pick<EditableFlags, "party" | "roomType" | "room">;
   extras: ExtraView[];
+  /** Waiting extras can be placed now: the guest is in, or the room is Ready. */
+  extrasApplicable: boolean;
   /** Free rooms of this line's type for the stay (to confirm into, or move a confirmed room to). */
   rooms: { id: string; name: string }[];
 };
@@ -196,7 +198,7 @@ export function LineCard({
       )}
       {cancellable && !canCancel && <p className="text-xs text-charcoal-light">Only an Admin can cancel rooms.</p>}
 
-      {(line.extras.length > 0 || extraItems) && <ExtrasPanel bookingId={line.id} extras={line.extras} items={extraItems} />}
+      {(line.extras.length > 0 || extraItems) && <ExtrasPanel bookingId={line.id} extras={line.extras} items={extraItems} canApplyNow={line.extrasApplicable} />}
 
       {editing && editable && (
         <form action={editAction} className="grid gap-3 border-t border-forest/10 pt-3 sm:grid-cols-2" noValidate>

@@ -61,10 +61,14 @@ describe("prep checklist with extras", () => {
 });
 
 describe("addExtraSchema", () => {
-  const ok = { bookingId: "b", itemId: "i", quantity: "2" };
+  const ok = { bookingId: "b", itemId: "i", quantity: "2", submissionId: "0123456789abcdef-token" };
   it("takes a positive number and an optional note", () => {
     expect(addExtraSchema.parse({ ...ok, note: " cold night " })).toMatchObject({ quantity: "2", note: "cold night" });
     expect(addExtraSchema.parse({ ...ok, note: "" }).note).toBeNull();
+  });
+  it("needs a submission id", () => {
+    expect(addExtraSchema.safeParse({ ...ok, submissionId: "" }).success).toBe(false);
+    expect(addExtraSchema.safeParse({ ...ok, submissionId: "short" }).success).toBe(false);
   });
   it("rejects blank, negative and non-numeric amounts and a missing item", () => {
     for (const quantity of ["", "-1", "abc", "1,5"]) expect(addExtraSchema.safeParse({ ...ok, quantity }).success).toBe(false);
