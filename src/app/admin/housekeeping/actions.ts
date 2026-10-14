@@ -7,7 +7,8 @@ import { requirePermission } from "@/lib/auth";
 import { ActionError, parseForm, runAction, type ActionResult } from "@/lib/actions";
 import { completeInspection, completePrep, HOUSEKEEPING_TX_OPTIONS } from "@/lib/housekeeping/service";
 import { setRoomStatus } from "@/lib/housekeeping/room-status";
-import { fieldsWithPrefix, inspectionEntries, inspectionSchema, prepSchema, setStatusSchema } from "@/lib/housekeeping/schemas";
+import { savePar, type ParScope } from "@/lib/housekeeping/par-service";
+import { fieldsWithPrefix, inspectionEntries, inspectionSchema, prepSchema, saveParSchema, setStatusSchema } from "@/lib/housekeeping/schemas";
 
 function revalidateHousekeeping() {
   revalidatePath("/admin/housekeeping");
@@ -57,5 +58,20 @@ export async function setRoomStatusAction(_prev: ActionResult | null, formData: 
     const message = await db.$transaction((tx) => setRoomStatus(tx, { roomId, to: status, note, userId: actor.id }));
     revalidateHousekeeping();
     return { ok: true, message };
+  });
+}
+
+// ─── Par lists (Admin and up) ────────────────────────────────────────────────
+
+export async function saveParAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("inventory.managePar");
+    const { roomTypeId, roomId } = parseForm(saveParSchema, formData);
+    const desired = fieldsWithPrefix(formData, "par");
+    const scope: ParScope = roomId ? { kind: "room", roomId } : { kind: "roomType", roomTypeId: roomTypeId! };
+    const result = await db.$transaction((tx) => savePar(tx, { scope, desired, userId: actor.id }), HOUSEKEEPING_TX_OPTIONS);
+    revalidatePath("/admin/rooms");
+    revalidatePath("/admin/housekeeping");
+    return { ok: true, message: result.message };
   });
 }

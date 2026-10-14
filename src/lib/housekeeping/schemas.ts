@@ -40,3 +40,7 @@ export function inspectionEntries(formData: FormData): Record<string, Inspection
   const notes = fieldsWithPrefix(formData, "note");
   return Object.fromEntries(Object.entries(counted).map(([itemId, value]) => [itemId, { counted: value, kind: kinds[itemId], note: notes[itemId] }]));
 }
+
+export const saveParSchema = z
+  .object({ roomTypeId: id.optional(), roomId: id.optional() })
+  .refine((v) => Boolean(v.roomTypeId) !== Boolean(v.roomId), { error: "Choose a room type or a room." });

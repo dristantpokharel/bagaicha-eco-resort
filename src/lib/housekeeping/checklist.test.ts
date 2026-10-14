@@ -4,7 +4,7 @@ vi.mock("@/lib/auth/session", () => ({ AuthorizationError: class extends Error {
 
 import { ActionError } from "@/lib/actions";
 import { buildPrepLines, planInspection, planPrep, type InspectionLine, type ItemInfo } from "./checklist";
-import { resolvePar } from "./par";
+import { planRoomOverrides, planTypeParSave, resolvePar } from "./par";
 
 const item = (id: string, over: Partial<ItemInfo> = {}): ItemInfo => ({ id, name: id, unit: "pcs", isConsumable: false, isFixedInRoom: false, isActive: true, ...over });
 const items = new Map([
@@ -114,5 +114,33 @@ describe("planInspection", () => {
   it("rejects an incomplete or foreign submission", () => {
     expect(() => planInspection(lines, { towel: { counted: "3" } })).toThrow(/changed/);
     expect(() => planInspection(lines, { towel: { counted: "3" }, kettle: { counted: "1" }, x: { counted: "1" } })).toThrow(/changed/);
+  });
+});
+
+describe("par saving", () => {
+  it("replaces a type's list: upserts only what changed, deletes what was removed", () => {
+    const plan = planTypeParSave(new Map([["towel", "3"], ["soap", "2"]]), new Map([["towel", "2"], ["soap", "2.00"], ["kettle", "1"]]));
+    expect(plan).toEqual({ upserts: [{ itemId: "towel", quantity: "3" }], deletes: ["kettle"] });
+  });
+
+  it("stores a room's difference from its type as overrides", () => {
+    const type = new Map([["towel", "2"], ["kettle", "1"]]);
+    const plan = planRoomOverrides(new Map([["towel", "4"], ["soap", "2"]]), type, new Map());
+    expect(plan.upserts.sort((a, b) => a.itemId.localeCompare(b.itemId))).toEqual([
+      { itemId: "kettle", quantity: "0" },
+      { itemId: "soap", quantity: "2" },
+      { itemId: "towel", quantity: "4" },
+    ]);
+  });
+
+  it("drops an override once the room matches its type again", () => {
+    const type = new Map([["towel", "2"]]);
+    const plan = planRoomOverrides(new Map([["towel", "2"]]), type, new Map([["towel", "4"], ["soap", "2"]]));
+    expect(plan).toEqual({ upserts: [], deletes: ["towel", "soap"] });
+  });
+
+  it("keeps an unchanged override as is", () => {
+    const plan = planRoomOverrides(new Map([["towel", "4"]]), new Map([["towel", "2"]]), new Map([["towel", "4.00"]]));
+    expect(plan).toEqual({ upserts: [], deletes: [] });
   });
 });

@@ -86,6 +86,18 @@ export default async function EditRoomTypePage({
           <RoomsManager roomTypeId={roomType.id} rooms={roomType.rooms} />
         </section>
 
+        {can(user.role, "inventory.managePar") && (
+          <section aria-labelledby="par-heading" className="rounded-lg border border-forest/10 bg-white p-6">
+            <h2 id="par-heading" className="mb-2 font-display text-lg text-forest">
+              Par list
+            </h2>
+            <p className="mb-3 text-sm text-charcoal-light">What each room should hold. Housekeeping prepares rooms from it.</p>
+            <Link href={`/admin/rooms/${roomType.id}/par`} className="text-sm text-forest underline underline-offset-4">
+              Edit the par list
+            </Link>
+          </section>
+        )}
+
         {canManageMedia && (
           <PlacementManager
             key={placementKey(placements)}
