@@ -1,6 +1,6 @@
 # Housekeeping walkthrough
 
-Branch `inventory-housekeeping`. **Part A is done** (par lists, room status, prep, inspection, board). Part B (booking extras, owner overview, inventory nav) is not started.
+Branch `inventory-housekeeping`. **Part A** (par lists, room status, prep, inspection, board) and **Part B** (booking extras, owner overview, inventory tabs) are built. Part B is described in the second half of this file.
 
 ## What was built (Part A)
 
@@ -40,7 +40,7 @@ One additive migration, `20261014204021_housekeeping_status_par_tasks`: new enum
 
 ## NOT done yet — please run or check
 
-- **The database tests have not been run.** I did not touch env files, so I couldn't. Run `npm run test:db:housekeeping`. Each test runs inside a transaction that is rolled back, so nothing stays in dev. It covers prep, shortfall, inspection with lost/damaged, check-in/out hooks, same-day turnaround, the second-person refusal, and that the database itself rejects a duplicate completion (unique key) and negative stock (CHECKs).
+- **The database tests** (`npm run test:db:housekeeping`) have been run since; see *Part B → Checks run*. Each test runs inside a transaction that is rolled back, so nothing stays in dev. It covers prep, shortfall, inspection with lost/damaged, check-in/out hooks, same-day turnaround, the second-person refusal, and that the database itself rejects a duplicate completion (unique key) and negative stock (CHECKs).
 - **A true parallel race** (two requests at the same instant) is not simulated; the tests prove the lock path and the unique key separately.
 - **No browser pass yet.** Nothing has been clicked through on a phone-sized screen.
 
@@ -56,5 +56,66 @@ One additive migration, `20261014204021_housekeeping_status_par_tasks`: new enum
 ## Placeholders / open questions
 
 - No placeholder content. There are no par lists yet, so every prep says "Nothing to place" until you enter them.
-- Should the board offer a "skip inspection" button, or is the Ready override enough?
-- Part B isn't started. It reuses this prep: extras added before arrival will appear on the prep checklist (the checklist builder already accepts an extras map; the loader will pass it in Part B).
+- (Answered) Skip inspection is now an Admin-only button, see Part B.
+
+---
+
+# Part B
+
+## Changes you asked for after Part A
+
+- **Item form:** *Consumable* or *Reusable* is a required radio with no default ("Used up, e.g. soap." / "Returned and reused, e.g. towels. Tracked by place."). Existing items keep their values. The cause of the 4 failing DB tests in Part A was the schema default of `isConsumable = true` in the test fixtures; nothing in the service was wrong.
+- **Skip inspection** (Admin and Superuser only, permission `housekeeping.skipInspection`): on the Inspect screen, *Skip this inspection (admin)* needs a reason (logged as `room.inspectionSkipped`). No stock moves, the room stays Dirty and can be prepared. It writes the same (room, INSPECTION, cycle) row as a real inspection, so a skip and an inspection can't both happen. If a room holds nothing to count, the message now says so plainly.
+
+## Booking extras (Staff)
+
+On the reservation page, each **Confirmed or Checked-in** room has *Extras in the room*: pick an item, how many, optional note, **Add**.
+
+- **When it goes into the room.** Straight away if the guest is in-house, or the room is **Ready** and this booking is its next arrival. Otherwise it is saved as *Waiting for room prep* (room Dirty or out of order, a guest still inside, an earlier arrival in the same room, or no room assigned yet).
+- **Applied straight away:** reusables move Store → Room (they come back at the checkout inspection automatically, since they are room balances); consumables are recorded as USED. Both are linked to the booking. If the store can't cover a reusable, adding is refused with the amount on hand, and nothing is saved.
+- **Waiting extras** show on the prep checklist ("par 2 + 1 extra for this booking"). Completing the prep places them with the rest; shortfalls work as before. Staff can still lower a line.
+- **Removing:** a waiting extra can be removed (logged). One already in the room can't, because stock has moved. It comes back at inspection.
+- Logged as `booking.extraAdded` / `booking.extraRemoved`. Archived items and finished or cancelled stays are refused.
+- Lock order is the same as everywhere else: reservation → room → items. Removing an extra and completing a prep take the room lock, and removal deletes only rows that are still unapplied, so whichever runs second sees the result.
+
+## Owner overview (Admin and Superuser)
+
+`/admin/inventory/overview`, first tab of the new Inventory tabs (**Overview, Items, Record stock, Move, Housekeeping**; each tab shows only if the role may use it).
+
+1. **What to buy.** Items at or below their alert level, plus what arrivals in the next 7 days (and rooms left short at prep) need that the Store and Laundry can't cover. *Buy at least* is the larger of the two gaps, not a made-up target. A row with no number to buy shows "Low".
+2. **Are the rooms stocked?** Reusable items by room against its par, as *have / should have*. ▼ short, ▲ over, with screen-reader text, not just colour.
+3. **What we have and where.** Store, Laundry, rooms and total per item.
+4. **Lost or damaged this month** (month in Kathmandu time), with cost where a unit cost is set; items without a cost are counted separately and say "Unit cost not set". Each entry is listed underneath.
+5. **Download:** four CSV files (to buy, stock, rooms, losses). Typed text starting with `= + - @` is defused so a spreadsheet won't run it. Signed-out gets 401, Staff get 403.
+6. **Print** button; the print view hides the menus and tabs.
+
+How "to buy" counts (so you can check it): a room is in scope if it has a confirmed arrival in the next 7 days, or it is Ready but was prepped short. Its need is par plus that arrival's waiting extras, minus what is in the room. A **Dirty or Occupied** room's movable items (linen) are treated as leaving, so they count as empty; fixed items stay. A room is counted once for reusables even with two arrivals; consumables are counted per arrival. Out-of-order rooms are skipped. Store and Laundry both count as available.
+
+## Database
+
+One more additive migration, `20261014221205_booking_extras`: table `booking_extras` (booking, item, quantity > 0 by CHECK, note, who added it, `appliedAt`), indexes and foreign keys (all RESTRICT). It was run on dev inside a transaction and rolled back first (`npm run db:dryrun-migration -- <path>`: 7 statements applied, nothing left after rollback), then applied with `migrate dev`. The dry-run script is new (`scripts/dryrun-migration.ts`) because the permission system refuses me running a script with `--env-file` directly; the npm script is the same pattern as `test:db:housekeeping`.
+
+## Checks run
+
+- Typecheck, lint, build: clean. `npm test`: 390 passed, 88 skipped (DB tests skip offline).
+- New unit tests: extras timing and prep lines, item usage radio, to-buy / grid / loss calculations (12), CSV escaping, extras and skip-inspection actions refuse before touching the database, export route permissions, permission matrix.
+- `npm run test:db:housekeeping`: **23 of 23 passed** (about 8 minutes; each test is rolled back). Part B added 11 of these: extras applied at once, waiting then applied at prep, removal, in-stay extras coming back at inspection, store shortfall, archived/cancelled refusals, the CHECK on extra quantity, skip inspection, and the overview's to-buy and losses.
+
+## NOT done / limits
+
+- **No browser or phone pass** (you said you'd do it on staging). Things to look at: the extras form on a phone, the wide rooms × items grid scrolling sideways (room names stay in place), and the print view.
+- **No true parallel race.** The tests prove the lock path and the unique key separately.
+- **Waiting extras on a room set to Ready by hand.** If someone overrides a Dirty room to Ready (instead of preparing it), a waiting extra is not placed. It stays "Waiting for room prep" on the reservation. Say if you want an *Apply now* button for that.
+- **A double click on Add** can add the extra twice (the button disables while saving, but there is no submission id). Easy to remove while waiting, harder once placed.
+- Extras are never charged. Nothing about them touches prices.
+- Archived items drop off prep lists, so a waiting extra for an item archived later stays waiting.
+
+## Try it by hand
+
+1. Item form: *Add item* with no radio chosen shows "Choose consumable or reusable."
+2. Check a guest out, open Inspect as Admin: *Skip this inspection*, reason required; as Staff the button isn't there.
+3. Room Dirty with a confirmed arrival: add an extra blanket on the reservation (*Waiting for room prep*), open Prep (the line says "+ 1 extra for this booking"), complete. Then add another extra: it is placed immediately.
+4. Remove a waiting extra; try removing a placed one.
+5. Check in, add an extra during the stay, check out, Inspect: the extra is listed to count.
+6. Admin → Inventory → Overview. Lower a store balance below an arriving room's need and see it under *What to buy*. Download a CSV; print.
+7. Staff: no Overview tab, and the Overview URL and CSV link are refused.
