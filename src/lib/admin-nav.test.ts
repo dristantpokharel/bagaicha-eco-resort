@@ -7,7 +7,7 @@ describe("visibleNavGroups", () => {
   it("shows a superuser everything, in group order", () => {
     expect(visibleNavGroups("SUPERUSER").map((g) => g.label)).toEqual(["Front desk", "Property", "Website", "Settings"]);
     expect(labels("SUPERUSER")).toEqual([
-      "Today", "Bookings", "Calendar", "Guests", "Enquiries", "Rooms", "Inventory", "Content", "Media", "Users", "Activity log", "Your profile",
+      "Today", "Bookings", "Calendar", "Housekeeping", "Guests", "Enquiries", "Rooms", "Inventory", "Content", "Media", "Users", "Activity log", "Your profile",
     ]);
   });
 
@@ -17,7 +17,7 @@ describe("visibleNavGroups", () => {
   });
 
   it("gives staff front desk, inventory and their profile only; drops empty groups", () => {
-    expect(labels("STAFF")).toEqual(["Today", "Bookings", "Calendar", "Guests", "Enquiries", "Inventory", "Your profile"]);
+    expect(labels("STAFF")).toEqual(["Today", "Bookings", "Calendar", "Housekeeping", "Guests", "Enquiries", "Inventory", "Your profile"]);
     expect(visibleNavGroups("STAFF").map((g) => g.label)).toEqual(["Front desk", "Property", "Settings"]);
   });
 });
@@ -27,11 +27,11 @@ describe("phoneNav", () => {
     const { tabs, more } = phoneNav("ADMIN");
     expect(tabs.map((t) => t.label)).toEqual(["Today", "Bookings", "Calendar", "Inventory"]);
     const moreLabels = more.flatMap((g) => g.items.map((i) => i.label));
-    expect(moreLabels).toEqual(["Guests", "Enquiries", "Rooms", "Content", "Media", "Activity log", "Your profile"]);
+    expect(moreLabels).toEqual(["Housekeeping", "Guests", "Enquiries", "Rooms", "Content", "Media", "Activity log", "Your profile"]);
   });
 
   it("keeps the profile reachable for staff", () => {
-    expect(phoneNav("STAFF").more.flatMap((g) => g.items.map((i) => i.label))).toEqual(["Guests", "Enquiries", "Your profile"]);
+    expect(phoneNav("STAFF").more.flatMap((g) => g.items.map((i) => i.label))).toEqual(["Housekeeping", "Guests", "Enquiries", "Your profile"]);
   });
 });
 
