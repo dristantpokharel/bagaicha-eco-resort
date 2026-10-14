@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { HOME } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import type { PublicActivity, PublicMedia } from "@/lib/content/queries";
@@ -7,30 +7,10 @@ import { showPlaceholders } from "@/lib/content/placeholder";
 import { Icon } from "../icons";
 import { MediaPhoto } from "../photo";
 import { Placeholder } from "../placeholder";
+import { ActivityPhotos } from "../activity-photos";
 import { Reveal } from "../reveal";
 import { Kicker, SectionHeading } from "../typography";
 import { ContentText } from "./content-text";
-
-const label = "text-label mb-1 text-ink-muted";
-
-function Chip({ children, flagged = false }: { children: React.ReactNode; flagged?: boolean }) {
-  return flagged ? (
-    <li>
-      <Placeholder>{children}</Placeholder>
-    </li>
-  ) : (
-    <li className="bg-sage px-3 py-1.5 font-label text-[0.6875rem] font-medium tracking-wider text-ink-heading uppercase">{children}</li>
-  );
-}
-
-function Tile({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border border-ink/20 bg-cream p-3">
-      <p className={label}>{title}</p>
-      <div className="text-ink">{children}</div>
-    </div>
-  );
-}
 
 /** "~5 km · 10–15 mins" from the linked nearby destination. Never typed on the activity. */
 function distanceText(a: PublicActivity) {
@@ -40,173 +20,66 @@ function distanceText(a: PublicActivity) {
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** One expandable experience: a native disclosure, so it works without JavaScript and by keyboard. */
-export function ExperiencePanel({ activity, defaultOpen = false }: { activity: PublicActivity; defaultOpen?: boolean }) {
+/** One experience, always open: photos on one side and text on the other (stacked on phones). */
+export function ExperiencePanel({ activity, flip = false }: { activity: PublicActivity; flip?: boolean }) {
   const flagged = (f: string) => activity.placeholderFields.includes(f);
   const distance = distanceText(activity);
-  const [main, ...more] = activity.photos;
+  const hasPhotos = activity.photos.length > 0;
+  const showPhotos = hasPhotos || showPlaceholders;
   const canArrange = activity.group !== "AT_BAGAICHA";
-  const hasBody =
-    !!(activity.overview || activity.duration || activity.season || activity.bestTime || activity.whatToExpect || activity.howWeHelp || activity.tip || distance) ||
-    activity.bestFor.length > 0 ||
-    activity.highlights.length > 0 ||
-    activity.photos.length > 0;
-
-  const head = (
-    <span className="min-w-0">
-      {activity.category && <span className="text-label block text-leaf">{activity.category}</span>}
-      <span className="mt-1 block font-display text-[clamp(1.375rem,2.4vw,2rem)] leading-tight font-bold text-ink-heading italic">
-        {activity.title}
-      </span>
-      {activity.summary && (
-        <span className="mt-1 block max-w-prose text-sm text-ink">
-          {flagged("summary") ? <Placeholder>{activity.summary}</Placeholder> : activity.summary}
-        </span>
-      )}
-    </span>
-  );
-
-  if (!hasBody) return <div id={activity.slug} className="min-h-16 border-b border-ink/20 py-5">{head}</div>;
 
   return (
-    <details id={activity.slug} open={defaultOpen} className="group border-b border-ink/20">
-      <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest [&::-webkit-details-marker]:hidden">
-        {head}
-        <span className="flex shrink-0 items-center gap-3">
-          {distance && (
-            <span className="hidden items-center gap-1.5 text-sm text-ink-heading sm:inline-flex">
-              <MapPin aria-hidden="true" size={16} strokeWidth={1.75} />
-              {activity.destination?.placeholder ? <span className="text-warning">distance: placeholder</span> : distance}
-            </span>
-          )}
-          <Plus aria-hidden="true" strokeWidth={1.5} className="text-icon transition-transform duration-300 group-open:rotate-45" />
-        </span>
-      </summary>
-
-      <div className="grid gap-6 pb-8 md:grid-cols-12 md:gap-8">
-        {(main || showPlaceholders) && (
-          <div className="md:col-span-5">
-            {main ? (
-              <MediaPhoto media={main} sizes="(min-width: 768px) 40vw, 100vw" className="aspect-[4/3]" />
-            ) : (
-              <div className="flex aspect-[4/3] items-center justify-center border border-dashed border-warning bg-cream p-4 text-center">
-                <Placeholder>Photo needed for {activity.title}</Placeholder>
-              </div>
-            )}
-            {more.length > 0 && (
-              <ul className="mt-3 grid grid-cols-3 gap-3">
-                {more.map((m) => (
-                  <li key={m.url}>
-                    <MediaPhoto media={m} sizes="(min-width: 768px) 14vw, 30vw" className="aspect-square" compact />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+    <article id={activity.slug} className="grid scroll-mt-28 gap-5 border-b border-ink/20 py-8 md:grid-cols-12 md:items-center md:gap-10">
+      <div className={`space-y-4 ${showPhotos ? "md:col-span-7" : "md:col-span-12"} ${flip ? "md:order-2" : ""}`}>
+        <div>
+          {activity.category && <p className="text-label text-leaf">{activity.category}</p>}
+          <h3 className="mt-1 font-display text-[clamp(1.375rem,2.4vw,2rem)] leading-tight font-bold text-ink-heading italic">{activity.title}</h3>
+        </div>
+        <ContentText text={activity.description} flagged={flagged("overview")} />
+        {canArrange && distance && (
+          <p className="inline-flex items-center gap-1.5 bg-sage px-3 py-1.5 text-sm text-ink-heading">
+            <MapPin aria-hidden="true" size={16} strokeWidth={1.75} />
+            {activity.destination?.placeholder ? <Placeholder>{distance}</Placeholder> : distance}
+            <span className="sr-only"> from Bagaicha</span>
+          </p>
         )}
-
-        <div className={`space-y-5 ${main || showPlaceholders ? "md:col-span-7" : "md:col-span-12"}`}>
-          <ContentText text={activity.overview} flagged={flagged("overview")} />
-
-          {(activity.duration || activity.season || activity.bestTime || distance) && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {distance && (
-                <Tile title={`From Bagaicha${activity.destination ? `: ${activity.destination.name}` : ""}`}>
-                  {activity.destination?.placeholder ? <Placeholder>{distance}</Placeholder> : distance}
-                </Tile>
-              )}
-              {activity.duration && (
-                <Tile title="Duration">
-                  <ContentText text={activity.duration} flagged={flagged("duration")} className="" />
-                </Tile>
-              )}
-              {activity.season && (
-                <Tile title="Best season">
-                  <ContentText text={activity.season} flagged={flagged("season")} className="" />
-                </Tile>
-              )}
-              {activity.bestTime && (
-                <Tile title="Best time">
-                  <ContentText text={activity.bestTime} flagged={flagged("bestTime")} className="" />
-                </Tile>
-              )}
-            </div>
-          )}
-
-          {activity.bestFor.length > 0 && (
-            <div>
-              <p className={label}>Best for</p>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {activity.bestFor.map((b) => (
-                  <Chip key={b} flagged={flagged("bestFor")}>
-                    {b}
-                  </Chip>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {activity.highlights.length > 0 && (
-            <div>
-              <p className={label}>What you might see</p>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {activity.highlights.map((h) => (
-                  <Chip key={h} flagged={flagged("highlights")}>
-                    {h}
-                  </Chip>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {activity.whatToExpect && (
-            <div>
-              <p className={label}>What to expect</p>
-              <ContentText text={activity.whatToExpect} flagged={flagged("whatToExpect")} />
-            </div>
-          )}
-
-          {activity.howWeHelp && (
-            <div>
-              <p className={label}>How we help</p>
-              <ContentText text={activity.howWeHelp} flagged={flagged("howWeHelp")} />
-            </div>
-          )}
-
-          {activity.tip && (
-            <div className="border-l-2 border-leaf pl-3">
-              <p className={label}>Tip</p>
-              <ContentText text={activity.tip} flagged={flagged("tip")} className="text-body italic" />
-            </div>
-          )}
-
-          {canArrange && (
-            <Link
-              href={`/enquiry?type=STAY&about=${encodeURIComponent(activity.slug)}`}
-              className={buttonClasses({ variant: "brand", size: "lg" })}
-            >
+        {canArrange && (
+          <div>
+            <Link href={`/enquiry?type=STAY&about=${encodeURIComponent(activity.slug)}`} className={buttonClasses({ variant: "brand", size: "lg" })}>
               Ask us to arrange
               <span className="sr-only">: {activity.title}</span>
             </Link>
+          </div>
+        )}
+      </div>
+
+      {showPhotos && (
+        <div className={`md:col-span-5 ${flip ? "md:order-1" : ""}`}>
+          {hasPhotos ? (
+            <ActivityPhotos photos={activity.photos} title={activity.title} />
+          ) : (
+            <div className="flex aspect-[4/3] items-center justify-center border border-dashed border-warning bg-cream p-4 text-center">
+              <Placeholder>Photo needed for {activity.title}</Placeholder>
+            </div>
           )}
         </div>
-      </div>
-    </details>
+      )}
+    </article>
   );
 }
 
-/** The activity list as an accordion. */
+/** The activity list: every experience open and compact, alternating sides on desktop. */
 export function ExperienceList({ activities }: { activities: PublicActivity[] }) {
   return (
     <div className="border-t border-ink/20">
-      {activities.map((a) => (
-        <ExperiencePanel key={a.id} activity={a} />
+      {activities.map((a, i) => (
+        <ExperiencePanel key={a.id} activity={a} flip={i % 2 === 1} />
       ))}
     </div>
   );
 }
 
-/** Home activities band: photo + label beside the accordion. Shows only what is at the resort. */
+/** Home activities band: photo + label beside the list. Shows only what is at the resort. */
 export function ActivitiesSection({ activities, photo }: { activities: PublicActivity[]; photo?: PublicMedia }) {
   const copy = HOME.explore;
   const here = activities.filter((a) => a.group === "AT_BAGAICHA");

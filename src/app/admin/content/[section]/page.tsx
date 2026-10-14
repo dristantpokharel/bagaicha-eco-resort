@@ -108,7 +108,7 @@ export default async function ContentSectionPage({ params }: { params: Promise<{
                                     key={`${row.id}:${placementKey(placements)}`}
                                     target={{ kind: "activity", activityId: row.id }}
                                     title="More photos"
-                                    description="Shown after the primary photo, in this order. Upload new photos in Media → Library."
+                                    description="The page shows the primary photo plus the first two of these, in this order. Upload new photos in Media → Library."
                                     placements={placements}
                                     library={library}
                                   />

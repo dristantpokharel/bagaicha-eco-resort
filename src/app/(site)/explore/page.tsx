@@ -7,7 +7,6 @@ import { Reveal } from "@/components/site/reveal";
 import { SectionHeading } from "@/components/site/typography";
 import { ExperienceList } from "@/components/site/sections/activities";
 import { ExploreHero } from "@/components/site/sections/explore-hero";
-import { MapPin } from "lucide-react";
 
 export const generateMetadata = () => pageMetadata({ title: PAGES.explore.title, description: PAGES.explore.description, path: "/explore" });
 
@@ -17,8 +16,6 @@ const GROUP_ID: Record<ActivityGroupKey, string> = { AT_BAGAICHA: "at-bagaicha",
 export default async function ExplorePage() {
   const [activities, slots] = await Promise.all([getActivities(), getHomepageSlots()]);
   const copy = PAGES.explore;
-  const blackbuck = activities.find((a) => a.slug === "krishnasaar-blackbuck-visit");
-  const blackbuckDistance = blackbuck?.destination && [blackbuck.destination.distance, blackbuck.destination.travelTime].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -45,23 +42,6 @@ export default async function ExplorePage() {
                 </div>
               </Reveal>
               <div className="md:col-span-8">
-                {group === "CLOSE_BY" && blackbuck?.overview && (
-                  <aside aria-label="About the blackbuck" className="mb-8 flex flex-col gap-4 bg-sage p-5 sm:flex-row sm:items-center sm:justify-between md:p-6">
-                    <div>
-                      <p className="text-label text-ink-muted">Nepal’s only blackbuck habitat</p>
-                      <p className="mt-2 max-w-prose text-ink-heading">{blackbuck.overview}</p>
-                      {blackbuckDistance && (
-                        <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-ink-heading">
-                          <MapPin aria-hidden="true" size={16} strokeWidth={1.75} />
-                          {blackbuckDistance} from Bagaicha
-                        </p>
-                      )}
-                    </div>
-                    <Link href="#krishnasaar-blackbuck-visit" className={buttonClasses({ variant: "brand", size: "lg", className: "shrink-0" })}>
-                      Read more
-                    </Link>
-                  </aside>
-                )}
                 <ExperienceList activities={items} />
               </div>
             </div>

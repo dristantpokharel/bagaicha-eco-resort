@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { MediaImage } from "@/components/media/media-image";
 import type { PublicGalleryItem } from "@/lib/content/queries";
+import { Lightbox } from "./lightbox";
 
 type Category = PublicGalleryItem["category"];
 
@@ -21,7 +21,6 @@ const ORDER: Category[] = ["ROOMS", "DINING", "ACTIVITIES", "EVENTS", "PROPERTY"
 export function Gallery({ items }: { items: PublicGalleryItem[] }) {
   const [filter, setFilter] = useState<"ALL" | Category>("ALL");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const lastTrigger = useRef<HTMLElement | null>(null);
 
   const categories = ORDER.filter((c) => items.some((i) => i.category === c));
@@ -36,29 +35,6 @@ export function Gallery({ items }: { items: PublicGalleryItem[] }) {
     lastTrigger.current = trigger;
     setOpenIndex(index);
   };
-  const close = useCallback(() => dialogRef.current?.close(), []);
-  const step = useCallback(
-    (delta: number) => setOpenIndex((i) => (i === null ? i : (i + delta + visible.length) % visible.length)),
-    [visible.length],
-  );
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (openIndex !== null && !dialog.open) dialog.showModal();
-  }, [openIndex]);
-
-  useEffect(() => {
-    if (openIndex === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") step(1);
-      if (e.key === "ArrowLeft") step(-1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [openIndex, step]);
-
-  const current = openIndex === null ? null : visible[openIndex];
 
   return (
     <div>
@@ -110,46 +86,7 @@ export function Gallery({ items }: { items: PublicGalleryItem[] }) {
       </ul>
       {visible.length === 0 && <p className="text-body mt-6">No photos in this category yet.</p>}
 
-      <dialog
-        ref={dialogRef}
-        aria-label="Photo viewer"
-        onClose={() => {
-          setOpenIndex(null);
-          lastTrigger.current?.focus();
-        }}
-        onClick={(e) => e.target === dialogRef.current && close()}
-        className="m-0 h-svh max-h-none w-screen max-w-none bg-forest/95 p-0 text-cream backdrop:bg-transparent"
-      >
-        {current && (
-          <div className="relative flex h-full flex-col">
-            <div className="flex items-center justify-between px-4 py-3 md:px-8">
-              <p className="text-label" aria-live="polite">
-                {(openIndex ?? 0) + 1} / {visible.length}
-              </p>
-              <button type="button" onClick={close} className="inline-flex size-12 items-center justify-center focus-visible:outline-2 focus-visible:outline-cream" autoFocus>
-                <X aria-hidden="true" />
-                <span className="sr-only">Close</span>
-              </button>
-            </div>
-            <div className="relative min-h-0 flex-1">
-              <MediaImage media={current} sizes="100vw" className="object-contain" />
-            </div>
-            {current.altText && <p className="px-4 py-3 text-center text-sm md:px-8">{current.altText}</p>}
-            {visible.length > 1 && (
-              <>
-                <button type="button" onClick={() => step(-1)} className="absolute top-1/2 left-1 inline-flex size-12 -translate-y-1/2 items-center justify-center bg-forest/70 focus-visible:outline-2 focus-visible:outline-cream md:left-4">
-                  <ChevronLeft aria-hidden="true" />
-                  <span className="sr-only">Previous photo</span>
-                </button>
-                <button type="button" onClick={() => step(1)} className="absolute top-1/2 right-1 inline-flex size-12 -translate-y-1/2 items-center justify-center bg-forest/70 focus-visible:outline-2 focus-visible:outline-cream md:right-4">
-                  <ChevronRight aria-hidden="true" />
-                  <span className="sr-only">Next photo</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </dialog>
+      <Lightbox items={visible} openIndex={openIndex} onChange={setOpenIndex} onClosed={() => lastTrigger.current?.focus()} />
     </div>
   );
 }

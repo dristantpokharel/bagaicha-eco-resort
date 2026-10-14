@@ -37,24 +37,17 @@ const BUSINESS = {
   longitude: 81.332061,
 };
 
-const ACTIVITY_DETAILS = (name: string) => ({
-  overview: ph(`${name} overview`),
-  duration: ph(`${name} duration`),
-  bestTime: ph(`best time for ${name.toLowerCase()}`),
-  whatToExpect: ph(`what to expect on ${name.toLowerCase()}`),
-});
-const DETAIL_FLAGS = ["overview", "duration", "bestTime", "whatToExpect"];
-
+/** One description paragraph per activity: the real line when there is one, otherwise a flagged placeholder. */
 const ACTIVITIES = [
-  { slug: "village-walks", title: "Village Walks", summary: ph("Village Walks short line"), flags: ["summary", ...DETAIL_FLAGS] },
-  { slug: "birdwatching", title: "Birdwatching", summary: "Discover local birdlife.", flags: DETAIL_FLAGS },
-  { slug: "pickleball", title: "Pickleball", summary: ph("Pickleball short line"), flags: ["summary", ...DETAIL_FLAGS] },
-  { slug: "outdoor-relaxation", title: "Outdoor Relaxation", summary: "Slow down and explore the outdoors.", flags: DETAIL_FLAGS },
+  { slug: "village-walks", title: "Village Walks", overview: ph("Village Walks description"), flagged: true },
+  { slug: "birdwatching", title: "Birdwatching", overview: "Discover local birdlife.", flagged: false },
+  { slug: "pickleball", title: "Pickleball", overview: ph("Pickleball description"), flagged: true },
+  { slug: "outdoor-relaxation", title: "Outdoor Relaxation", overview: "Slow down and explore the outdoors.", flagged: false },
   {
     slug: "chill-pool",
     title: "Chill Pool",
-    summary: "Take a refreshing dip, relax in the nature and enjoy food and drinks by the pool.",
-    flags: DETAIL_FLAGS,
+    overview: "Take a refreshing dip, relax in the nature and enjoy food and drinks by the pool.",
+    flagged: false,
   },
 ];
 
@@ -130,15 +123,6 @@ const POLICIES = [
  * facts; everything else is a flagged placeholder. Distances are never typed here: activities link to a
  * NearbyDestination row and the page reads the distance from it.
  */
-const PH_FIELDS = ["duration", "season", "bestTime", "bestFor", "whatToExpect", "howWeHelp"] as const;
-const exploreDetails = (what: string) => ({
-  duration: ph(`${what} duration`),
-  season: ph(`best season for ${what}`),
-  bestTime: ph(`best time of day for ${what}`),
-  bestFor: [ph(`who ${what} suits`)],
-  whatToExpect: ph(`what to expect on ${what}`),
-  howWeHelp: `We can help arrange this visit. Placeholder: owner to confirm exactly what the resort arranges.`,
-});
 
 const NEW_NEARBY = [
   {
@@ -155,9 +139,8 @@ type ExploreActivity = {
   title: string;
   group: "AT_BAGAICHA" | "CLOSE_BY" | "DAY_TRIP";
   category: string;
-  summary: string;
+  /** The single description paragraph. */
   overview: string;
-  highlights: string[];
   /** NearbyDestination name this activity links to. */
   nearby: string | null;
   sortOrder: number;
@@ -169,9 +152,8 @@ const EXPLORE_ACTIVITIES: ExploreActivity[] = [
     title: "Krishnasaar blackbuck visit",
     group: "CLOSE_BY",
     category: "Wildlife",
-    summary: "Visit the Krishnasaar Conservation Area, Nepal’s only blackbuck habitat.",
-    overview: "The Krishnasaar Conservation Area is the only place in Nepal where blackbuck live, on open grassland close to Bagaicha.",
-    highlights: ["Blackbuck"],
+    overview:
+      "Visit the Krishnasaar Conservation Area, Nepal’s only blackbuck habitat. The Krishnasaar Conservation Area is the only place in Nepal where blackbuck live, on open grassland close to Bagaicha.",
     nearby: "Blackbuck / Krishnasaar Conservation Area",
     sortOrder: 10,
   },
@@ -180,9 +162,8 @@ const EXPLORE_ACTIVITIES: ExploreActivity[] = [
     title: "Tharu village visit",
     group: "CLOSE_BY",
     category: "Culture",
-    summary: "Learn about Tharu culture and village life.",
-    overview: "The Tharu are the indigenous people of the Bardiya region, with a distinctive culture and village way of life.",
-    highlights: [],
+    overview:
+      "Learn about Tharu culture and village life. The Tharu are the indigenous people of the Bardiya region, with a distinctive culture and village way of life.",
     nearby: "Tharu village",
     sortOrder: 11,
   },
@@ -191,9 +172,8 @@ const EXPLORE_ACTIVITIES: ExploreActivity[] = [
     title: "Bardiya National Park jeep safari",
     group: "DAY_TRIP",
     category: "Safari",
-    summary: "Explore Bardiya National Park by jeep.",
-    overview: "Bardiya National Park is home to tigers, rhinos and elephants.",
-    highlights: ["Tigers", "Rhinos", "Elephants"],
+    overview:
+      "Explore Bardiya National Park by jeep. Bardiya National Park is home to tigers, rhinos and elephants.",
     nearby: "Bardiya National Park / Thakurdwara",
     sortOrder: 20,
   },
@@ -202,9 +182,8 @@ const EXPLORE_ACTIVITIES: ExploreActivity[] = [
     title: "Bardiya National Park jungle walk",
     group: "DAY_TRIP",
     category: "Safari",
-    summary: "Explore Bardiya National Park on foot.",
-    overview: "Bardiya National Park is home to tigers, rhinos and elephants.",
-    highlights: ["Tigers", "Rhinos", "Elephants"],
+    overview:
+      "Explore Bardiya National Park on foot. Bardiya National Park is home to tigers, rhinos and elephants.",
     nearby: "Bardiya National Park / Thakurdwara",
     sortOrder: 21,
   },
@@ -213,9 +192,8 @@ const EXPLORE_ACTIVITIES: ExploreActivity[] = [
     title: "Karnali river",
     group: "DAY_TRIP",
     category: "Nature",
-    summary: "Spend time by the Karnali river.",
-    overview: "The Karnali river is home to river dolphins and crocodiles.",
-    highlights: ["River dolphins", "Crocodiles"],
+    overview:
+      "Spend time by the Karnali river. The Karnali river is home to river dolphins and crocodiles.",
     nearby: "Karnali Bridge",
     sortOrder: 22,
   },
@@ -263,7 +241,7 @@ async function main() {
       note(`activity: ${a.title}`);
       if (apply)
         await db.activity.create({
-          data: { slug: a.slug, title: a.title, summary: a.summary, ...ACTIVITY_DETAILS(a.title), sortOrder: i, placeholderFields: a.flags },
+          data: { slug: a.slug, title: a.title, overview: a.overview, sortOrder: i, placeholderFields: a.flagged ? ["overview"] : [] },
         });
     }
 
@@ -333,9 +311,7 @@ async function main() {
         await db.activity.create({
           data: {
             ...fields,
-            ...exploreDetails(a.title.toLowerCase()),
             destinationId: await destId(nearby),
-            placeholderFields: [...PH_FIELDS],
           },
         });
       }
@@ -360,7 +336,7 @@ async function main() {
           where: { slug: "chill-pool" },
           data: {
             title: "Chill Pool & outdoor relaxation",
-            summary: `${pool.summary ?? ""} Slow down and explore the outdoors.`.trim(),
+            overview: `${pool.overview ?? ""} Slow down and explore the outdoors.`.trim(),
             sortOrder: 3,
           },
         });

@@ -96,6 +96,8 @@ export const getStayTerms = cached(loadStayTerms, "stay-terms");
 
 // ─── Activities, events, dining, FAQs, policies, nearby ─────────────────────
 
+const MAX_ACTIVITY_PHOTOS = 3;
+
 export type ActivityGroupKey = "AT_BAGAICHA" | "CLOSE_BY" | "DAY_TRIP";
 
 export type PublicActivity = {
@@ -104,20 +106,11 @@ export type PublicActivity = {
   title: string;
   group: ActivityGroupKey;
   category: string | null;
-  summary: string | null;
-  overview: string | null;
-  duration: string | null;
-  season: string | null;
-  bestTime: string | null;
-  bestFor: string[];
-  /** "What you might see" */
-  highlights: string[];
-  whatToExpect: string | null;
-  howWeHelp: string | null;
-  tip: string | null;
+  /** The single description paragraph. */
+  description: string | null;
   /** Distance and travel time come only from the linked nearby destination. */
   destination: { name: string; distance: string | null; travelTime: string | null; placeholder: boolean } | null;
-  /** Primary photo first, then the extras in order (flagged images are already filtered out). */
+  /** Primary photo first, then up to two extras in order (flagged images are already filtered out). */
   photos: PublicMedia[];
   /** The primary photo, for compact views. */
   cover: PublicMedia | null;
@@ -137,8 +130,7 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
   return rows
     .filter((r) => !hasPlaceholderIn(r, ["title"]) || showPlaceholders)
     .map((r) => {
-      const list = (field: "bestFor" | "highlights") => (r.placeholderFields.includes(field) && !showPlaceholders ? [] : r[field]);
-      const photos = shownMedia([...(r.coverMedia ? [r.coverMedia] : []), ...r.photos.map((p) => p.media)]);
+      const photos = shownMedia([...(r.coverMedia ? [r.coverMedia] : []), ...r.photos.map((p) => p.media)]).slice(0, MAX_ACTIVITY_PHOTOS);
       const d = r.destination;
       return {
         id: r.id,
@@ -146,16 +138,7 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
         title: r.title,
         group: r.group,
         category: liveValue<string>(r, "category"),
-        summary: liveValue<string>(r, "summary"),
-        overview: liveValue<string>(r, "overview"),
-        duration: liveValue<string>(r, "duration"),
-        season: liveValue<string>(r, "season"),
-        bestTime: liveValue<string>(r, "bestTime"),
-        bestFor: list("bestFor"),
-        highlights: list("highlights"),
-        whatToExpect: liveValue<string>(r, "whatToExpect"),
-        howWeHelp: liveValue<string>(r, "howWeHelp"),
-        tip: liveValue<string>(r, "tip"),
+        description: liveValue<string>(r, "overview"),
         destination: d
           ? {
               name: d.name,

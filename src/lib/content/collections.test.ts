@@ -6,9 +6,9 @@ const parse = (key: keyof typeof COLLECTIONS, data: Record<string, string>) => b
 describe("content schemas", () => {
   it("requires the title of an activity and turns blank optional fields into null", () => {
     expect(parse("activities", { title: "", group: "AT_BAGAICHA" }).success).toBe(false);
-    const ok = parse("activities", { title: "Birdwatching", group: "AT_BAGAICHA", summary: "  ", duration: "" });
+    const ok = parse("activities", { title: "Birdwatching", group: "AT_BAGAICHA", overview: "  ", category: "" });
     expect(ok.success).toBe(true);
-    if (ok.success) expect(ok.data).toMatchObject({ title: "Birdwatching", summary: null, duration: null, isActive: false });
+    if (ok.success) expect(ok.data).toMatchObject({ title: "Birdwatching", overview: null, category: null, isActive: false });
   });
 
   it("reads the visibility checkbox", () => {
@@ -45,19 +45,24 @@ describe("content schemas", () => {
     expect(parse("diningItems", { sectionId: "s1", name: "Thali", priceNpr: "-5" }).success).toBe(false);
   });
 
-  it("activities need a group, split best-for and highlights into lists, and link a destination", () => {
+  it("activities need a group, link a destination and only keep the simplified fields", () => {
     expect(parse("activities", { title: "Jeep safari", group: "SPACE" }).success).toBe(false);
     expect(parse("activities", { title: "Jeep safari" }).success).toBe(false);
     const ok = parse("activities", {
       title: "Jeep safari",
       group: "DAY_TRIP",
-      bestFor: "Families\nBirders",
-      highlights: "Tigers\n\nRhinos",
+      overview: "A day in the park.",
       destinationId: "abc123",
-      tip: "",
+      duration: "All day",
+      bestFor: "Families",
+      tip: "Bring a hat",
     });
     expect(ok.success).toBe(true);
-    if (ok.success) expect(ok.data).toMatchObject({ group: "DAY_TRIP", bestFor: ["Families", "Birders"], highlights: ["Tigers", "Rhinos"], destinationId: "abc123", tip: null });
+    if (ok.success) {
+      expect(ok.data).toMatchObject({ group: "DAY_TRIP", overview: "A day in the park.", destinationId: "abc123" });
+      for (const gone of ["summary", "duration", "season", "bestTime", "bestFor", "highlights", "whatToExpect", "howWeHelp", "tip"])
+        expect(ok.data).not.toHaveProperty(gone);
+    }
   });
 
   it("allows an activity with no linked destination", () => {
