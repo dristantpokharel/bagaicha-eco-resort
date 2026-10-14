@@ -7,6 +7,7 @@ import { BOOKING_STATUS_LABELS } from "./labels";
 import { canTransition } from "./status";
 import { nightsBetween } from "./dates";
 import { computeQuote } from "./pricing";
+import { markRoomDirtyAfterCheckout, markRoomOccupied } from "@/lib/housekeeping/room-status";
 
 type Tx = Prisma.TransactionClient;
 
@@ -72,6 +73,8 @@ export async function transitionLine(
   bookingId: string,
   to: BookingStatus,
   prepare?: (line: Line) => Promise<Prisma.BookingUncheckedUpdateManyInput>,
+  /** Who is acting; recorded with the room's status change on check-in and check-out. */
+  actorId: string | null = null,
 ): Promise<Line> {
   const peek = await tx.booking.findUnique({ where: { id: bookingId }, select: { reservationId: true } });
   if (!peek) throw new ActionError("That room no longer exists.");
@@ -87,6 +90,9 @@ export async function transitionLine(
   const updated = await tx.booking.updateMany({ where: { id: bookingId, status: line.status }, data: { ...data, status: to } });
   if (updated.count !== 1) throw new ActionError("Someone else just changed this room. Reload the page and try again.");
   await syncTotal(tx, line.reservationId);
+  // The room's housekeeping status follows the guests, in the same transaction.
+  if (line.roomId && to === "CHECKED_IN") await markRoomOccupied(tx, { roomId: line.roomId, bookingId, userId: actorId });
+  if (line.roomId && to === "CHECKED_OUT") await markRoomDirtyAfterCheckout(tx, { roomId: line.roomId, bookingId, userId: actorId });
   return line;
 }
 

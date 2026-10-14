@@ -443,7 +443,7 @@ export async function checkInLine(_prev: ActionResult | null, formData: FormData
         transitionLine(tx, bookingId, "CHECKED_IN", async (line) => {
           if (line.checkIn > todayInResort()) throw new ActionError(`Check-in opens on ${formatStayDate(line.checkIn)}.`);
           return { checkedInAt: new Date() };
-        }),
+        }, actor.id),
     });
     revalidateAdmin();
     return { ok: true, message: "Guests checked in." };
@@ -459,7 +459,7 @@ export async function checkOutLine(_prev: ActionResult | null, formData: FormDat
       actor,
       to: "CHECKED_OUT",
       action: "reservation.roomCheckedOut",
-      change: (tx) => transitionLine(tx, bookingId, "CHECKED_OUT", async () => ({ checkedOutAt: new Date() })),
+      change: (tx) => transitionLine(tx, bookingId, "CHECKED_OUT", async () => ({ checkedOutAt: new Date() }), actor.id),
     });
     revalidateAdmin();
     return { ok: true, message: "Guests checked out." };

@@ -33,9 +33,11 @@ export async function recordStockMovement(
     submissionId?: string;
     /** Reusable items only: which location an ADJUSTED count is for. Defaults to the Store. */
     locationId?: string;
+    /** The stay this belongs to (consumables placed in a room for a booking). */
+    bookingId?: string | null;
   },
 ) {
-  const { itemId, userId, type, amount, note, submissionId, locationId } = params;
+  const { itemId, userId, type, amount, note, submissionId, locationId, bookingId } = params;
   await lockItem(tx, itemId);
 
   if (submissionId) {
@@ -103,6 +105,7 @@ export async function recordStockMovement(
       submissionId,
       fromLocationId: fromLocation?.id,
       toLocationId: toLocation?.id,
+      bookingId: bookingId ?? null,
     },
   });
   await logActivity(tx, {
