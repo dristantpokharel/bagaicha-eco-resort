@@ -127,7 +127,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="flex items-center gap-2 border-b border-forest/10 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-forest/10 px-3 py-2">
         <Search aria-hidden="true" className="size-5 shrink-0 text-charcoal-light" />
         <input
           autoFocus
@@ -210,7 +210,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-      <p className="hidden border-t border-forest/10 px-3 py-1.5 text-xs text-charcoal-light md:block">
+      <p className="hidden shrink-0 border-t border-forest/10 px-3 py-1.5 text-xs text-charcoal-light md:block">
         ↑↓ to move · Enter to open · Esc to close
       </p>
     </>

@@ -113,7 +113,7 @@ export function PhoneTabBar({
       </nav>
 
       <Sheet open={moreOpen} onClose={() => setOpenAt(null)} label="More" placement="bottom">
-        <div className="overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="font-display text-lg text-forest">More</h2>
             <button type="button" onClick={() => setOpenAt(null)} className={`min-h-11 rounded-md px-3 text-sm text-forest ${focus}`}>

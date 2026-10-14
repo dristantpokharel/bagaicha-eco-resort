@@ -8,6 +8,9 @@ import { useEffect, useRef, type ReactNode } from "react";
  */
 type Placement = "bottom" | "full" | "palette";
 
+// The dialog itself is the flex column (only while open: a `display` class would otherwise beat the browser's
+// `dialog:not([open]) { display: none }` and leave an invisible, tap-blocking box on the page). Its children are
+// the flex items, so nothing relies on percentage heights inside an auto-height box, which Safari resolves to 0.
 const PLACEMENT: Record<Placement, string> = {
   bottom: "fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none rounded-t-xl",
   full: "fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none",
@@ -17,7 +20,8 @@ const PLACEMENT: Record<Placement, string> = {
 
 /**
  * A modal built on the native <dialog>: focus is trapped, the page behind is inert, Esc and the backdrop close
- * it. Children are only mounted while open, so their state resets on every opening.
+ * it. Children are only mounted while open, so their state resets on every opening. They are the dialog's flex
+ * items: give the part that scrolls `min-h-0 flex-1 overflow-y-auto`.
  */
 export function Sheet({
   open,
@@ -61,9 +65,9 @@ export function Sheet({
       onClose={onClose}
       // A click on the dialog element itself is a click on the backdrop; the content div fills the rest.
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className={`${PLACEMENT[placement]} overflow-hidden border-0 bg-white p-0 text-charcoal shadow-elevated backdrop:bg-black/40 ${className}`}
+      className={`${PLACEMENT[placement]} overflow-hidden border-0 bg-white p-0 text-charcoal shadow-elevated backdrop:bg-black/40 open:flex open:flex-col ${className}`}
     >
-      {open && <div className="flex h-full max-h-[inherit] min-h-0 flex-col">{children}</div>}
+      {open && children}
     </dialog>
   );
 }
