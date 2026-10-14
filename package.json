@@ -15,6 +15,7 @@
     "test:db:reservations": "RUN_DB_TESTS=1 vitest run src/lib/booking/reservation-migration.db.test.ts src/lib/booking/reservation.db.test.ts src/lib/booking/reservation-admin.db.test.ts src/lib/booking/reservation-submit.db.test.ts src/lib/booking/reservation-snapshot-migration.db.test.ts src/lib/booking/reservation-guest.db.test.ts src/lib/booking/tape-service.db.test.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:dryrun-migration": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs scripts/dryrun-migration.ts",
     "db:seed": "prisma db seed",
     "db:generate": "prisma generate",
     "media:seed-photos": "tsx scripts/seed-photos.ts",

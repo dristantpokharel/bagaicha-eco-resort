@@ -134,6 +134,7 @@ model User {
   stockMovements      StockMovement[]
   activityLogs        ActivityLog[]
   roomTasks           RoomTask[]
+  bookingExtras       BookingExtra[]
 
   @@map("users")
 }
@@ -320,6 +321,7 @@ model Booking {
 
   stockMovements StockMovement[]
   roomTasks      RoomTask[]
+  extras         BookingExtra[]
 
   @@index([status])
   @@index([checkIn, checkOut])
@@ -640,10 +642,11 @@ model InventoryItem {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  movements    StockMovement[]
-  balances     StockBalance[]
-  parLines     ParLine[]
-  parOverrides RoomParOverride[]
+  movements     StockMovement[]
+  balances      StockBalance[]
+  parLines      ParLine[]
+  bookingExtras BookingExtra[]
+  parOverrides  RoomParOverride[]
 
   @@index([category])
   @@map("inventory_items")
@@ -770,4 +773,26 @@ model RoomTask {
   @@unique([roomId, kind, cycle])
   @@index([bookingId])
   @@map("room_tasks")
+}
+
+/// Something extra put in a guest's room for one booking line (an extra blanket, a heater). `appliedAt` null =
+/// not yet in the room: it shows on the prep checklist and is applied when the room is prepped. Set = stock has
+/// moved (reusables Store → Room, consumables recorded as used) and it can no longer be removed here.
+model BookingExtra {
+  id        String    @id @default(cuid())
+  bookingId String
+  itemId    String
+  quantity  Decimal   @db.Decimal(10, 2)
+  note      String?
+  addedById String
+  createdAt DateTime  @default(now())
+  appliedAt DateTime?
+
+  booking Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  item    InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  addedBy User          @relation(fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([itemId])
+  @@map("booking_extras")
 }
