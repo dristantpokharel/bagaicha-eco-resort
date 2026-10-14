@@ -26,13 +26,18 @@ export function NewBookingForm({
   roomTypes,
   defaultCountryCode,
   childUnderAge,
+  initial,
 }: {
   roomTypes: RoomTypeOption[];
   defaultCountryCode: string;
   childUnderAge: number;
+  /** Prefill from the tape chart: the clicked room and the selected nights. */
+  initial?: { roomTypeId?: string; roomId?: string; checkIn?: string; checkOut?: string };
 }) {
   const [result, action, pending] = useActionState<ActionResult | null, FormData>(createManualBooking, null);
-  const [rows, setRows] = useState<Row[]>(() => [blankRow("row-0", roomTypes[0]?.id ?? "")]);
+  const [rows, setRows] = useState<Row[]>(() => [
+    { ...blankRow("row-0", initial?.roomTypeId ?? roomTypes[0]?.id ?? ""), roomId: initial?.roomId ?? "" },
+  ]);
   const rowCount = useRef(1);
   const update = (key: string, patch: Partial<Row>) => setRows((all) => all.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const errors = result && !result.ok ? result.fieldErrors : undefined;
@@ -49,10 +54,10 @@ export function NewBookingForm({
         <legend className="px-1 font-display text-lg text-forest">Stay</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="new-checkIn" label="Check-in" error={errors?.checkIn}>
-            <Input id="new-checkIn" name="checkIn" type="date" required {...a11y("checkIn")} />
+            <Input id="new-checkIn" name="checkIn" type="date" required defaultValue={initial?.checkIn} {...a11y("checkIn")} />
           </Field>
           <Field id="new-checkOut" label="Check-out" error={errors?.checkOut}>
-            <Input id="new-checkOut" name="checkOut" type="date" required {...a11y("checkOut")} />
+            <Input id="new-checkOut" name="checkOut" type="date" required defaultValue={initial?.checkOut} {...a11y("checkOut")} />
           </Field>
         </div>
       </fieldset>

@@ -4,14 +4,17 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 /**
  * How the dialog sits: a sheet from the bottom edge, the whole screen, or (on phones the whole screen, from
- * `md` up) a centred panel near the top, like a command palette.
+ * `md` up) a centred panel near the top, like a command palette. "dialog" is a bottom sheet on phones and a
+ * centred box from `md` up (confirmations).
  */
-type Placement = "bottom" | "full" | "palette";
+type Placement = "bottom" | "full" | "palette" | "dialog";
 
 // The dialog itself is the flex column (only while open: a `display` class would otherwise beat the browser's
 // `dialog:not([open]) { display: none }` and leave an invisible, tap-blocking box on the page). Its children are
 // the flex items, so nothing relies on percentage heights inside an auto-height box, which Safari resolves to 0.
 const PLACEMENT: Record<Placement, string> = {
+  dialog:
+    "fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none rounded-t-xl md:top-[12vh] md:bottom-auto md:mx-auto md:max-w-md md:rounded-lg",
   bottom: "fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none rounded-t-xl",
   full: "fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none",
   palette:
@@ -40,11 +43,15 @@ export function Sheet({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const openedAt = useRef(0);
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      openedAt.current = Date.now();
+      dialog.showModal();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -63,8 +70,10 @@ export function Sheet({
       ref={ref}
       aria-label={label}
       onClose={onClose}
-      // A click on the dialog element itself is a click on the backdrop; the content div fills the rest.
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      // A click on the dialog element itself is a click on the backdrop; the content fills the rest. A tap that
+      // opened the sheet (e.g. on a chart cell) is followed by its own click, which lands on the new backdrop:
+      // ignore clicks in the first moments so the sheet doesn't close the instant it opens.
+      onClick={(e) => e.target === e.currentTarget && Date.now() - openedAt.current > 400 && onClose()}
       className={`${PLACEMENT[placement]} overflow-hidden border-0 bg-white p-0 text-charcoal shadow-elevated backdrop:bg-black/40 open:flex open:flex-col ${className}`}
     >
       {open && children}
