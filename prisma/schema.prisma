@@ -89,6 +89,18 @@ enum StockLocationKind {
   ROOM
 }
 
+enum RoomStatus {
+  DIRTY
+  READY
+  OCCUPIED
+  OUT_OF_ORDER
+}
+
+enum RoomTaskKind {
+  PREP
+  INSPECTION
+}
+
 enum StockMovementType {
   RECEIVED
   USED
@@ -121,6 +133,7 @@ model User {
   roomBlocks          RoomBlock[]
   stockMovements      StockMovement[]
   activityLogs        ActivityLog[]
+  roomTasks           RoomTask[]
 
   @@map("users")
 }
@@ -170,23 +183,35 @@ model RoomType {
   rooms    Room[]
   bookings Booking[]
   media    RoomTypeMedia[]
+  parLines ParLine[]
 
   @@map("room_types")
 }
 
 model Room {
-  id         String   @id @default(cuid())
-  roomTypeId String
+  id               String     @id @default(cuid())
+  roomTypeId       String
   /// Room name or number as shown to staff.
-  name       String
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  name             String
+  isActive         Boolean    @default(true)
+  /// Housekeeping state. Changes only through src/lib/housekeeping (check-in/out, checklists, manual change).
+  status           RoomStatus @default(READY)
+  /// Why the room is out of order (required for OUT_OF_ORDER).
+  statusNote       String?
+  statusChangedAt  DateTime   @default(now())
+  /// Bumped every time the room becomes DIRTY. A checklist belongs to one cycle, so it can be completed only once.
+  dirtyCycle       Int        @default(0)
+  /// The checked-out booking whose inspection is still to do; null once inspected or when the room isn't DIRTY.
+  inspectBookingId String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  roomType      RoomType       @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  roomType      RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
   bookings      Booking[]
   blocks        RoomBlock[]
   stockLocation StockLocation?
+  parOverrides  RoomParOverride[]
+  tasks         RoomTask[]
 
   @@unique([roomTypeId, name])
   @@map("rooms")
@@ -294,6 +319,7 @@ model Booking {
   room        Room?       @relation(fields: [roomId], references: [id], onDelete: Restrict)
 
   stockMovements StockMovement[]
+  roomTasks      RoomTask[]
 
   @@index([status])
   @@index([checkIn, checkOut])
@@ -614,8 +640,10 @@ model InventoryItem {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  movements StockMovement[]
-  balances  StockBalance[]
+  movements    StockMovement[]
+  balances     StockBalance[]
+  parLines     ParLine[]
+  parOverrides RoomParOverride[]
 
   @@index([category])
   @@map("inventory_items")
@@ -684,4 +712,62 @@ model StockBalance {
   @@id([itemId, locationId])
   @@index([locationId])
   @@map("stock_balances")
+}
+
+// ─── Housekeeping ────────────────────────────────────────────────────────────
+
+/// How many of an item every room of a type should hold.
+model ParLine {
+  roomTypeId String
+  itemId     String
+  quantity   Decimal  @db.Decimal(10, 2)
+  updatedAt  DateTime @updatedAt
+
+  roomType RoomType      @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@id([roomTypeId, itemId])
+  @@index([itemId])
+  @@map("par_lines")
+}
+
+/// A one-off change to a room's par: replaces the type's quantity for the item (0 = none), or adds an item.
+model RoomParOverride {
+  roomId    String
+  itemId    String
+  quantity  Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+
+  room Room          @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@id([roomId, itemId])
+  @@index([itemId])
+  @@map("room_par_overrides")
+}
+
+/// A completed prep or inspection. The unique key (one per room, kind and dirty cycle) is what stops two people
+/// completing the same checklist; the row is also the record of what was done and what was short.
+model RoomTask {
+  id            String       @id @default(cuid())
+  roomId        String
+  kind          RoomTaskKind
+  /// Room.dirtyCycle when the checklist was completed.
+  cycle         Int
+  /// The arrival a prep was done for, or the stay an inspection was of.
+  bookingId     String?
+  completedById String
+  completedAt   DateTime     @default(now())
+  /// What was placed / counted, per item.
+  lines         Json
+  /// Items the store couldn't cover (prep) or that were missing (inspection); null when none.
+  shortfalls    Json?
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  completedBy User     @relation(fields: [completedById], references: [id], onDelete: Restrict)
+
+  @@unique([roomId, kind, cycle])
+  @@index([bookingId])
+  @@map("room_tasks")
 }
