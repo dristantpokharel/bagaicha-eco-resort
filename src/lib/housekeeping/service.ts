@@ -102,7 +102,11 @@ export async function loadPrepChecklist(tx: Tx, roomId: string, options: { lock?
     }),
   ]);
   const par = resolvePar(typePar, overrides);
-  const itemIds = [...par.keys()];
+  // Extras added for the linked booking before the room was prepared: they go on this checklist.
+  const pending = booking ? await tx.bookingExtra.findMany({ where: { bookingId: booking.id, appliedAt: null }, select: { itemId: true, quantity: true } }) : [];
+  const extras = new Map<string, Prisma.Decimal>();
+  for (const e of pending) extras.set(e.itemId, (extras.get(e.itemId) ?? toDecimal(0)).plus(e.quantity));
+  const itemIds = [...new Set([...par.keys(), ...extras.keys()])];
   if (options.lock) await lockItemsInOrder(tx, itemIds);
 
   const [itemRows, roomBalances, store] = await Promise.all([
@@ -122,6 +126,7 @@ export async function loadPrepChecklist(tx: Tx, roomId: string, options: { lock?
 
   const lines = buildPrepLines({
     par,
+    extras,
     items,
     inRoom: new Map(roomBalances.map((b) => [b.itemId, b.quantity])),
     available,
@@ -191,6 +196,12 @@ export async function completePrep(
     } else {
       await transferStock(tx, { itemId: line.itemId, userId, fromLocationId: store.id, toLocationId: room.locationId, amount: line.placed, note, bookingId });
     }
+  }
+
+  // Every pending extra whose line was on the checklist has now been dealt with (placed, or short and flagged).
+  if (bookingId) {
+    const answered = plan.lines.map((l) => l.itemId);
+    await tx.bookingExtra.updateMany({ where: { bookingId, appliedAt: null, itemId: { in: answered } }, data: { appliedAt: new Date() } });
   }
 
   await tx.roomTask.create({

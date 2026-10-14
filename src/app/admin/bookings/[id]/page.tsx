@@ -19,6 +19,7 @@ import { ReservationStatusBadge } from "@/components/admin/status-badge";
 import { FormMessage } from "@/components/ui/form";
 import { GuestDiffersNotice } from "./guest-differs-notice";
 import { checkInWarning } from "@/lib/housekeeping/status";
+import { formatQuantityWithUnit } from "@/lib/inventory/format";
 import { LineCard, type LineView } from "./line-card";
 import { ReservationActions } from "./reservation-actions";
 import { ReservationEditForm } from "./reservation-edit-form";
@@ -47,7 +48,11 @@ export default async function ReservationPage({
       guest: true,
       createdBy: { select: { name: true } },
       bookings: {
-        include: { roomType: true, room: true },
+        include: {
+          roomType: true,
+          room: true,
+          extras: { orderBy: { createdAt: "asc" }, select: { id: true, quantity: true, note: true, appliedAt: true, item: { select: { name: true, unit: true } } } },
+        },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       },
     },
@@ -60,7 +65,8 @@ export default async function ReservationPage({
   const dateFlags = reservationDateFlags(reservation.bookings.map((b) => b.status));
   const nights = nightsBetween(reservation.checkIn, reservation.checkOut);
 
-  const [freeByLine, roomTypes, history] = await Promise.all([
+  const canExtras = can(user.role, "housekeeping.work");
+  const [freeByLine, roomTypes, history, extraItemRows] = await Promise.all([
     Promise.all(
       reservation.bookings.map(async (b) => {
         const f = editableFlags(b.status);
@@ -81,6 +87,9 @@ export default async function ReservationPage({
           take: 50,
           select: { id: true, action: true, createdAt: true, user: { select: { name: true } } },
         })
+      : Promise.resolve([]),
+    canExtras
+      ? db.inventoryItem.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, unit: true, isConsumable: true } })
       : Promise.resolve([]),
   ]);
 
@@ -109,6 +118,12 @@ export default async function ReservationPage({
       totalLabel: `Room total: ${formatNpr(b.totalPriceNpr)}`,
       cancellationReason: b.cancellationReason,
       flags: { party: flags.party, roomType: flags.roomType, room: flags.room },
+      extras: b.extras.map((e) => ({
+        id: e.id,
+        label: `${formatQuantityWithUnit(e.quantity.toString(), e.item.unit)} ${e.item.name}`,
+        note: e.note,
+        placed: e.appliedAt !== null,
+      })),
       rooms: freeByLine[i],
     };
   });
@@ -183,7 +198,7 @@ export default async function ReservationPage({
           <Card title={`Rooms (${reservation.bookings.length})`}>
             <ul className="-mx-5 divide-y divide-forest/10 border-y border-forest/10">
               {views.map((line) => (
-                <LineCard key={`${line.id}-${reservation.updatedAt.toISOString()}`} line={line} roomTypes={roomTypes} canCancel={can(user.role, "bookings.cancel")} checkInOpensOn={checkInOpensOn} childUnderAge={terms.childUnderAge} />
+                <LineCard key={`${line.id}-${reservation.updatedAt.toISOString()}`} line={line} roomTypes={roomTypes} canCancel={can(user.role, "bookings.cancel")} checkInOpensOn={checkInOpensOn} childUnderAge={terms.childUnderAge} extraItems={canExtras && (line.status === "CONFIRMED" || line.status === "CHECKED_IN") ? extraItemRows : null} />
               ))}
             </ul>
             <p className="mt-4 text-base font-semibold text-charcoal">

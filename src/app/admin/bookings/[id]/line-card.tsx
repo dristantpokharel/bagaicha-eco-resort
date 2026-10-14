@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import type { ActionResult } from "@/lib/actions";
 import type { BookingStatus } from "@/generated/prisma/enums";
 import type { EditableFlags } from "@/lib/booking/status";
+import { ExtrasPanel, type ExtraItemOption, type ExtraView } from "./extras-panel";
 import { cancelLine, checkInLine, checkOutLine, confirmLine, updateBookingLine } from "../actions";
 
 export type LineView = {
@@ -27,6 +28,7 @@ export type LineView = {
   totalLabel: string;
   cancellationReason: string | null;
   flags: Pick<EditableFlags, "party" | "roomType" | "room">;
+  extras: ExtraView[];
   /** Free rooms of this line's type for the stay (to confirm into, or move a confirmed room to). */
   rooms: { id: string; name: string }[];
 };
@@ -40,6 +42,7 @@ export function LineCard({
   canCancel,
   checkInOpensOn,
   childUnderAge,
+  extraItems,
 }: {
   line: LineView;
   roomTypes: { id: string; name: string }[];
@@ -47,6 +50,8 @@ export function LineCard({
   /** Set (formatted) while check-in is still in the future. */
   checkInOpensOn: string | null;
   childUnderAge: number;
+  /** Items staff can add as extras; null when this role or this stay can't add them. */
+  extraItems: ExtraItemOption[] | null;
 }) {
   const [message, setMessage] = useState<ActionResult | null>(null);
   const [askingCheckIn, setAskingCheckIn] = useState(false);
@@ -190,6 +195,8 @@ export function LineCard({
         </form>
       )}
       {cancellable && !canCancel && <p className="text-xs text-charcoal-light">Only an Admin can cancel rooms.</p>}
+
+      {(line.extras.length > 0 || extraItems) && <ExtrasPanel bookingId={line.id} extras={line.extras} items={extraItems} />}
 
       {editing && editable && (
         <form action={editAction} className="grid gap-3 border-t border-forest/10 pt-3 sm:grid-cols-2" noValidate>

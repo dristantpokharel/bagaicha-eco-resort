@@ -50,3 +50,21 @@ export function inspectionEntries(formData: FormData): Record<string, Inspection
 export const saveParSchema = z
   .object({ roomTypeId: id.optional(), roomId: id.optional() })
   .refine((v) => Boolean(v.roomTypeId) !== Boolean(v.roomId), { error: "Choose a room type or a room." });
+
+export const addExtraSchema = z.object({
+  bookingId: id,
+  itemId: z.string().trim().min(1, { error: "Choose an item." }).max(64),
+  quantity: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter how many." })
+    .regex(/^\d{1,6}(\.\d{1,2})?$/, { error: "Enter a number, like 1 or 2.5." }),
+  note: z
+    .string()
+    .trim()
+    .max(200, { error: "At most 200 characters." })
+    .optional()
+    .transform((value) => value || null),
+});
+
+export const removeExtraSchema = z.object({ extraId: id });

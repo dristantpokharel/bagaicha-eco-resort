@@ -17,6 +17,7 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
   let db: typeof import("@/lib/db").db;
   let svc: typeof import("./service");
   let status: typeof import("./room-status");
+  let extras: typeof import("./extras-service");
   let reservations: typeof import("@/lib/booking/reservation-service");
   let locations: typeof import("@/lib/inventory/locations");
   let todayInResort: typeof import("@/lib/dates").todayInResort;
@@ -136,6 +137,7 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
     ({ db } = await import("@/lib/db"));
     svc = await import("./service");
     status = await import("./room-status");
+    extras = await import("./extras-service");
     reservations = await import("@/lib/booking/reservation-service");
     locations = await import("@/lib/inventory/locations");
     ({ todayInResort } = await import("@/lib/dates"));
@@ -306,6 +308,112 @@ describe.skipIf(!enabled)("housekeeping against the database", { timeout: 120_00
       await expect(svc.skipInspection(tx, { roomId: f.room.id, cycle, userId: f.other.id, reason: "again" })).rejects.toThrow(/already finished/);
       await prep(tx, f, { quantities: { [f.kettle.id]: "1", [f.soap.id]: "2" } });
       expect((await roomOf(tx, f)).status).toBe("READY");
+    });
+  });
+
+  describe("booking extras", () => {
+    const add = (tx: Tx, f: Fixtures, itemId: string, quantity = "1", user = f.user) =>
+      extras.addExtra(tx, { bookingId: f.booking.id, itemId, quantity, note: null, userId: user.id });
+    const movesFor = (tx: Tx, f: Fixtures, itemId: string) => tx.stockMovement.findMany({ where: { itemId, bookingId: f.booking.id } });
+
+    it("a Ready room gets the extra at once: reusables Store → Room, consumables recorded as used, both against the booking", async () => {
+      await inRollback(async (tx, f) => {
+        expect((await add(tx, f, f.towel.id)).timing).toBe("NOW");
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("1");
+        expect(await balance(tx, f.towel.id, f.store.id)).toBe("4");
+        expect(await movesFor(tx, f, f.towel.id)).toHaveLength(1);
+
+        await add(tx, f, f.soap.id, "2");
+        expect((await tx.inventoryItem.findUniqueOrThrow({ where: { id: f.soap.id } })).quantity.toString()).toBe("8");
+        expect(await movesFor(tx, f, f.soap.id)).toMatchObject([{ type: "USED" }]);
+
+        const rows = await tx.bookingExtra.findMany({ where: { bookingId: f.booking.id } });
+        expect(rows.every((r) => r.appliedAt !== null)).toBe(true);
+        const log = await tx.activityLog.findMany({ where: { entityId: f.booking.id, action: "booking.extraAdded" } });
+        expect(log).toHaveLength(2);
+      });
+    });
+
+    it("a Dirty room only stores the extra; it appears on the prep checklist and is applied when the room is prepped", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        expect((await add(tx, f, f.towel.id)).timing).toBe("LATER");
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("0");
+        expect(await movesFor(tx, f, f.towel.id)).toHaveLength(0);
+
+        const checklist = await svc.loadPrepChecklist(tx, f.room.id);
+        expect(checklist.lines.find((l) => l.itemId === f.towel.id)).toMatchObject({ par: "2", extra: "1", need: "3" });
+
+        await prep(tx, f, { quantities: { [f.towel.id]: "3", [f.kettle.id]: "1", [f.soap.id]: "2" } });
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("3");
+        const extra = await tx.bookingExtra.findFirstOrThrow({ where: { bookingId: f.booking.id } });
+        expect(extra.appliedAt).not.toBeNull();
+      });
+    });
+
+    it("an extra added after the room is Ready is applied immediately, on top of what prep placed", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        await prep(tx, f);
+        expect((await add(tx, f, f.towel.id, "2")).timing).toBe("NOW");
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("4");
+      });
+    });
+
+    it("a pending extra can be removed; an applied one cannot, and the refusal moves nothing", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        await add(tx, f, f.towel.id);
+        const pending = await tx.bookingExtra.findFirstOrThrow({ where: { bookingId: f.booking.id } });
+        await extras.removeExtra(tx, { extraId: pending.id, userId: f.user.id });
+        expect(await tx.bookingExtra.count({ where: { bookingId: f.booking.id } })).toBe(0);
+        expect(await tx.activityLog.count({ where: { entityId: f.booking.id, action: "booking.extraRemoved" } })).toBe(1);
+        await expect(extras.removeExtra(tx, { extraId: pending.id, userId: f.user.id })).rejects.toThrow(/already removed/);
+
+        await add(tx, f, f.towel.id);
+        await prep(tx, f, { quantities: { [f.towel.id]: "3", [f.kettle.id]: "1", [f.soap.id]: "2" } });
+        const applied = await tx.bookingExtra.findFirstOrThrow({ where: { bookingId: f.booking.id } });
+        await expect(extras.removeExtra(tx, { extraId: applied.id, userId: f.user.id })).rejects.toThrow(/already in the room/);
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("3");
+      });
+    });
+
+    it("an extra during the stay is applied at once and is expected back at the checkout inspection", async () => {
+      await inRollback(async (tx, f) => {
+        await dirty(tx, f);
+        await prep(tx, f);
+        await checkIn(tx, f);
+        expect((await add(tx, f, f.towel.id)).timing).toBe("NOW");
+        await checkOut(tx, f);
+        const checklist = await svc.loadInspectionChecklist(tx, f.room.id);
+        expect(checklist.lines.find((l) => l.itemId === f.towel.id)?.expected).toBe("3");
+      });
+    });
+
+    it("refuses when the store can't cover it, and leaves no extra behind", async () => {
+      await inRollback(async (tx, f) => {
+        await expect(add(tx, f, f.towel.id, "6")).rejects.toThrow(/Only 5/);
+        expect(await tx.bookingExtra.count({ where: { bookingId: f.booking.id } })).toBe(0);
+        expect(await balance(tx, f.towel.id, f.roomLoc.id)).toBe("0");
+      });
+    });
+
+    it("refuses a stay that has ended or was cancelled, and archived items", async () => {
+      await inRollback(async (tx, f) => {
+        await tx.inventoryItem.update({ where: { id: f.soap.id }, data: { isActive: false } });
+        await expect(add(tx, f, f.soap.id)).rejects.toThrow(/archived/);
+        await tx.booking.update({ where: { id: f.booking.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+        await expect(add(tx, f, f.towel.id)).rejects.toThrow(/ended or been cancelled/);
+      });
+    });
+
+    it("the database refuses a zero or negative extra", async () => {
+      await inRollback(async (tx, f) => {
+        const error = await rejected(tx, () =>
+          tx.bookingExtra.create({ data: { bookingId: f.booking.id, itemId: f.towel.id, quantity: "0", addedById: f.user.id } }),
+        );
+        expect(error).not.toBeNull();
+      });
     });
   });
 

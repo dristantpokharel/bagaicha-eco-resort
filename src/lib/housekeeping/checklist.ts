@@ -12,8 +12,10 @@ export type PrepLine = {
   name: string;
   unit: string;
   isConsumable: boolean;
-  /** What the room should hold. */
+  /** The par list's share of what the room should hold. */
   par: string;
+  /** Booking extras added on top of par (0 when none). */
+  extra: string;
   /** Reusables already in the room (always 0 for consumables: they aren't tracked by room). */
   inRoom: string;
   /** What to place: par minus what is there (consumables: the full par). The most the staff can place. */
@@ -36,20 +38,22 @@ export function buildPrepLines(params: {
   const wanted = new Map<string, Decimal>();
   for (const [itemId, quantity] of params.par) wanted.set(itemId, toDecimal(quantity));
   for (const [itemId, quantity] of params.extras ?? []) wanted.set(itemId, (wanted.get(itemId) ?? toDecimal(0)).plus(quantity));
+  const extraOf = (itemId: string) => toDecimal(params.extras?.get(itemId) ?? 0);
 
   const lines: PrepLine[] = [];
-  for (const [itemId, par] of wanted) {
+  for (const [itemId, total] of wanted) {
     const item = params.items.get(itemId);
     if (!item?.isActive) continue;
     const inRoom = item.isConsumable ? toDecimal(0) : toDecimal(params.inRoom.get(itemId) ?? 0);
-    const need = atLeastZero(par.minus(inRoom));
+    const need = atLeastZero(total.minus(inRoom));
     if (need.isZero()) continue;
     lines.push({
       itemId,
       name: item.name,
       unit: item.unit,
       isConsumable: item.isConsumable,
-      par: par.toString(),
+      par: total.minus(extraOf(itemId)).toString(),
+      extra: extraOf(itemId).toString(),
       inRoom: inRoom.toString(),
       need: need.toString(),
       available: toDecimal(params.available.get(itemId) ?? 0).toString(),

@@ -65,8 +65,8 @@ export function PrepForm({ roomId, cycle, lines, blocked }: { roomId: string; cy
                     <span className="block text-base">{line.name}</span>
                     <span className="block text-xs text-charcoal-light">
                       {line.isConsumable
-                        ? `Place ${formatQuantityWithUnit(line.need, line.unit)}`
-                        : `Need ${formatQuantityWithUnit(line.need, line.unit)} (par ${line.par}, ${line.inRoom} there)`}
+                        ? `Place ${formatQuantityWithUnit(line.need, line.unit)}${Number(line.extra) > 0 ? ` (includes ${line.extra} extra for this booking)` : ""}`
+                        : `Need ${formatQuantityWithUnit(line.need, line.unit)} (par ${line.par}${Number(line.extra) > 0 ? ` + ${line.extra} extra for this booking` : ""}, ${line.inRoom} there)`}
                     </span>
                     {(short || Number(line.available) < Number(line.need)) && (
                       <span className="block text-xs font-medium text-warning">Store has {formatQuantityWithUnit(line.available, line.unit)}</span>
