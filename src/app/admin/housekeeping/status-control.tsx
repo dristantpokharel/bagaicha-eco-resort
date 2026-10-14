@@ -6,7 +6,7 @@ import { ActionMessage } from "@/components/ui/action-message";
 import { Input, Select } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/actions";
 import type { RoomStatus } from "@/generated/prisma/enums";
-import { MANUAL_STATUSES, OUT_OF_ORDER_HINT, ROOM_STATUS_LABELS } from "@/lib/housekeeping/status";
+import { MANUAL_STATUSES, OUT_OF_ORDER_HINT, ROOM_STATUS_LABELS } from "@/lib/housekeeping/labels";
 import { setRoomStatusAction } from "./actions";
 
 /** Change a room's status by hand. Out of order needs a note and shows a hint about blocking dates. */

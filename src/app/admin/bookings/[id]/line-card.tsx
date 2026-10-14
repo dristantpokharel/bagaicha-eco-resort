@@ -18,6 +18,8 @@ export type LineView = {
   roomTypeName: string;
   roomId: string | null;
   roomName: string | null;
+  /** Set when the room isn't Ready: shown (and confirmed) before checking in. Never blocks. */
+  checkInWarning: string | null;
   adults: number;
   children: number;
   guestsLabel: string;
@@ -47,6 +49,7 @@ export function LineCard({
   childUnderAge: number;
 }) {
   const [message, setMessage] = useState<ActionResult | null>(null);
+  const [askingCheckIn, setAskingCheckIn] = useState(false);
   const wrap = (fn: ServerAction): ServerAction => async (prev, formData) => {
     const result = await fn(prev, formData);
     setMessage(result);
@@ -123,9 +126,27 @@ export function LineCard({
       {status === "CONFIRMED" && (
         <form action={checkInAction}>
           <input type="hidden" name="bookingId" value={line.id} />
-          <Button type="submit" disabled={checkingIn || checkInOpensOn !== null}>
-            {checkingIn ? "Checking in…" : "Check in"}
-          </Button>
+          {askingCheckIn && line.checkInWarning ? (
+            <div className="max-w-sm space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3" role="alert">
+              <p className="text-sm text-charcoal">{line.checkInWarning}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={checkingIn} className="min-h-11">
+                  {checkingIn ? "Checking in…" : "Check in anyway"}
+                </Button>
+                <Button type="button" variant="secondary" className="min-h-11" onClick={() => setAskingCheckIn(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type={line.checkInWarning ? "button" : "submit"}
+              disabled={checkingIn || checkInOpensOn !== null}
+              onClick={line.checkInWarning ? () => setAskingCheckIn(true) : undefined}
+            >
+              {checkingIn ? "Checking in…" : "Check in"}
+            </Button>
+          )}
           {checkInOpensOn && <p className="mt-1 text-xs text-charcoal-light">Check-in opens on {checkInOpensOn}.</p>}
         </form>
       )}

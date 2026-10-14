@@ -19,7 +19,8 @@ import {
   type PrepPlan,
 } from "./checklist";
 import { resolvePar } from "./par";
-import { roomTodo, ROOM_STATUS_LABELS } from "./status";
+import { ROOM_STATUS_LABELS } from "./labels";
+import { roomTodo } from "./status";
 
 type Tx = Prisma.TransactionClient;
 

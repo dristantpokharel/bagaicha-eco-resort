@@ -31,7 +31,7 @@ export default async function BookingCalendarPage({ searchParams }: { searchPara
   const [roomTypes, bookings, blocks] = await Promise.all([
     db.roomType.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, rooms: { orderBy: { name: "asc" }, select: { id: true, name: true, isActive: true } } },
+      select: { id: true, name: true, rooms: { orderBy: { name: "asc" }, select: { id: true, name: true, isActive: true, status: true } } },
     }),
     db.booking.findMany({
       where: { status: { in: ["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] }, checkIn: { lt: range.end }, checkOut: { gt: range.start } },

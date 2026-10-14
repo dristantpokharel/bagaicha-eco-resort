@@ -6,6 +6,11 @@ import { loadToday, type TodayLine, type TodayReservation } from "@/lib/admin/to
 import { parseDateOnly } from "@/lib/booking/dates";
 import { listLowStockItems } from "@/lib/inventory/queries";
 import { formatQuantityWithUnit } from "@/lib/inventory/stock";
+import { loadBoard } from "@/lib/housekeeping/queries";
+import { todayHousekeeping } from "@/lib/housekeeping/board";
+import { checkInWarning } from "@/lib/housekeeping/status";
+import { ROOM_STATUS_LABELS } from "@/lib/housekeeping/labels";
+import { RoomStatusBadge } from "@/components/admin/room-status-badge";
 import { listPlaceholders } from "@/lib/content/placeholder-report";
 import { summariseRooms } from "@/lib/booking/multi-room";
 import { formatShortDate } from "@/lib/booking/dates";
@@ -28,13 +33,16 @@ export default async function TodayPage() {
   const canStatus = can(user.role, "bookings.changeStatus");
   const canEnquiries = can(user.role, "enquiries.manage");
   const canInventory = can(user.role, "inventory.recordMovements");
+  const canHousekeeping = can(user.role, "housekeeping.work");
 
-  const [today, lowStock, newEnquiries, placeholders] = await Promise.all([
+  const [today, lowStock, newEnquiries, placeholders, board] = await Promise.all([
     loadToday(db, user.role),
     canInventory ? listLowStockItems() : [],
     canEnquiries ? db.enquiry.count({ where: { status: "NEW" } }) : 0,
     can(user.role, "content.manage") ? listPlaceholders() : null,
+    canHousekeeping ? loadBoard(db) : [],
   ]);
+  const housekeeping = todayHousekeeping(board);
   const dateLabel = formatInTimeZone(parseDateOnly(today.date)!, "UTC", "EEEE, d MMMM yyyy");
   const arrivalsToDo = today.arrivals.filter((r) => r.lines.some((l) => l.status !== "CHECKED_IN")).length;
   const departuresToDo = today.departures.filter((r) => r.lines.some((l) => l.status === "CHECKED_IN")).length;
@@ -75,7 +83,9 @@ export default async function TodayPage() {
                   <ul className="mt-2 space-y-2">
                     {r.lines.map((l) => (
                       <LineItem key={l.id} line={l}>
-                        {canStatus && l.status === "CONFIRMED" && <CheckInButton bookingIds={[l.id]} room={lineName(l)} />}
+                        {canStatus && l.status === "CONFIRMED" && (
+                          <CheckInButton bookingIds={[l.id]} room={lineName(l)} warning={l.roomStatus ? roomWarning(l) : undefined} />
+                        )}
                         {canStatus && l.status === "PENDING" && (
                           <AssignConfirm bookingId={l.id} rooms={today.freeRooms[l.id] ?? []} typeName={l.roomTypeName} />
                         )}
@@ -84,7 +94,7 @@ export default async function TodayPage() {
                   </ul>
                   {canStatus && confirmed.length > 1 && (
                     <div className="mt-2">
-                      <CheckInButton bookingIds={confirmed.map((l) => l.id)} all />
+                      <CheckInButton bookingIds={confirmed.map((l) => l.id)} all warning={allWarning(confirmed)} />
                     </div>
                   )}
                 </Row>
@@ -171,6 +181,55 @@ export default async function TodayPage() {
         </div>
       )}
 
+      {canHousekeeping && (
+        <div className="mt-4 grid gap-4 lg:mt-6 lg:grid-cols-2 lg:gap-6">
+          <Section
+            title="Rooms to prep for today's arrivals"
+            count={housekeeping.toPrep.length}
+            empty="No arriving room needs preparing."
+            footer={
+              <Link href="/admin/housekeeping" className="text-forest underline underline-offset-4">
+                Open housekeeping
+              </Link>
+            }
+          >
+            {housekeeping.toPrep.map((room) => (
+              <li key={room.id} className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                <span>
+                  <span className="font-medium">{room.name}</span> <RoomStatusBadge status={room.status} />
+                  <span className="block text-xs text-charcoal-light">
+                    {room.arrivalToday?.guestName}
+                    {room.status === "OUT_OF_ORDER" ? " · out of order" : room.todo === "INSPECT" ? " · inspect first" : ""}
+                  </span>
+                </span>
+                {room.todo && (
+                  <Link href={`/admin/housekeeping/rooms/${room.id}/${room.todo === "INSPECT" ? "inspect" : "prep"}`} className={buttonClasses({ size: "md", className: "min-h-11" })}>
+                    {room.todo === "INSPECT" ? "Inspect" : "Prep"}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </Section>
+
+          <Section title="Rooms to inspect" count={housekeeping.toInspect.length} empty="No checked-out room is waiting to be inspected.">
+            {housekeeping.toInspect.map((room) => (
+              <li key={room.id} className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                <span>
+                  <span className="font-medium">{room.name}</span>
+                  <span className="block text-xs text-charcoal-light">
+                    {room.departureToday ? `${room.departureToday.guestName} left today` : "Checked out"}
+                    {room.arrivalToday ? " · arrival today" : ""}
+                  </span>
+                </span>
+                <Link href={`/admin/housekeeping/rooms/${room.id}/inspect`} className={buttonClasses({ size: "md", className: "min-h-11" })}>
+                  Inspect
+                </Link>
+              </li>
+            ))}
+          </Section>
+        </div>
+      )}
+
       {canInventory && (
         <div className="mt-4 grid gap-4 lg:mt-6 lg:grid-cols-2 lg:gap-6">
           <Section
@@ -222,6 +281,19 @@ export default async function TodayPage() {
       )}
     </>
   );
+}
+
+/** The "are you sure?" text before checking into a room that isn't Ready; undefined when it is. */
+function roomWarning(line: TodayLine): string | undefined {
+  const warning = line.roomStatus ? checkInWarning(line.roomStatus) : null;
+  return warning ? `${line.roomName}: ${warning.message}` : undefined;
+}
+
+function allWarning(lines: TodayLine[]): string | undefined {
+  const notReady = lines.filter((l) => l.roomStatus && l.roomStatus !== "READY");
+  if (notReady.length === 0) return undefined;
+  const names = notReady.map((l) => `${l.roomName} (${ROOM_STATUS_LABELS[l.roomStatus!].toLowerCase()})`).join(", ");
+  return `Not ready: ${names}. Check in anyway?`;
 }
 
 function Section({

@@ -21,6 +21,7 @@ function RunButton({
   doneLabel,
   variant = "primary",
   ariaLabel,
+  warning,
 }: {
   action: Action;
   runs: Record<string, string>[];
@@ -30,12 +31,16 @@ function RunButton({
   doneLabel?: string;
   variant?: "primary" | "secondary";
   ariaLabel?: string;
+  /** Asks "are you sure?" before the first run; never blocks, the person can go ahead. */
+  warning?: string;
 }) {
   const [pending, start] = useTransition();
   const [result, setResult] = useState<ActionResult | null>(null);
+  const [asking, setAsking] = useState(false);
 
   const run = () =>
     start(async () => {
+      setAsking(false);
       setResult(null);
       let done = 0;
       let last: ActionResult | null = null;
@@ -52,9 +57,25 @@ function RunButton({
       setResult(runs.length === 1 && last ? last : { ok: true, message: doneLabel ?? "Done." });
     });
 
+  if (asking && warning) {
+    return (
+      <div className="min-w-0 max-w-xs space-y-2 rounded-md border border-warning/40 bg-warning/10 p-2" role="alert">
+        <p className="text-sm text-charcoal">{warning}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={run} disabled={pending} className="min-h-11 px-4">
+            {pending ? busyLabel : "Check in anyway"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => setAsking(false)} className="min-h-11 px-4">
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0">
-      <Button type="button" variant={variant} onClick={run} disabled={pending} aria-label={ariaLabel} className="min-h-11 px-4">
+      <Button type="button" variant={variant} onClick={warning ? () => setAsking(true) : run} disabled={pending} aria-label={ariaLabel} className="min-h-11 px-4">
         {pending ? busyLabel : label}
       </Button>
       {result && (
@@ -66,7 +87,7 @@ function RunButton({
   );
 }
 
-export function CheckInButton({ bookingIds, room, all }: { bookingIds: string[]; room?: string; all?: boolean }) {
+export function CheckInButton({ bookingIds, room, all, warning }: { bookingIds: string[]; room?: string; all?: boolean; warning?: string }) {
   return (
     <RunButton
       action={checkInLine}
@@ -76,6 +97,7 @@ export function CheckInButton({ bookingIds, room, all }: { bookingIds: string[];
       doneLabel={`Checked in ${bookingIds.length} rooms.`}
       variant={all ? "secondary" : "primary"}
       ariaLabel={room ? `Check in ${room}` : undefined}
+      warning={warning}
     />
   );
 }

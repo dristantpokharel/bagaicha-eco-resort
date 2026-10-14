@@ -18,6 +18,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { formatInTimeZone } from "date-fns-tz";
 import { Button } from "@/components/ui/button";
+import { RoomStatusDot } from "@/components/admin/room-status-badge";
+import type { RoomStatus } from "@/generated/prisma/enums";
 import { parseDateOnly } from "@/lib/booking/dates";
 import { BOOKING_STATUS_LABELS } from "@/lib/booking/labels";
 import {
@@ -55,6 +57,7 @@ const BLOCK_STYLE =
 
 type RowDef = {
   key: string;
+  status?: RoomStatus;
   kind: "room" | "unassigned";
   label: string;
   sub?: string;
@@ -77,7 +80,7 @@ function buildSections(data: TapeData): Section[] {
       const bars = data.bars.filter((b) => b.roomId === room.id);
       // Archived rooms only appear while they still have something in view.
       if (!room.isActive && bars.length === 0) continue;
-      rows.push({ key: room.id, kind: "room", label: room.name, sub: room.isActive ? undefined : "archived", roomId: room.id, typeId: type.id, muted: !room.isActive, bars });
+      rows.push({ key: room.id, kind: "room", label: room.name, sub: room.isActive ? undefined : "archived", roomId: room.id, typeId: type.id, muted: !room.isActive, bars, status: room.isActive ? room.status : undefined });
     }
     const pending = data.bars.filter((b) => b.kind === "booking" && b.roomId === null && b.roomTypeId === type.id);
     packLanes(pending).forEach((lane, i) =>
@@ -433,7 +436,10 @@ function RowView({
       style={{ gridTemplateColumns: gridCols }}
     >
       <div className={`sticky left-0 z-10 bg-white px-3 py-1.5 text-sm ${row.muted ? "text-charcoal-light" : "text-charcoal"}`} style={{ gridColumn: 1, gridRow: 1 }}>
-        {row.label}
+        <span className="flex items-center gap-1.5">
+          {row.status && <RoomStatusDot status={row.status} />}
+          {row.label}
+        </span>
         {row.sub && <span className="block text-[0.6875rem] text-charcoal-light">{row.sub}</span>}
       </div>
       {dayList.map((day, i) => {

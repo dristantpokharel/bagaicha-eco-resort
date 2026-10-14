@@ -1,6 +1,6 @@
 import type { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
-import type { Role, BookingStatus } from "@/generated/prisma/enums";
+import type { Role, BookingStatus, RoomStatus } from "@/generated/prisma/enums";
 import { can } from "@/lib/auth/permissions";
 import { findFreeRooms, OCCUPYING_STATUSES } from "@/lib/booking/availability";
 import { addDays, nightsBetween, toDateOnlyString } from "@/lib/booking/dates";
@@ -14,6 +14,8 @@ export type TodayLine = {
   status: BookingStatus;
   roomTypeName: string;
   roomName: string | null;
+  /** The room's housekeeping status; null while no room is assigned. */
+  roomStatus: RoomStatus | null;
   guests: number;
 };
 
@@ -90,7 +92,7 @@ const reservationSelect = {
       children: true,
       roomTypeId: true,
       roomType: { select: { name: true } },
-      room: { select: { name: true } },
+      room: { select: { name: true, status: true } },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   },
@@ -114,6 +116,7 @@ function toReservation(r: Row, statuses: readonly BookingStatus[], now: Date, wi
         status: b.status,
         roomTypeName: b.roomType.name,
         roomName: b.room?.name ?? null,
+        roomStatus: b.room?.status ?? null,
         guests: b.adults + b.children,
       })),
     ...(withWaiting ? { waiting: waitingLabel(r.createdAt, now) } : {}),

@@ -1,17 +1,6 @@
 import type { RoomStatus } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/actions";
-
-export const ROOM_STATUS_LABELS: Record<RoomStatus, string> = {
-  DIRTY: "Dirty",
-  READY: "Ready",
-  OCCUPIED: "Occupied",
-  OUT_OF_ORDER: "Out of order",
-};
-
-/** What staff may set by hand. Occupied only ever comes from checking a guest in. */
-export const MANUAL_STATUSES = ["DIRTY", "READY", "OUT_OF_ORDER"] as const satisfies readonly RoomStatus[];
-
-export const OUT_OF_ORDER_HINT = "Block dates on the calendar if it'll be out for a while.";
+import { MANUAL_STATUSES, ROOM_STATUS_LABELS } from "./labels";
 
 export type ManualChange = { to: RoomStatus; note: string | null; bumpsCycle: boolean };
 

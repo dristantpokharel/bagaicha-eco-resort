@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { ReservationStatusBadge } from "@/components/admin/status-badge";
 import { FormMessage } from "@/components/ui/form";
 import { GuestDiffersNotice } from "./guest-differs-notice";
+import { checkInWarning } from "@/lib/housekeeping/status";
 import { LineCard, type LineView } from "./line-card";
 import { ReservationActions } from "./reservation-actions";
 import { ReservationEditForm } from "./reservation-edit-form";
@@ -100,6 +101,7 @@ export default async function ReservationPage({
       roomTypeName: b.roomType.name,
       roomId: b.roomId,
       roomName: b.room?.name ?? null,
+      checkInWarning: b.room ? (checkInWarning(b.room.status)?.message ?? null) : null,
       adults: b.adults,
       children: b.children,
       guestsLabel: `${plural(b.adults, "adult", "adults")}${b.children > 0 ? `, ${plural(b.children, "child", "children")} under ${terms.childUnderAge}` : ""}`,

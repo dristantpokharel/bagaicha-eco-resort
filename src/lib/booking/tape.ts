@@ -1,4 +1,4 @@
-import type { BookingStatus } from "@/generated/prisma/enums";
+import type { BookingStatus, RoomStatus } from "@/generated/prisma/enums";
 import { addDays, nightsBetween, parseDateOnly, toDateOnlyString } from "./dates";
 import { computeQuote } from "./pricing";
 import { reservationDateFlags } from "./status";
@@ -9,7 +9,7 @@ import { reservationDateFlags } from "./status";
  * (src/lib/booking/tape-service.ts); nothing here is trusted.
  */
 
-export type TapeRoom = { id: string; name: string; typeId: string; isActive: boolean };
+export type TapeRoom = { id: string; name: string; typeId: string; isActive: boolean; /** Housekeeping status, shown as a dot. */ status?: RoomStatus };
 export type TapeType = { id: string; name: string; rooms: TapeRoom[] };
 
 export type TapeBar = {

@@ -1,5 +1,5 @@
 import type { RoomStatus } from "@/generated/prisma/enums";
-import { ROOM_STATUS_LABELS } from "@/lib/housekeeping/status";
+import { ROOM_STATUS_LABELS } from "@/lib/housekeeping/labels";
 
 const BADGE: Record<RoomStatus, string> = {
   READY: "border-success/40 bg-success/10 text-success",

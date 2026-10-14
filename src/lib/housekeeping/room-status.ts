@@ -3,7 +3,8 @@ import type { RoomStatus } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/actions";
 import { logActivity } from "@/lib/activity-log";
 import { lockRoom } from "@/lib/booking/availability";
-import { planManualChange, ROOM_STATUS_LABELS } from "./status";
+import { ROOM_STATUS_LABELS } from "./labels";
+import { planManualChange } from "./status";
 
 type Tx = Prisma.TransactionClient;
 
