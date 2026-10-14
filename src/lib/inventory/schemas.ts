@@ -51,6 +51,11 @@ const checkbox = z
   .optional()
   .transform((value) => value === "on" || value === "true");
 
+/** Required radio, no default: a wrong guess silently changes how stock is tracked. */
+const usage = z
+  .enum(["consumable", "reusable"], { error: "Choose consumable or reusable." })
+  .transform((value) => value === "consumable");
+
 const itemFields = z.object({
   name: z.string().trim().min(2, { error: "Enter a name." }).max(80, { error: "At most 80 characters." }),
   category: z
@@ -62,7 +67,7 @@ const itemFields = z.object({
   lowStockThreshold: quantityOrZero,
   unitCostNpr: optionalCost,
   supplier: optionalText(80),
-  isConsumable: checkbox,
+  isConsumable: usage,
   isFixedInRoom: checkbox,
 });
 

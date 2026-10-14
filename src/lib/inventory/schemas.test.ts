@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createItemSchema, recordMovementSchema, transferStockSchema, updateItemSchema, writeOffStockSchema } from "./schemas";
 
-const item = { name: "Basmati rice", category: "Kitchen", unit: "kg" };
+const item = { name: "Basmati rice", category: "Kitchen", unit: "kg", isConsumable: "consumable" };
 
 describe("createItemSchema", () => {
   it("defaults blank threshold, opening stock, cost and supplier", () => {
@@ -71,10 +71,14 @@ describe("recordMovementSchema", () => {
 });
 
 describe("item usage flags", () => {
-  it("reads ticked checkboxes as true and missing ones as false", () => {
-    expect(createItemSchema.parse({ ...item }).isConsumable).toBe(false);
-    expect(createItemSchema.parse({ ...item, isConsumable: "on", isFixedInRoom: "on" })).toMatchObject({
-      isConsumable: true,
+  it("requires an explicit consumable or reusable choice", () => {
+    const without: Record<string, string> = { ...item };
+    delete without.isConsumable;
+    expect(createItemSchema.safeParse(without).success).toBe(false);
+    expect(createItemSchema.safeParse({ ...item, isConsumable: "" }).success).toBe(false);
+    expect(createItemSchema.parse({ ...item, isConsumable: "consumable" }).isConsumable).toBe(true);
+    expect(createItemSchema.parse({ ...item, isConsumable: "reusable", isFixedInRoom: "on" })).toMatchObject({
+      isConsumable: false,
       isFixedInRoom: true,
     });
   });

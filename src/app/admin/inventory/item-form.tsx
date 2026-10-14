@@ -125,22 +125,34 @@ export function ItemForm({ item, categories }: { item?: ItemValues; categories: 
 
       <fieldset className="space-y-3">
         <legend className="mb-1 text-sm font-medium text-charcoal">How it is used</legend>
-        <label className="flex min-h-10 items-start gap-2 text-sm">
-          <input type="checkbox" name="isConsumable" defaultChecked={item?.isConsumable ?? true} className="mt-0.5 size-4" />
-          <span>
-            Consumable
-            <span className="block text-xs text-charcoal-light">
-              Used up when handed out (soap, paper). Untick for items that come back (towels, kettles): those are tracked by place.
+        {(
+          [
+            ["consumable", "Consumable", "Used up, e.g. soap."],
+            ["reusable", "Reusable", "Returned and reused, e.g. towels. Tracked by place."],
+          ] as const
+        ).map(([value, label, hint]) => (
+          <label key={value} className="flex min-h-11 items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="isConsumable"
+              value={value}
+              required
+              defaultChecked={item ? item.isConsumable === (value === "consumable") : false}
+              className="mt-0.5 size-4"
+            />
+            <span>
+              {label}
+              <span className="block text-xs text-charcoal-light">{hint}</span>
             </span>
-            {errors?.isConsumable && <span className="block text-xs text-error">{errors.isConsumable}</span>}
-          </span>
-        </label>
+          </label>
+        ))}
+        {errors?.isConsumable && <p className="text-xs text-error">{errors.isConsumable}</p>}
         <label className="flex min-h-10 items-start gap-2 text-sm">
           <input type="checkbox" name="isFixedInRoom" defaultChecked={item?.isFixedInRoom ?? false} className="mt-0.5 size-4" />
           <span>
             Stays in the room at checkout
             <span className="block text-xs text-charcoal-light">
-              For reusable items like a kettle or glasses. Left unticked, the item goes to the laundry after a stay.
+              Reusable items only, like a kettle or glasses. Left unticked, the item goes to the laundry after a stay.
             </span>
           </span>
         </label>
