@@ -69,6 +69,11 @@ enum GalleryCategory {
   SURROUNDINGS
 }
 
+enum GuideStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum HomepageSlotKey {
   HERO_DESKTOP
   HERO_MOBILE
@@ -387,6 +392,7 @@ model Media {
   activities     Activity[]
   eventTypes     EventType[]
   activityPhotos ActivityMedia[]
+  guides         Guide[]
 
   @@map("media")
 }
@@ -797,4 +803,35 @@ model BookingExtra {
   @@index([bookingId])
   @@index([itemId])
   @@map("booking_extras")
+}
+
+// ─── Guides ──────────────────────────────────────────────────────────────────
+
+/// A blog post. Public only when published, dated in the past and free of placeholder text (src/lib/guides/visibility.ts).
+model Guide {
+  id                String      @id @default(cuid())
+  slug              String      @unique
+  title             String
+  excerpt           String      @default("")
+  /// Markdown. Images reference Media library URLs.
+  body              String      @default("")
+  coverMediaId      String?
+  tags              String[]    @default([])
+  authorName        String      @default("")
+  authorRole        String?
+  status            GuideStatus @default(DRAFT)
+  publishedAt       DateTime?
+  seoTitle          String?
+  seoDescription    String?
+  /// [{ question, answer }]; validated with Zod on write.
+  faq               Json        @default("[]")
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[]    @default([])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  cover Media? @relation(fields: [coverMediaId], references: [id], onDelete: Restrict)
+
+  @@index([status, publishedAt])
+  @@map("guides")
 }
