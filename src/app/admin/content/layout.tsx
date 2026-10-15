@@ -18,6 +18,7 @@ export default async function ContentLayout({ children }: { children: React.Reac
           { href: "/admin/content/faqs", label: "FAQs" },
           { href: "/admin/content/policies", label: "Policies" },
           { href: "/admin/content/nearby", label: "Nearby" },
+          { href: "/admin/content/guides", label: "Guides" },
         ]}
       />
       {children}
