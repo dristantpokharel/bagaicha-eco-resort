@@ -24,48 +24,18 @@ export const FOOTER_NAV = [
 ] as const;
 
 export const HOME = {
-  highlights: [
-    { icon: "leaf", label: "Peaceful surroundings" },
-    { icon: "bed", label: "Comfortable stays" },
-    { icon: "food", label: "Local food" },
-    { icon: "people", label: "Memorable events" },
-  ],
-  intro: {
-    kicker: ["Relax", "Reconnect", "Belong"],
-    body: "Bagaicha Eco Resort is a peaceful retreat in the heart of Bardiya, where modern comfort meets nature.",
-  },
-  pillars: [
-    { word: "Stay", line: "Quiet, comfortable stays surrounded by nature.", href: "/stay", slot: "STAY" },
-    { word: "Dine", line: "Local flavours, rooted in culture.", href: "/dine", slot: "DINE" },
-    { word: "Explore", line: "Village walks, birdwatching, pickleball and more.", href: "/explore", slot: "EXPLORE" },
-    { word: "Celebrate", line: "Celebrate surrounded by nature.", href: "/events", slot: "EVENTS" },
-  ],
   about: {
     strong: "Surrounded by greenery",
     soft: "and open skies",
-    body: "It’s a place to slow down, reconnect, and enjoy a quiet escape. Wake up to birdsong, fresh air, and the beauty of nature.",
-    quote: "Wake up to birdsong, fresh air and a quieter way to stay.",
-    amenities: [
-      { icon: "bed", label: "Comfortable rooms" },
-      { icon: "wifi", label: "Modern amenities" },
-      { icon: "leaf", label: "Clean, peaceful spaces" },
-      { icon: "sun", label: "Surrounded by nature" },
-      { icon: "people", label: "Perfect for families & groups" },
-    ],
   },
   rooms: {
-    kicker: ["Relax", "Reconnect", "Belong"],
     lead: "a",
     accent: "stay",
     soft: "closer to nature",
-    line: "Quiet, comfortable stays surrounded by nature.",
-    overlay: { title: "Rooms", body: "Quiet, comfortable and surrounded by nature for a peaceful stay." },
   },
   explore: {
-    kicker: ["Taste", "Explore", "Enjoy"],
     strong: "Slow down,",
     soft: "explore the outdoors",
-    line: "Village walks, birdwatching, pickleball and more.",
   },
   events: {
     kicker: ["Gather", "Celebrate", "Remember"],
@@ -73,6 +43,8 @@ export const HOME = {
     soft: "Celebrate surrounded by nature.",
     body: "Celebrate life’s special moments surrounded by nature. With beautiful gardens, open spaces and a relaxed atmosphere, Bagaicha is a welcoming setting for weddings, celebrations and gatherings.",
   },
+  dining: { title: "Dining" },
+  gatherings: { title: "Events & gatherings" },
   location: {
     body: "Set amid the greenery of Gulariya, Bagaicha is a peaceful retreat in the heart of Bardiya. Its relaxed garden setting offers a quiet escape while keeping you within easy reach of the region’s natural and cultural highlights.",
   },

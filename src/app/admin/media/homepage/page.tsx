@@ -8,10 +8,17 @@ import { HomepageSlotKey } from "@/generated/prisma/enums";
 
 export const metadata = { title: "Homepage · Media" };
 
+/** Slots the public site no longer shows. Their placements stay in the database; they are just not listed here. */
+const RETIRED_SLOTS: readonly HomepageSlotKey[] = ["STAY", "EXPLORE"];
+
 const SLOT_HINTS: Partial<Record<HomepageSlotKey, string>> = {
   HERO_DESKTOP: "Wide landscape photo for large screens.",
   HERO_MOBILE: "Photo cropped for phones; a portrait-friendly subject works best.",
   ABOUT: "Main photo first, then the smaller overlapping photos.",
+  DINE: "The photo in the Dining band (the Dine page uses these too).",
+  EVENTS: "The photo in the Events & gatherings band (the Events page uses these too).",
+  CONFERENCE: "Conferences & trainings photo on the Events page. The homepage uses it only when there is no Events photo.",
+  LOCATION: "The illustrated map on the homepage and the Location page.",
   EXPLORE_HERO_DESKTOP: "Wide landscape photo at the top of the Explore page.",
   EXPLORE_HERO_MOBILE: "Portrait-friendly photo at the top of the Explore page on phones.",
 };
@@ -29,9 +36,9 @@ export default async function HomepageMediaPage() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-charcoal-light">
-        Photos for each homepage section, in order. The public homepage starts using these in Phase 5.
+        Photos for the homepage sections that still use them, in order. Rooms and Experiences photos come from Rooms and Content → Activities.
       </p>
-      {Object.values(HomepageSlotKey).map((slot) => {
+      {Object.values(HomepageSlotKey).filter((slot) => !RETIRED_SLOTS.includes(slot)).map((slot) => {
         const placements = toPlacements(slots.filter((row) => row.slot === slot));
         return (
           <PlacementManager

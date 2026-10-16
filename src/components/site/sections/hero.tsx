@@ -44,20 +44,16 @@ export function Hero({
       <div className="absolute inset-0 bg-linear-to-t from-forest/90 via-forest/35 via-45% to-transparent" aria-hidden="true" />
 
       <div className="container-page relative flex h-full flex-col justify-end pb-28 md:pb-40">
-        <p className="text-label animate-fade-up" aria-label="Stay, Dine, Celebrate, Explore">
-          Stay <span aria-hidden="true">|</span> Dine <span aria-hidden="true">|</span> Celebrate{" "}
-          <span aria-hidden="true">|</span> Explore
-        </p>
         <h1 id="hero-heading" className="text-display mt-5 max-w-3xl animate-fade-up [animation-delay:150ms]">
           {name}
         </h1>
         {tagline && <p className="text-heading-soft mt-3 animate-fade-up [animation-delay:300ms]">{tagline}</p>}
         <div className="mt-9 flex flex-wrap gap-3 animate-fade-up [animation-delay:450ms]">
-          <Link href="#pillars" className={buttonClasses({ variant: "brand-light", size: "lg" })}>
-            Explore Bagaicha
+          <Link href={BOOKING_HREF} className={buttonClasses({ variant: "brand-light", size: "lg" })}>
+            Book your stay
           </Link>
-          <Link href={BOOKING_HREF} className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-cream" })}>
-            Book Your Stay
+          <Link href="/explore" className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-cream" })}>
+            Explore
           </Link>
         </div>
       </div>

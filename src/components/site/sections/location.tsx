@@ -1,11 +1,10 @@
-import { MapPin, Phone } from "lucide-react";
-import { HOME } from "@/config/site-copy";
+import Link from "next/link";
+import { MapPin } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 import { MediaImage } from "@/components/media/media-image";
 import type { Business, PublicMedia, PublicNearby } from "@/lib/content/queries";
-import { formatWhatsapp, telHref, whatsappHref } from "@/lib/content/contact";
 import { LeafSprig } from "../decor";
-import { Icon, isIconName, WhatsAppIcon } from "../icons";
+import { Icon, isIconName } from "../icons";
 import { MapEmbed } from "../map-embed";
 
 export function NearbyList({ nearby }: { nearby: PublicNearby[] }) {
@@ -29,7 +28,7 @@ export function NearbyList({ nearby }: { nearby: PublicNearby[] }) {
 }
 
 /** Illustrated map, Get Directions and the click-to-load Google map. */
-export function MapBlock({ business, map }: { business: Business; map?: PublicMedia }) {
+export function MapBlock({ business, map, embed = true }: { business: Business; map?: PublicMedia; embed?: boolean }) {
   const { latitude, longitude } = business;
   return (
     <div className="flex flex-col items-start gap-6">
@@ -45,14 +44,14 @@ export function MapBlock({ business, map }: { business: Business; map?: PublicMe
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         )}
-        {business.googleMapsUrl && (
+        {embed && business.googleMapsUrl && (
           <a href={business.googleMapsUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-ink-heading" })}>
             Open in Google Maps
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         )}
       </div>
-      {latitude != null && longitude != null && (
+      {embed && latitude != null && longitude != null && (
         <div className="w-full">
           <MapEmbed lat={latitude} lng={longitude} title={`Map showing ${business.name}`} />
         </div>
@@ -61,56 +60,56 @@ export function MapBlock({ business, map }: { business: Business; map?: PublicMe
   );
 }
 
-/** Home location band. */
+/** Home location band: illustrated map, address, the Nepalgunj distance, directions and a link to /location. */
 export function LocationSection({ business, nearby, map }: { business: Business; nearby: PublicNearby[]; map?: PublicMedia }) {
-  const [phone] = business.phones;
+  const airport = nearby.find((n) => /nepalgunj/i.test(n.name));
+  const distance = airport && [airport.distance, airport.travelTime].filter(Boolean).join(" · ");
   return (
     <section aria-labelledby="location-heading" className="relative overflow-hidden bg-cream-dark py-section-sm md:py-section">
       <LeafSprig className="pointer-events-none absolute -top-4 -right-8 w-28 -scale-x-100 md:w-36" />
-      <div className="container-page">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
+      <div className="container-page grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+        <div className="flex flex-col items-start gap-5 lg:col-span-5">
           <h2
             id="location-heading"
-            className="self-start rounded-full bg-sage px-7 py-3 whitespace-nowrap font-display text-[clamp(1.75rem,3vw,2.5rem)] font-bold text-ink-heading italic"
+            className="rounded-full bg-sage px-7 py-3 whitespace-nowrap font-display text-[clamp(1.75rem,3vw,2.5rem)] font-bold text-ink-heading italic"
           >
             Our Location
           </h2>
-          <address className="flex flex-col gap-4 not-italic sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10">
+          <address className="flex flex-col gap-3 not-italic">
             {business.address && (
               <span className="flex items-start gap-3 font-label text-lg font-semibold text-ink-heading">
                 <MapPin aria-hidden="true" strokeWidth={1.75} className="mt-0.5 shrink-0" />
                 {business.address}
               </span>
             )}
-            {phone && (
-              <a href={telHref(phone)} className="flex items-center gap-3 font-label font-semibold text-ink-heading underline-offset-4 hover:underline">
-                <Phone aria-hidden="true" strokeWidth={1.75} size={20} />
-                {phone}
-              </a>
-            )}
-            {business.whatsapp && (
-              <a href={whatsappHref(business.whatsapp)} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand", size: "lg", className: "self-start" })}>
-                <WhatsAppIcon size={18} />
-                Chat on WhatsApp
-                <span className="sr-only"> {formatWhatsapp(business.whatsapp)} (opens in a new tab)</span>
-              </a>
+            {airport && distance && (
+              <span className="flex items-start gap-3 text-ink">
+                <Icon name="plane" size={22} className="mt-0.5 shrink-0" />
+                <span>
+                  <span className="font-semibold text-ink-heading">{airport.name}</span>: {distance}
+                </span>
+              </span>
             )}
           </address>
-        </div>
-
-        <p className="text-body mt-6 max-w-3xl md:mt-10">{HOME.location.body}</p>
-
-        <div className="mt-8 grid gap-8 lg:mt-12 lg:grid-cols-12 lg:gap-12">
-          {nearby.length > 0 && (
-            <div className="lg:col-span-5">
-              <h3 className="sr-only">Nearby places</h3>
-              <NearbyList nearby={nearby} />
-            </div>
-          )}
-          <div className={nearby.length > 0 ? "lg:col-span-7" : "lg:col-span-12"}>
-            <MapBlock business={business} map={map} />
+          <div className="flex flex-wrap items-center gap-3">
+            {business.directionsUrl && (
+              <a href={business.directionsUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "brand", size: "lg" })}>
+                Get directions
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            )}
+            <Link href="/location" className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-ink-heading" })}>
+              More about getting here
+            </Link>
           </div>
         </div>
+        {map && (
+          <div className="lg:col-span-7">
+            <div className="relative w-full" style={{ aspectRatio: `${map.width} / ${map.height}` }}>
+              <MediaImage media={map} sizes="(min-width: 1024px) 55vw, 100vw" className="object-contain" />
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
-import { HOME } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
-import type { PublicActivity, PublicMedia } from "@/lib/content/queries";
+import type { PublicActivity } from "@/lib/content/queries";
 import { showPlaceholders } from "@/lib/content/placeholder";
-import { Icon } from "../icons";
-import { MediaPhoto } from "../photo";
 import { Placeholder } from "../placeholder";
 import { ActivityPhotos } from "../activity-photos";
-import { Reveal } from "../reveal";
-import { Kicker, SectionHeading } from "../typography";
 import { ContentText } from "./content-text";
 
 /** "~5 km · 10–15 mins" from the linked nearby destination. Never typed on the activity. */
@@ -76,46 +71,5 @@ export function ExperienceList({ activities }: { activities: PublicActivity[] })
         <ExperiencePanel key={a.id} activity={a} flip={i % 2 === 1} />
       ))}
     </div>
-  );
-}
-
-/** Home activities band: photo + label beside the list. Shows only what is at the resort. */
-export function ActivitiesSection({ activities, photo }: { activities: PublicActivity[]; photo?: PublicMedia }) {
-  const copy = HOME.explore;
-  const here = activities.filter((a) => a.group === "AT_BAGAICHA");
-  const caption = activities.find((a) => a.slug === "chill-pool")?.title;
-  return (
-    <section aria-labelledby="explore-heading" className="py-section-sm md:py-section">
-      <div className="container-page grid gap-8 md:grid-cols-12 md:gap-16">
-        {photo && (
-          <div className="md:col-span-5">
-            <div className="md:sticky md:top-28">
-              <MediaPhoto media={photo} sizes="(min-width: 768px) 40vw, 100vw" className="aspect-[4/5]" />
-              {caption && (
-                <div className="flex items-center gap-5 bg-sage px-6 py-5">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.5px] border-icon text-icon">
-                    <Icon name="waves" size={24} />
-                  </span>
-                  <p className="text-title text-ink-heading">{caption}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        <div className={photo ? "md:col-span-7" : "md:col-span-12"}>
-          <Reveal className="flex flex-col gap-6 md:gap-10">
-            <Kicker words={copy.kicker} />
-            <SectionHeading id="explore-heading" strong={copy.strong} soft={copy.soft} />
-            <p className="text-body max-w-md">{copy.line}</p>
-          </Reveal>
-          <div className="mt-8 md:mt-12">
-            <ExperienceList activities={here} />
-          </div>
-          <Link href="/explore" className={buttonClasses({ variant: "brand-outline", size: "lg", className: "mt-8 text-ink-heading" })}>
-            See all experiences
-          </Link>
-        </div>
-      </div>
-    </section>
   );
 }

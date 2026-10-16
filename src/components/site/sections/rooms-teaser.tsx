@@ -1,71 +1,41 @@
 import Link from "next/link";
-import { BOOKING_HREF, HOME } from "@/config/site-copy";
+import { HOME } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import type { PublicRoomType } from "@/lib/content/queries";
 import { formatNpr } from "@/lib/money";
-import { Icon } from "../icons";
 import { MediaPhoto } from "../photo";
 import { Reveal } from "../reveal";
-import { Kicker, SectionHeading } from "../typography";
+import { SectionHeading } from "../typography";
 
-/** Home rooms band: lead photo, detail row and one line per room type, all from RoomType + RoomTypeMedia. */
-export function RoomsTeaser({ rooms }: { rooms: PublicRoomType[] }) {
-  const photos = rooms.flatMap((r) => r.photos.slice(0, 2));
-  const [main, ...details] = photos;
+/** Home rooms: one card per active room type (photo, name, short line, price, Book this room). */
+export function RoomsBand({ rooms }: { rooms: PublicRoomType[] }) {
+  if (rooms.length === 0) return null;
   const copy = HOME.rooms;
   return (
     <section aria-labelledby="stay-heading" className="bg-cream-dark py-section-sm md:py-section">
       <div className="container-page">
-        <div className="grid gap-8 md:grid-cols-12 md:gap-10">
-          <Reveal className={`flex flex-col gap-6 md:gap-10 ${main ? "md:col-span-4" : "md:col-span-12"}`}>
-            <Kicker words={copy.kicker} />
-            <SectionHeading id="stay-heading" lead={copy.lead} accent={copy.accent} soft={copy.soft} />
-            <p className="text-body">{copy.line}</p>
-            {rooms.length > 0 && (
-              <ul className="border-t border-ink/20">
-                {rooms.map((r) => (
-                  <li key={r.id} className="flex items-baseline justify-between gap-4 border-b border-ink/20 py-3">
-                    <Link href={`/stay#${r.slug}`} className="font-display text-xl font-bold text-ink-heading italic underline-offset-4 hover:underline">
-                      {r.name}
-                    </Link>
-                    <span className="text-sm text-ink">From {formatNpr(r.basePriceNpr)} / night</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-wrap gap-3">
-              <Link href="/stay" className={buttonClasses({ variant: "brand", size: "lg" })}>
-                See the rooms
-              </Link>
-              <Link href={BOOKING_HREF} className={buttonClasses({ variant: "brand-outline", size: "lg", className: "text-ink-heading" })}>
-                Book Your Stay
-              </Link>
-            </div>
-          </Reveal>
-          {main && (
-            <Reveal className="md:col-span-8" delay={150}>
-              <div className="relative">
-                <MediaPhoto media={main} sizes="(min-width: 768px) 60vw, 100vw" className="aspect-[4/3]" />
-                <div className="relative -mt-12 ml-auto max-w-[17rem] rounded-tl-organic bg-forest px-7 pt-8 pb-6 text-right text-cream md:absolute md:right-0 md:bottom-0 md:mt-0 md:max-w-xs">
-                  <Icon name="bed" size={36} className="ml-auto" />
-                  <p className="mt-3 font-label text-xl tracking-[0.2em] uppercase">{copy.overlay.title}</p>
-                  <p className="mt-2 text-sm leading-relaxed md:text-base">{copy.overlay.body}</p>
-                </div>
-              </div>
-            </Reveal>
-          )}
-        </div>
-        {details.length > 0 && (
-          <ul className="mt-3 grid grid-cols-3 gap-3 md:mt-4 md:gap-4">
-            {details.slice(0, 3).map((d, i) => (
-              <li key={d.url}>
-                <Reveal delay={i * 120}>
-                  <MediaPhoto media={d} sizes="33vw" className="aspect-square md:aspect-[4/3]" />
-                </Reveal>
-              </li>
-            ))}
-          </ul>
-        )}
+        <Reveal>
+          <SectionHeading id="stay-heading" lead={copy.lead} accent={copy.accent} soft={copy.soft} />
+        </Reveal>
+        <ul className={`mt-8 grid gap-8 md:mt-12 md:gap-10 sm:grid-cols-2 ${rooms.length > 2 ? "lg:grid-cols-3" : ""}`}>
+          {rooms.map((room, i) => (
+            <li key={room.id}>
+              <Reveal delay={i * 120} className="flex h-full flex-col">
+                {room.photos[0] && <MediaPhoto media={room.photos[0]} sizes="(min-width: 1024px) 40vw, (min-width: 640px) 50vw, 100vw" className="aspect-[4/3]" />}
+                <h3 className="mt-5 font-display text-2xl font-bold text-ink-heading italic">{room.name}</h3>
+                {room.description && <p className="mt-2 line-clamp-2 text-ink">{room.description}</p>}
+                <p className="mt-3 font-label text-sm font-semibold tracking-wide text-ink-heading">from {formatNpr(room.basePriceNpr)} / night</p>
+                <Link
+                  href={`/book?room=${encodeURIComponent(room.slug)}`}
+                  className={buttonClasses({ variant: "brand", size: "lg", className: "mt-5 self-start" })}
+                >
+                  Book this room
+                  <span className="sr-only">: {room.name}</span>
+                </Link>
+              </Reveal>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

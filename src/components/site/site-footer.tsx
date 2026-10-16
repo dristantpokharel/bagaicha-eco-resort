@@ -24,7 +24,10 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
         <div className="container-page grid gap-8 pt-6 md:gap-12 md:pt-4 md:grid-cols-[1.3fr_1fr_1fr]">
           <div>
             <Link href="/" aria-label={`${business.name}, home`} className="inline-block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream">
-              <Logo art="emblem" className="size-28 md:size-32" />
+              {/* The emblem's dark leaves vanish on the forest band, so it sits on a cream badge. */}
+              <span className="flex size-32 items-center justify-center rounded-full bg-cream md:size-36">
+                <Logo art="emblem" className="size-[5.5rem] md:size-24" />
+              </span>
               <Logo art="wordmark-white" className="mt-4 h-auto w-48 md:w-56" />
             </Link>
             {business.tagline && <p className="mt-4 font-display text-xl font-light italic text-sage">{business.tagline}</p>}
