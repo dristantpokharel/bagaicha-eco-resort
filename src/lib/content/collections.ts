@@ -106,6 +106,9 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
       },
       { name: "latitude", label: "Latitude", kind: "float", min: -90, maxValue: 90 },
       { name: "longitude", label: "Longitude", kind: "float", min: -180, maxValue: 180 },
+      { name: "homeAbout", label: "Homepage: About text", kind: "textarea", rows: 4, max: 600, hint: "Two or three sentences, next to the photo collage on the homepage." },
+      { name: "homeDiningLine", label: "Homepage: Dining line", kind: "text", max: 200, hint: "One line in the Dining band on the homepage." },
+      { name: "homeEventsLine", label: "Homepage: Events line", kind: "text", max: 200, hint: "One line in the Events band on the homepage." },
     ],
   },
   activities: {

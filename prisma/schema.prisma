@@ -456,6 +456,10 @@ model BusinessInfo {
   childUnderAge     Int      @default(8)
   latitude          Float?
   longitude         Float?
+  /// Homepage copy: the About paragraph, the Dining band line and the Events band line.
+  homeAbout         String?
+  homeDiningLine    String?
+  homeEventsLine    String?
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
   placeholderFields String[] @default([])
   updatedAt         DateTime @updatedAt

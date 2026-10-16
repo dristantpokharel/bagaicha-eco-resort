@@ -63,6 +63,9 @@ export type Business = {
   checkOutTime: string | null;
   latitude: number | null;
   longitude: number | null;
+  homeAbout: string | null;
+  homeDiningLine: string | null;
+  homeEventsLine: string | null;
 };
 
 const BUSINESS_FIELDS = [
@@ -78,6 +81,9 @@ const BUSINESS_FIELDS = [
   "checkOutTime",
   "latitude",
   "longitude",
+  "homeAbout",
+  "homeDiningLine",
+  "homeEventsLine",
 ] as const;
 
 export const getBusiness = cached(async (): Promise<Business> => {
