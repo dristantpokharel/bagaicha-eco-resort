@@ -1,33 +1,13 @@
-import { deliveryUrl } from "@/lib/cloudinary/delivery";
-import type { Business, PublicMedia } from "@/lib/content/queries";
-import { SITE } from "@/config/site";
+import type { Business, PublicMedia, PublicRoomType } from "@/lib/content/queries";
+import { hotelJsonLd, serializeJsonLd } from "@/lib/structured-data";
 
-/** LodgingBusiness structured data, built only from what BusinessInfo actually holds. */
-export function LodgingJsonLd({ business, image }: { business: Business; image?: PublicMedia }) {
-  const data = {
-    "@context": "https://schema.org",
-    "@type": "LodgingBusiness",
-    name: business.name,
-    description: business.intro ?? undefined,
-    url: SITE.url.toString(),
-    image: image ? deliveryUrl(image.url, 1200) : undefined,
-    telephone: business.phones[0],
-    email: business.emails[0],
-    address: business.address
-      ? { "@type": "PostalAddress", streetAddress: business.address, addressCountry: "NP" }
-      : undefined,
-    geo:
-      business.latitude != null && business.longitude != null
-        ? { "@type": "GeoCoordinates", latitude: business.latitude, longitude: business.longitude }
-        : undefined,
-    hasMap: business.googleMapsUrl ?? undefined,
-    sameAs: [business.instagramUrl, business.facebookUrl].filter(Boolean),
-  };
-  return (
-    <script
-      type="application/ld+json"
-      // `<` is escaped so no field can close the script tag.
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }}
-    />
-  );
+/** One JSON-LD script. Skips nothing/null so callers can pass optional data. */
+export function JsonLd({ data }: { data: unknown }) {
+  if (!data) return null;
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(data) }} />;
+}
+
+/** Hotel (LodgingBusiness) structured data for the whole site, built from the database. */
+export function LodgingJsonLd({ business, rooms, image }: { business: Business; rooms: PublicRoomType[]; image?: PublicMedia }) {
+  return <JsonLd data={hotelJsonLd(business, rooms, image)} />;
 }

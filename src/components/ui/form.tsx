@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 // 16px on phones: smaller text makes iOS zoom the page when a field is focused.
 const control =
@@ -19,7 +19,7 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
   return <input className={`${control} h-10 ${className}`} {...props} />;
 }
 
-export function Textarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className = "", ...props }: ComponentProps<"textarea">) {
   return <textarea className={`${control} py-2 ${className}`} {...props} />;
 }
 

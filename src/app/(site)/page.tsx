@@ -4,7 +4,6 @@ import { About } from "@/components/site/sections/about";
 import { ExperiencesBand } from "@/components/site/sections/experiences-band";
 import { Hero } from "@/components/site/sections/hero";
 import { LocationSection } from "@/components/site/sections/location";
-import { LodgingJsonLd } from "@/components/site/json-ld";
 import { RoomsBand } from "@/components/site/sections/rooms-teaser";
 import { DiningBand, EventsBand } from "@/components/site/sections/slim-bands";
 
@@ -29,7 +28,6 @@ export default async function HomePage() {
 
   return (
     <>
-      <LodgingJsonLd business={business} image={slots.HERO_DESKTOP?.[0]} />
       <Hero name={business.name} tagline={business.tagline} desktop={slots.HERO_DESKTOP?.[0]} mobile={slots.HERO_MOBILE?.[0]} />
       <About text={business.homeAbout} photos={slots.ABOUT ?? []} />
       <RoomsBand rooms={rooms} />

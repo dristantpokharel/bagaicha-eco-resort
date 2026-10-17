@@ -15,8 +15,11 @@ export const NAV = [
   { label: "Location", href: "/location" },
 ] as const;
 
+export const GUIDES_NAV = { label: "Guides", href: "/guides" } as const;
+
 export const FOOTER_NAV = [
   ...NAV,
+  GUIDES_NAV,
   { label: "Gallery", href: "/gallery" },
   { label: "Contact", href: "/contact" },
   { label: "FAQ", href: "/faq" },
@@ -59,6 +62,12 @@ export const EVENT_ICONS: Record<string, "rings" | "cake" | "glasses" | "present
 };
 
 export const PAGES = {
+  guides: {
+    title: "Guides",
+    heading: { strong: "Guides", soft: "for visiting Bardiya" },
+    line: "Planning notes and local know-how for your stay.",
+    description: "Guides for planning a visit to Bardiya, from Bagaicha Eco Resort.",
+  },
   stay: {
     title: "Stay",
     heading: { strong: "A stay", soft: "closer to nature" },
