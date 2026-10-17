@@ -37,12 +37,10 @@ export function GuideCard({ guide }: { guide: Pick<PublicGuide, "slug" | "title"
   return (
     <article className="group flex flex-col">
       <Link href={`/guides/${guide.slug}`} className="block focus-visible:outline-2 focus-visible:outline-forest">
-        {guide.cover ? (
-          <MediaPhoto media={guide.cover} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" className="aspect-[3/2]" imgClassName="transition-transform duration-700 group-hover:scale-[1.02]" />
-        ) : (
-          <div className="aspect-[3/2] bg-sage" aria-hidden="true" />
+        {guide.cover && (
+          <MediaPhoto media={guide.cover} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" className="mb-4 aspect-[3/2]" imgClassName="transition-transform duration-700 group-hover:scale-[1.02]" />
         )}
-        <p className="mt-4 font-label text-xs tracking-widest text-ink-muted uppercase">
+        <p className="font-label text-xs tracking-widest text-ink-muted uppercase">
           {formatGuideDate(guide.publishedAt)} · {guide.readingMinutes} min read
         </p>
         <h2 className="text-title mt-2 text-ink-heading">{guide.title}</h2>

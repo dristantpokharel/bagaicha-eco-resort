@@ -22,16 +22,22 @@ export function SiteFooter({ business, nav, bookingHref }: { business: Business;
       <Wave />
       <div className="bg-forest pb-10 text-cream">
         <div className="container-page grid gap-8 pt-6 md:gap-12 md:pt-4 md:grid-cols-[1.3fr_1fr_1fr]">
-          <div>
-            <Link href="/" aria-label={`${business.name}, home`} className="inline-block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream">
+          {/* One column: badge centred above the wordmark; tagline and button centred on phones, left on desktop. */}
+          <div className="flex flex-col items-center text-center md:items-start md:text-left">
+            <Link
+              href="/"
+              aria-label={`${business.name}, home`}
+              className="inline-flex flex-col items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream"
+            >
               {/* The emblem's dark leaves vanish on the forest band, so it sits on a cream badge. */}
               <span className="flex size-32 items-center justify-center rounded-full bg-cream md:size-36">
                 <Logo art="emblem" className="size-[5.5rem] md:size-24" />
               </span>
-              <Logo art="wordmark-white" className="mt-4 h-auto w-48 md:w-56" />
+              {/* About 1.4 times the badge width. */}
+              <Logo art="wordmark-white" className="mt-4 h-auto w-44 md:w-50" />
             </Link>
             {business.tagline && <p className="mt-4 font-display text-xl font-light italic text-sage">{business.tagline}</p>}
-            <Link href={bookingHref} className={buttonClasses({ variant: "brand-light", size: "lg", className: "mt-8" })}>
+            <Link href={bookingHref} className={buttonClasses({ variant: "brand-light", size: "lg", className: "mt-6" })}>
               Book Your Stay
             </Link>
           </div>

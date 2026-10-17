@@ -6,6 +6,7 @@ import { Hero } from "@/components/site/sections/hero";
 import { LocationSection } from "@/components/site/sections/location";
 import { RoomsBand } from "@/components/site/sections/rooms-teaser";
 import { DiningBand, EventsBand } from "@/components/site/sections/slim-bands";
+import { eventsCollage } from "@/lib/content/collage";
 
 export async function generateMetadata(): Promise<Metadata> {
   const business = await getBusiness();
@@ -33,7 +34,7 @@ export default async function HomePage() {
       <RoomsBand rooms={rooms} />
       <ExperiencesBand activities={activities} />
       <DiningBand line={business.homeDiningLine} photo={slots.DINE?.[0]} />
-      <EventsBand line={business.homeEventsLine} photo={slots.EVENTS?.[0] ?? slots.CONFERENCE?.[0]} />
+      <EventsBand line={business.homeEventsLine} photos={eventsCollage(slots.EVENTS, slots.CONFERENCE)} />
       <LocationSection business={business} nearby={nearby} map={slots.LOCATION?.[0]} />
     </>
   );
