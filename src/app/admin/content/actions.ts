@@ -81,9 +81,15 @@ export async function saveContentItem(_prev: ActionResult | null, formData: Form
 
         // "I've reviewed this" clears every flag, even when the text is kept as it is.
         const reviewed = formData.get("markReviewed") === "on";
+        const flags = reviewed ? [] : remainingPlaceholders(previous, input, activeFlags(key, previous?.placeholderFields));
+        if (key === "business") {
+          for (const field of ["panVatNumber", "invoiceFooterNote"] as const) {
+            if (!String(input[field] ?? "").trim() && !flags.includes(field)) flags.push(field);
+          }
+        }
         const data = {
           ...input,
-          placeholderFields: reviewed ? [] : remainingPlaceholders(previous, input, activeFlags(key, previous?.placeholderFields)),
+          placeholderFields: flags,
         };
         const saved = previous ? await model.update({ where, data }) : await model.create({ data });
         await logActivity(tx, {

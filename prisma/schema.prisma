@@ -41,6 +41,20 @@ enum BookingSource {
   OTHER
 }
 
+enum InvoiceStatus {
+  ISSUED
+  PAID
+  VOID
+}
+
+enum InvoicePaymentMethod {
+  CASH
+  CHEQUE
+  FONEPAY
+  ESEWA
+  BANK_TRANSFER
+}
+
 enum EnquiryType {
   STAY
   EVENT
@@ -135,6 +149,8 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   reservationsCreated Reservation[]   @relation("ReservationCreatedBy")
+  invoicesIssued      Invoice[]       @relation("InvoiceIssuedBy")
+  invoicesVoided      Invoice[]       @relation("InvoiceVoidedBy")
   roomBlocks          RoomBlock[]
   stockMovements      StockMovement[]
   activityLogs        ActivityLog[]
@@ -160,6 +176,44 @@ model ActivityLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@map("activity_logs")
+}
+
+/// Issued invoices are immutable financial snapshots. SQL trigger protects every snapshot column.
+model Invoice {
+  id                  String                @id @default(cuid())
+  number              String                @unique
+  reservationId       String
+  reservationRef      String
+  status              InvoiceStatus         @default(ISSUED)
+  guestSnapshot       Json
+  checkIn             DateTime              @db.Date
+  checkOut            DateTime              @db.Date
+  nights              Int
+  roomLines           Json
+  extraLines          Json
+  standardSubtotalNpr Int
+  discountTotalNpr    Int
+  grandTotalNpr       Int
+  issuedAt            DateTime              @default(now())
+  issuedById          String
+  paidAt              DateTime?             @db.Date
+  paymentMethod       InvoicePaymentMethod?
+  paymentNote         String?
+  voidedAt            DateTime?
+  voidReason          String?
+  voidedById          String?
+  emailedAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  issuedBy    User        @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  voidedBy    User?       @relation("InvoiceVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+
+  @@index([status, issuedAt])
+  @@index([paidAt])
+  @@index([reservationRef])
+  @@map("invoices")
 }
 
 // ─── Rooms ───────────────────────────────────────────────────────────────────
@@ -286,6 +340,7 @@ model Reservation {
   guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
   createdBy User?     @relation("ReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   bookings  Booking[]
+  invoices  Invoice[]
 
   @@index([guestId])
   @@index([checkIn, checkOut])
@@ -466,6 +521,8 @@ model BusinessInfo {
   homeAbout         String?
   homeDiningLine    String?
   homeEventsLine    String?
+  panVatNumber      String?
+  invoiceFooterNote String?
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
   placeholderFields String[] @default([])
   updatedAt         DateTime @updatedAt

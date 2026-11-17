@@ -11,7 +11,7 @@ const HIDDEN_KEY = /e-?mail|phone|mobile|whats?app|password|token|hash|special_?
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 const PHONE_CANDIDATE = /\+?\d[\d\s().-]{7,}\d/g;
 /** Not phone numbers, even though they are long digit runs. */
-const SAFE_NUMBERS = /BG-\d{4}-\d{6}|\d{4}-\d{2}-\d{2}/g;
+const SAFE_NUMBERS = /BG-\d{4}-\d{6}|INV-\d{4}-\d{6}|\d{4}-\d{2}-\d{2}/g;
 
 export const HIDDEN = "[hidden]";
 const MAX_VALUE_LENGTH = 200;
@@ -86,6 +86,8 @@ export function entityHref(params: {
     case "Booking":
     case "Reservation":
       return entityId ? `/admin/bookings/${entityId}` : null;
+    case "Invoice":
+      return entityId ? `/admin/invoices/${entityId}` : null;
     case "InventoryItem":
       return entityId ? `/admin/inventory/${entityId}` : null;
     case "RoomType":
@@ -111,5 +113,5 @@ export function entityHref(params: {
 /** Short name for what the entry is about: booking number, item name, room… */
 export function entityLabel(entityType: string, details: unknown): string {
   const d = isPlainObject(details) ? details : {};
-  return text(d.reference) ?? text(d.bookingNumber) ?? text(d.item) ?? text(d.room) ?? text(d.name) ?? humanize(entityType);
+  return text(d.number) ?? text(d.reference) ?? text(d.bookingNumber) ?? text(d.item) ?? text(d.room) ?? text(d.name) ?? humanize(entityType);
 }

@@ -109,6 +109,8 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
       { name: "homeAbout", label: "Homepage: About text", kind: "textarea", rows: 4, max: 600, hint: "Two or three sentences, next to the photo collage on the homepage." },
       { name: "homeDiningLine", label: "Homepage: Dining line", kind: "text", max: 200, hint: "One line in the Dining band on the homepage." },
       { name: "homeEventsLine", label: "Homepage: Events line", kind: "text", max: 200, hint: "One line in the Events band on the homepage." },
+      { name: "panVatNumber", label: "PAN / VAT number", kind: "text", max: 80, hint: "Optional. Invoice business detail; remains marked as a placeholder until completed." },
+      { name: "invoiceFooterNote", label: "Invoice footer note", kind: "textarea", rows: 3, max: 500, hint: "Optional note printed and emailed with invoices; remains marked as a placeholder until completed." },
     ],
   },
   activities: {
