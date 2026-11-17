@@ -384,6 +384,17 @@ body {
 
 /* Printing an admin page (e.g. the inventory overview): just the content, no navigation. */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
   .admin-shell > header,
   .admin-shell aside,
   .admin-shell nav.fixed {
@@ -391,5 +402,13 @@ body {
   }
   .admin-shell main {
     padding: 0 !important;
+  }
+  .invoice-print {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
   }
 }

@@ -23,6 +23,7 @@ import { formatQuantityWithUnit } from "@/lib/inventory/format";
 import { LineCard, type LineView } from "./line-card";
 import { ReservationActions } from "./reservation-actions";
 import { ReservationEditForm } from "./reservation-edit-form";
+import { InvoiceIssueForm } from "./invoice-issue-form";
 
 export const metadata = { title: "Booking" };
 
@@ -66,7 +67,7 @@ export default async function ReservationPage({
   const nights = nightsBetween(reservation.checkIn, reservation.checkOut);
 
   const canExtras = can(user.role, "housekeeping.work");
-  const [freeByLine, roomTypes, history, extraItemRows] = await Promise.all([
+  const [freeByLine, roomTypes, history, extraItemRows, latestInvoice] = await Promise.all([
     Promise.all(
       reservation.bookings.map(async (b) => {
         const f = editableFlags(b.status);
@@ -91,6 +92,7 @@ export default async function ReservationPage({
     canExtras
       ? db.inventoryItem.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, unit: true, isConsumable: true } })
       : Promise.resolve([]),
+    db.invoice.findFirst({ where: { reservationId: reservation.id }, orderBy: { issuedAt: "desc" }, select: { id: true, number: true, status: true } }),
   ]);
 
   const today = todayInResort();
@@ -170,6 +172,25 @@ export default async function ReservationPage({
       )}
 
       {diffRows.length > 0 && <GuestDiffersNotice reservationId={reservation.id} guestId={reservation.guest.id} rows={diffRows} />}
+
+      <Card title="Invoice">
+        {latestInvoice && latestInvoice.status !== "VOID" ? <p className="text-sm">An active invoice exists: <Link href={`/admin/invoices/${latestInvoice.id}`} className="font-medium text-forest underline underline-offset-4">{latestInvoice.number} · {latestInvoice.status}</Link>.</p> : (
+          <>
+            {latestInvoice?.status === "VOID" && <p className="mb-3 text-sm">Previous invoice <Link href={`/admin/invoices/${latestInvoice.id}`} className="text-forest underline underline-offset-4">{latestInvoice.number}</Link> is void. Issue a replacement from the current eligible room lines.</p>}
+            {can(user.role, "invoices.issue") ? (() => {
+              const eligible = reservation.bookings.filter((b) => b.status === "CONFIRMED" || b.status === "CHECKED_IN" || b.status === "CHECKED_OUT");
+              if (eligible.length === 0) return <p className="text-sm text-charcoal-light">This reservation has no confirmed, checked-in, or checked-out rooms to invoice. Pending or cancelled rooms are not invoiced.</p>;
+              return <InvoiceIssueForm
+                reservationId={reservation.id}
+                nights={nights}
+                allowAboveStandard={user.role === "ADMIN" || user.role === "SUPERUSER"}
+                rooms={eligible.map((b) => ({ id: b.id, name: b.roomType.name, roomName: b.room?.name ?? null, standardRateNpr: b.pricePerNightNpr, childRateNpr: b.childPricePerNightNpr, children: b.children }))}
+                extras={eligible.flatMap((b) => b.extras.map((extra) => ({ id: extra.id, name: extra.item.name, unit: extra.item.unit, quantity: Number(extra.quantity) })))}
+              />;
+            })() : <p className="text-sm text-charcoal-light">Only Admin+ can issue or change invoices.</p>}
+          </>
+        )}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">

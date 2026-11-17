@@ -14,6 +14,7 @@ export type AdminSection = {
 export const ADMIN_SECTIONS = {
   dashboard: { href: "/admin", label: "Today" },
   bookings: { href: "/admin/bookings", label: "Bookings", permission: "bookings.manage" },
+  invoices: { href: "/admin/invoices", label: "Invoices", permission: "invoices.view" },
   calendar: { href: "/admin/bookings/calendar", label: "Calendar", permission: "bookings.manage" },
   guests: { href: "/admin/guests", label: "Guests", permission: "bookings.manage" },
   enquiries: { href: "/admin/enquiries", label: "Enquiries", permission: "enquiries.manage" },
@@ -31,7 +32,7 @@ export type AdminSectionKey = keyof typeof ADMIN_SECTIONS;
 
 /** Navigation groups, in order. */
 export const NAV_GROUPS: readonly { label: string; keys: readonly AdminSectionKey[] }[] = [
-  { label: "Front desk", keys: ["dashboard", "bookings", "calendar", "housekeeping", "guests", "enquiries"] },
+  { label: "Front desk", keys: ["dashboard", "bookings", "calendar", "invoices", "housekeeping", "guests", "enquiries"] },
   { label: "Property", keys: ["rooms", "inventory"] },
   { label: "Website", keys: ["content", "media"] },
   { label: "Settings", keys: ["users", "activityLog", "profile"] },

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, CalendarDays, Ellipsis, ClipboardList, Package, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CalendarDays, Ellipsis, ClipboardList, Package, ReceiptText, type LucideIcon } from "lucide-react";
 import { activeHref, type AdminSectionKey, type NavGroup, type NavItem } from "@/lib/admin-nav";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const TAB_ICONS: Partial<Record<AdminSectionKey, LucideIcon>> = {
   dashboard: CalendarCheck,
   bookings: ClipboardList,
+  invoices: ReceiptText,
   calendar: CalendarDays,
   inventory: Package,
 };
