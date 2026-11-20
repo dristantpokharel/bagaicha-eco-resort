@@ -22,7 +22,10 @@ export type InvoiceAdjustmentInput = {
   type: "TAX";
   description: string;
   reference: string | null;
-  calculation: "PERCENT" | "FIXED";
+  calculation: "QUANTITY" | "PERCENT" | "FIXED";
+  quantity?: number;
+  unitAmountNpr?: number;
+  unitLabel?: string | null;
   percentage?: number | null;
   amountNpr?: number | null;
 };
@@ -120,6 +123,13 @@ export function calculateInvoiceTotals(
       return { ...common, calculation: "QUANTITY", quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: line.unitLabel ?? null, amountNpr };
     }
     if (line.type !== "TAX") throw new Error("Unsupported invoice line type.");
+    if (line.calculation === "QUANTITY") {
+      const unitAmountNpr = line.unitAmountNpr ?? 0;
+      const quantity = line.quantity ?? 0;
+      assertRate(unitAmountNpr);
+      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Line quantity must be greater than zero.");
+      return { ...common, calculation: "QUANTITY", quantity, unitAmountNpr, unitLabel: line.unitLabel ?? null, amountNpr: assertDatabaseInteger(Math.round(quantity * unitAmountNpr)) };
+    }
     if (line.calculation === "FIXED") {
       const enteredAmountNpr = line.amountNpr ?? 0;
       assertRate(enteredAmountNpr);

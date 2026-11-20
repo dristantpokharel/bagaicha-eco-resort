@@ -182,13 +182,15 @@ model ActivityLog {
 model Invoice {
   id                  String                @id @default(cuid())
   number              String                @unique
-  reservationId       String
-  reservationRef      String
+  reservationId       String?
+  reservationRef      String?
+  linkedReservationId String?
   status              InvoiceStatus         @default(ISSUED)
   guestSnapshot       Json
-  checkIn             DateTime              @db.Date
-  checkOut            DateTime              @db.Date
-  nights              Int
+  invoiceDate         DateTime              @default(now()) @db.Date
+  checkIn             DateTime?             @db.Date
+  checkOut            DateTime?             @db.Date
+  nights              Int?
   roomLines           Json
   extraLines          Json
   /// Canonical issued lines: ROOM, CHARGE, TAX, and DISCOUNT snapshots.
@@ -210,13 +212,15 @@ model Invoice {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
-  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
-  issuedBy    User        @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
-  voidedBy    User?       @relation("InvoiceVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+  reservation       Reservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  linkedReservation Reservation? @relation("InvoiceLinkedReservation", fields: [linkedReservationId], references: [id], onDelete: Restrict)
+  issuedBy          User         @relation("InvoiceIssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  voidedBy          User?        @relation("InvoiceVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
 
   @@index([status, issuedAt])
   @@index([paidAt])
   @@index([reservationRef])
+  @@index([linkedReservationId])
   @@map("invoices")
 }
 
@@ -341,10 +345,11 @@ model Reservation {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  guest     Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
-  createdBy User?     @relation("ReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  bookings  Booking[]
-  invoices  Invoice[]
+  guest          Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  createdBy      User?     @relation("ReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  bookings       Booking[]
+  invoices       Invoice[]
+  linkedInvoices Invoice[] @relation("InvoiceLinkedReservation")
 
   @@index([guestId])
   @@index([checkIn, checkOut])

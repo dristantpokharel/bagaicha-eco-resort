@@ -1,0 +1,18 @@
+ALTER TABLE "invoices"
+  ALTER COLUMN "reservationId" DROP NOT NULL,
+  ALTER COLUMN "reservationRef" DROP NOT NULL,
+  ALTER COLUMN "checkIn" DROP NOT NULL,
+  ALTER COLUMN "checkOut" DROP NOT NULL,
+  ALTER COLUMN "nights" DROP NOT NULL,
+  ADD COLUMN "linkedReservationId" TEXT,
+  ADD COLUMN "invoiceDate" DATE NOT NULL DEFAULT CURRENT_DATE;
+
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_linkedReservationId_fkey" FOREIGN KEY ("linkedReservationId") REFERENCES "reservations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+CREATE INDEX "invoices_linkedReservationId_idx" ON "invoices"("linkedReservationId");
+
+CREATE OR REPLACE FUNCTION protect_issued_invoice() RETURNS trigger AS $$
+BEGIN IF ROW(NEW."number", NEW."reservationId", NEW."reservationRef", NEW."guestSnapshot", NEW."invoiceDate", NEW."checkIn", NEW."checkOut", NEW."nights", NEW."roomLines", NEW."extraLines", NEW."invoiceLines", NEW."standardSubtotalNpr", NEW."discountTotalNpr", NEW."subtotalNpr", NEW."taxTotalNpr", NEW."grandTotalNpr", NEW."issuedAt", NEW."issuedById", NEW."createdAt") IS DISTINCT FROM ROW(OLD."number", OLD."reservationId", OLD."reservationRef", OLD."guestSnapshot", OLD."invoiceDate", OLD."checkIn", OLD."checkOut", OLD."nights", OLD."roomLines", OLD."extraLines", OLD."invoiceLines", OLD."standardSubtotalNpr", OLD."discountTotalNpr", OLD."subtotalNpr", OLD."taxTotalNpr", OLD."grandTotalNpr", OLD."issuedAt", OLD."issuedById", OLD."createdAt") THEN RAISE EXCEPTION 'Issued invoice snapshots are immutable'; END IF; IF NEW."linkedReservationId" IS DISTINCT FROM OLD."linkedReservationId" AND (OLD."reservationId" IS NOT NULL OR OLD."status" <> 'ISSUED' OR OLD."linkedReservationId" IS NOT NULL OR NEW."linkedReservationId" IS NULL) THEN RAISE EXCEPTION 'Only an issued standalone invoice can be linked once'; END IF; IF OLD."status" = 'VOID' THEN RAISE EXCEPTION 'Voided invoices cannot be changed'; END IF; IF NEW."status" = 'ISSUED' AND OLD."status" <> 'ISSUED' THEN RAISE EXCEPTION 'Invoice status cannot return to ISSUED'; END IF; IF OLD."status" = 'ISSUED' AND NEW."status" = 'PAID' AND (NEW."paidAt" IS NULL OR NEW."paymentMethod" IS NULL) THEN RAISE EXCEPTION 'Paid invoices require payment date and method'; END IF; IF NEW."status" = 'VOID' AND (NEW."voidedAt" IS NULL OR NEW."voidReason" IS NULL OR btrim(NEW."voidReason") = '' OR NEW."voidedById" IS NULL) THEN RAISE EXCEPTION 'Voiding an invoice requires date, actor and reason'; END IF; IF OLD."status" = 'PAID' AND (NEW."paidAt", NEW."paymentMethod", NEW."paymentNote") IS DISTINCT FROM (OLD."paidAt", OLD."paymentMethod", OLD."paymentNote") THEN RAISE EXCEPTION 'Payment details cannot be changed after marking paid'; END IF; IF NEW."status" <> 'PAID' AND OLD."status" = 'ISSUED' AND (NEW."paidAt" IS NOT NULL OR NEW."paymentMethod" IS NOT NULL OR NEW."paymentNote" IS NOT NULL) THEN RAISE EXCEPTION 'Payment details require a paid invoice'; END IF; IF NEW."status" <> 'VOID' AND (NEW."voidedAt" IS NOT NULL OR NEW."voidReason" IS NOT NULL OR NEW."voidedById" IS NOT NULL) THEN RAISE EXCEPTION 'Void details require a void invoice'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
+
+CREATE FUNCTION protect_invoice_link_status() RETURNS trigger AS $$
+BEGIN IF NEW."linkedReservationId" IS DISTINCT FROM OLD."linkedReservationId" AND (OLD."status" <> 'ISSUED' OR NEW."status" <> 'ISSUED') THEN RAISE EXCEPTION 'Only an issued invoice can be linked'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER "invoices_link_only_while_issued_trigger" BEFORE UPDATE OF "linkedReservationId" ON "invoices" FOR EACH ROW EXECUTE FUNCTION protect_invoice_link_status();

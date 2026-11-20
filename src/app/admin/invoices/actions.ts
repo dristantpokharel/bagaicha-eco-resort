@@ -6,8 +6,8 @@ import { requirePermission } from "@/lib/auth";
 import { ActionError, runAction, type ActionResult } from "@/lib/actions";
 import { db } from "@/lib/db";
 import { parseDateOnly } from "@/lib/booking/dates";
-import { issueInvoiceSchema, markInvoicePaidSchema, voidInvoiceSchema, emailInvoiceSchema } from "@/lib/invoice/schemas";
-import { InvoiceRuleError, issueInvoice, markInvoicePaid, voidInvoice } from "@/lib/invoice/service";
+import { issueInvoiceSchema, markInvoicePaidSchema, voidInvoiceSchema, emailInvoiceSchema, standaloneInvoiceSchema, linkInvoiceReservationSchema } from "@/lib/invoice/schemas";
+import { InvoiceRuleError, issueInvoice, issueStandaloneInvoice, linkStandaloneInvoice, markInvoicePaid, voidInvoice } from "@/lib/invoice/service";
 import { sendEmail } from "@/lib/email/send";
 import { emailLogoUrl } from "@/lib/email/logo";
 import { renderInvoiceEmail } from "@/lib/invoice/email";
@@ -50,6 +50,46 @@ export async function issueInvoiceAction(_prev: ActionResult | null, formData: F
     }
     revalidateInvoices(reservationId);
     return { ok: true, message: "Invoice issued from the current reservation snapshot." };
+  });
+}
+
+export async function issueStandaloneInvoiceAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("invoices.issue");
+    const parsed = standaloneInvoiceSchema.safeParse({
+      name: formData.get("name"), phone: formData.get("phone"), email: formData.get("email"), address: formData.get("address"),
+      invoiceDate: formData.get("invoiceDate"), checkIn: formData.get("checkIn"), checkOut: formData.get("checkOut"),
+      referenceNote: formData.get("referenceNote"), saveAsGuest: formData.get("saveAsGuest") === "on", lines: formData.get("lines"),
+    });
+    if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Check the standalone invoice details.");
+    const invoiceDate = parseDateOnly(parsed.data.invoiceDate);
+    const checkIn = parsed.data.checkIn ? parseDateOnly(parsed.data.checkIn) : null;
+    const checkOut = parsed.data.checkOut ? parseDateOnly(parsed.data.checkOut) : null;
+    if (!invoiceDate || (parsed.data.checkIn && !checkIn) || (parsed.data.checkOut && !checkOut)) throw new ActionError("Enter valid invoice and stay dates.");
+    await db.$transaction((tx) => issueStandaloneInvoice(tx, {
+      userId: actor.id, name: parsed.data.name, phone: parsed.data.phone,
+      email: parsed.data.email || null, address: parsed.data.address || null, invoiceDate,
+      checkIn, checkOut, referenceNote: parsed.data.referenceNote || null, saveAsGuest: parsed.data.saveAsGuest,
+      lines: parsed.data.lines,
+    }));
+    revalidateInvoices();
+    return { ok: true, message: "Standalone invoice issued." };
+  });
+}
+
+export async function linkStandaloneInvoiceAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("invoices.issue");
+    const parsed = linkInvoiceReservationSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw new ActionError("Select a reservation to link.");
+    try {
+      await db.$transaction((tx) => linkStandaloneInvoice(tx, { ...parsed.data, userId: actor.id }));
+    } catch (error) {
+      if (error instanceof InvoiceRuleError) throw new ActionError(error.message);
+      throw error;
+    }
+    revalidateInvoices();
+    return { ok: true, message: "Reservation link recorded." };
   });
 }
 

@@ -90,6 +90,7 @@ export async function issueInvoice(
       reservationId: reservation.id,
       reservationRef: reservation.reference,
       guestSnapshot,
+      invoiceDate: new Date(`${formatInTimeZone(now, "Asia/Kathmandu", "yyyy-MM-dd")}T00:00:00.000Z`),
       checkIn: reservation.checkIn,
       checkOut: reservation.checkOut,
       nights,
@@ -113,6 +114,79 @@ export async function issueInvoice(
     details: { number, reservationRef: reservation.reference, amountDueNpr: totals.grandTotalNpr },
   });
   return created;
+}
+
+export async function issueStandaloneInvoice(
+  tx: Prisma.TransactionClient,
+  input: {
+    userId: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    address: string | null;
+    invoiceDate: Date;
+    checkIn: Date | null;
+    checkOut: Date | null;
+    referenceNote: string | null;
+    saveAsGuest: boolean;
+    lines: Array<{ id: string; type: "CHARGE" | "TAX" | "DISCOUNT"; description: string; reference: string; quantity: number; unitAmountNpr: number }>;
+    now?: Date;
+  },
+) {
+  if (input.saveAsGuest) {
+    await tx.guest.create({ data: { name: input.name, phone: input.phone, email: input.email, notes: input.address ? `Invoice address: ${input.address}` : null } });
+  }
+  const nights = input.checkIn && input.checkOut ? nightsBetween(input.checkIn, input.checkOut) : 1;
+  const adjustments: InvoiceAdjustmentInput[] = input.lines.map((line) => {
+    const base = { id: line.id, description: line.description, reference: line.reference || null, quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: null };
+    if (line.type === "CHARGE") return { ...base, type: "CHARGE" };
+    if (line.type === "DISCOUNT") return { ...base, type: "DISCOUNT" };
+    return { ...base, type: "TAX", calculation: "QUANTITY" };
+  });
+  const totals = calculateInvoiceTotals([], adjustments, nights);
+  const now = input.now ?? new Date();
+  const year = Number(formatInTimeZone(now, "Asia/Kathmandu", "yyyy"));
+  const sequence = await tx.$queryRaw<{ value: bigint }[]>`SELECT nextval('invoice_number_seq') AS value`;
+  const number = invoiceNumber(year, sequence[0].value);
+  const guestSnapshot = { name: input.name.trim(), email: input.email, phone: input.phone.trim(), country: null, address: input.address, referenceNote: input.referenceNote };
+  const created = await tx.invoice.create({
+    data: {
+      number,
+      reservationId: null,
+      reservationRef: null,
+      guestSnapshot,
+      invoiceDate: input.invoiceDate,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      nights: input.checkIn && input.checkOut ? nights : null,
+      roomLines: [] as unknown as Prisma.InputJsonValue,
+      extraLines: [] as unknown as Prisma.InputJsonValue,
+      invoiceLines: totals.invoiceLines as unknown as Prisma.InputJsonValue,
+      standardSubtotalNpr: 0,
+      discountTotalNpr: totals.discountTotalNpr,
+      subtotalNpr: totals.subtotalNpr,
+      taxTotalNpr: totals.taxTotalNpr,
+      grandTotalNpr: totals.grandTotalNpr,
+      issuedById: input.userId,
+      issuedAt: now,
+    },
+  });
+  await logActivity(tx, { userId: input.userId, action: "invoice.issued_standalone", entityType: "Invoice", entityId: created.id, details: { number, amountDueNpr: totals.grandTotalNpr, lineCount: input.lines.length } });
+  return created;
+}
+
+export async function linkStandaloneInvoice(
+  tx: Prisma.TransactionClient,
+  input: { invoiceId: string; reservationId: string; userId: string },
+) {
+  const invoice = await tx.invoice.findUnique({ where: { id: input.invoiceId } });
+  if (!invoice) throw new InvoiceRuleError("Invoice not found.");
+  if (invoice.reservationId || invoice.status !== "ISSUED" || invoice.linkedReservationId) throw new InvoiceRuleError("Only an unlinked ISSUED standalone invoice can be linked.");
+  const reservation = await tx.reservation.findUnique({ where: { id: input.reservationId }, select: { id: true, reference: true } });
+  if (!reservation) throw new InvoiceRuleError("Reservation not found.");
+  const saved = await tx.invoice.update({ where: { id: invoice.id }, data: { linkedReservationId: reservation.id } });
+  await logActivity(tx, { userId: input.userId, action: "invoice.linked_reservation", entityType: "Invoice", entityId: invoice.id, details: { number: invoice.number, reservationRef: reservation.reference } });
+  return saved;
 }
 
 export async function markInvoicePaid(

@@ -35,7 +35,7 @@ export function invoiceDisplayLines(source: LinesSource): InvoiceDisplayLine[] {
       const quantity = Number(line.quantity ?? 0);
       const unitLabel = typeof line.unitLabel === "string" && line.unitLabel ? ` ${line.unitLabel}` : "";
       let detail = baseDescription;
-      if ((type === "CHARGE" || type === "DISCOUNT") && line.calculation === "QUANTITY") {
+      if ((type === "CHARGE" || type === "DISCOUNT" || type === "TAX") && line.calculation === "QUANTITY") {
         detail += ` · ${quantity}${unitLabel} × ${formatNpr(Number(line.unitAmountNpr ?? 0))}`;
       } else if (type === "TAX" && line.calculation === "PERCENT") {
         detail += ` · ${Number(line.percentage ?? 0)}% of subtotal`;
@@ -43,7 +43,8 @@ export function invoiceDisplayLines(source: LinesSource): InvoiceDisplayLine[] {
       const amountNpr = Number(line.amountNpr ?? 0);
       return {
         id: String(line.id ?? `line-${index}`), type, description: `${detail}${referenceText}`, reference,
-        ratePerNightNpr: null, standardRateNpr: null, nights: null, amountNpr,
+        ratePerNightNpr: line.calculation === "QUANTITY" ? Number(line.unitAmountNpr ?? 0) : null, standardRateNpr: null,
+        nights: line.calculation === "QUANTITY" ? quantity : null, amountNpr,
         included: type === "CHARGE" && Boolean(line.sourceExtraId) && amountNpr === 0,
       };
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { issueInvoiceSchema, markInvoicePaidSchema, voidInvoiceSchema } from "./schemas";
+import { invoiceFilterSchema, issueInvoiceSchema, markInvoicePaidSchema, standaloneInvoiceSchema, voidInvoiceSchema } from "./schemas";
 
 describe("invoice validation", () => {
   it("validates whole-NPR room rates and all adjustment line types", () => {
@@ -18,5 +18,13 @@ describe("invoice validation", () => {
     expect(markInvoicePaidSchema.safeParse({ invoiceId: "i", paymentMethod: "CARD", paidDate: "2026-11-17" }).success).toBe(false);
     expect(voidInvoiceSchema.safeParse({ invoiceId: "i", reason: "Correction" }).success).toBe(true);
     expect(voidInvoiceSchema.safeParse({ invoiceId: "i", reason: "  " }).success).toBe(false);
+  });
+  it("validates standalone bill-to fields, optional paired stay dates, and line types", () => {
+    const base = { name: "Guest", phone: "9800000000", email: "", address: "", invoiceDate: "2026-11-20", checkIn: "", checkOut: "", referenceNote: "", saveAsGuest: false, lines: JSON.stringify([{ id: "1", type: "TAX", description: "VAT", quantity: 1, unitAmountNpr: 13 }]) };
+    expect(standaloneInvoiceSchema.safeParse(base).success).toBe(true);
+    expect(standaloneInvoiceSchema.safeParse({ ...base, checkIn: "2026-12-01" }).success).toBe(false);
+    expect(standaloneInvoiceSchema.safeParse({ ...base, lines: JSON.stringify([{ id: "1", type: "CHARGE", description: "Bad", quantity: 1, unitAmountNpr: 1.5 }]) }).success).toBe(false);
+    expect(invoiceFilterSchema.safeParse({ source: "STANDALONE" }).success).toBe(true);
+    expect(invoiceFilterSchema.safeParse({ source: "OTHER" }).success).toBe(false);
   });
 });

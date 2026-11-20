@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Prisma } from "@/generated/prisma/client";
-import { issueInvoice, markInvoicePaid, voidInvoice } from "./service";
+import { issueInvoice, issueStandaloneInvoice, linkStandaloneInvoice, markInvoicePaid, voidInvoice } from "./service";
 
 function setup(statuses: string[] = ["CONFIRMED", "CANCELLED", "PENDING"]) {
   const reservation = {
@@ -14,9 +14,10 @@ function setup(statuses: string[] = ["CONFIRMED", "CANCELLED", "PENDING"]) {
   };
   const tx = {
     reservation: { findUnique: vi.fn(async () => reservation) },
+    guest: { create: vi.fn(async ({ data }: { data: unknown }) => ({ id: "g1", ...data as object })) },
     invoice: {
       create: vi.fn(async ({ data }: { data: unknown }) => ({ id: "i1", ...data as object })),
-      findUnique: vi.fn(async () => ({ id: "i1", number: "INV-2026-000007", status: "ISSUED" })),
+      findUnique: vi.fn(async () => ({ id: "i1", number: "INV-2026-000007", status: "ISSUED", reservationId: null, linkedReservationId: null })),
       update: vi.fn(async ({ data }: { data: unknown }) => ({ id: "i1", ...data as object })),
     },
     activityLog: { create: vi.fn(async () => ({ id: "log1" })) },
@@ -83,5 +84,37 @@ describe("invoice payment and void rules", () => {
     await expect(voidInvoice(paidTx, { invoiceId: "i1", userId: "staff", reason: "Correction", allowPaid: false })).rejects.toThrow(/Admin\+/);
     await voidInvoice(paidTx, { invoiceId: "i1", userId: "admin", reason: "Correction", allowPaid: true });
     expect(paidTx.invoice.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "VOID", voidReason: "Correction" }) }));
+  });
+});
+
+describe("standalone invoices", () => {
+  it("issues a copied standalone invoice with the shared number sequence and line totals", async () => {
+    const { tx } = setup();
+    const created = await issueStandaloneInvoice(tx, {
+      userId: "u1", name: "Standalone Guest", phone: "9800000000", email: "guest@example.test", address: "Bardiya",
+      invoiceDate: new Date("2026-11-20T00:00:00Z"), checkIn: null, checkOut: null, referenceNote: "PO-24", saveAsGuest: true,
+      lines: [
+        { id: "c", type: "CHARGE", description: "Laundry", reference: "", quantity: 2, unitAmountNpr: 100 },
+        { id: "t", type: "TAX", description: "VAT", reference: "", quantity: 1, unitAmountNpr: 26 },
+        { id: "d", type: "DISCOUNT", description: "Discount", reference: "", quantity: 1, unitAmountNpr: 10 },
+      ], now: new Date("2026-11-20T00:00:00Z"),
+    });
+    expect(created.number).toBe("INV-2026-000007");
+    expect(created.reservationId).toBeNull();
+    const data = (tx.invoice.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.guestSnapshot).toMatchObject({ name: "Standalone Guest", address: "Bardiya", referenceNote: "PO-24" });
+    expect(data.invoiceLines).toHaveLength(3);
+    expect(data).toMatchObject({ subtotalNpr: 200, taxTotalNpr: 26, discountTotalNpr: 10, grandTotalNpr: 216 });
+    expect(tx.guest.create).toHaveBeenCalled();
+    expect(tx.activityLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "invoice.issued_standalone" }) }));
+  });
+
+  it("links only an unlinked issued standalone invoice and records the event", async () => {
+    const { tx } = setup();
+    await linkStandaloneInvoice(tx, { invoiceId: "i1", reservationId: "r1", userId: "u1" });
+    expect(tx.invoice.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { linkedReservationId: "r1" } });
+    expect(tx.activityLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "invoice.linked_reservation" }) }));
+    (tx.invoice.findUnique as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "i1", number: "INV-2026-000007", status: "PAID", reservationId: null, linkedReservationId: null });
+    await expect(linkStandaloneInvoice(tx, { invoiceId: "i1", reservationId: "r1", userId: "u1" })).rejects.toThrow(/ISSUED/);
   });
 });

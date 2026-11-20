@@ -38,6 +38,36 @@ export const issueInvoiceSchema = z.object({
   if (new Set(sourceExtraIds).size !== sourceExtraIds.length) ctx.addIssue({ code: "custom", path: ["adjustmentLines"], message: "A booking extra can only be added once." });
 });
 
+const standaloneLineArray = z.array(z.discriminatedUnion("type", [
+  z.object({ id: z.string().min(1), type: z.literal("CHARGE"), description: z.string().trim().min(1).max(240), reference: z.string().trim().max(120).optional().default(""), quantity: z.number().finite().positive(), unitAmountNpr: wholeNpr }),
+  z.object({ id: z.string().min(1), type: z.literal("TAX"), description: z.string().trim().min(1).max(240), reference: z.string().trim().max(120).optional().default(""), quantity: z.number().finite().positive(), unitAmountNpr: wholeNpr }),
+  z.object({ id: z.string().min(1), type: z.literal("DISCOUNT"), description: z.string().trim().min(1).max(240), reference: z.string().trim().max(120).optional().default(""), quantity: z.number().finite().positive(), unitAmountNpr: wholeNpr }),
+])).min(1);
+const standaloneLines = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}, standaloneLineArray);
+
+export const standaloneInvoiceSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  phone: z.string().trim().min(1).max(40),
+  email: z.email().or(z.literal("")).optional().default(""),
+  address: z.string().trim().max(300).optional().default(""),
+  invoiceDate: z.iso.date(),
+  checkIn: z.union([z.iso.date(), z.literal("")]).optional().default(""),
+  checkOut: z.union([z.iso.date(), z.literal("")]).optional().default(""),
+  referenceNote: z.string().trim().max(500).optional().default(""),
+  saveAsGuest: z.boolean().default(false),
+  lines: standaloneLines,
+}).superRefine((value, ctx) => {
+  const ids = value.lines.map((line) => line.id);
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", path: ["lines"], message: "Duplicate invoice line." });
+  if (Boolean(value.checkIn) !== Boolean(value.checkOut)) ctx.addIssue({ code: "custom", path: ["checkIn"], message: "Enter both stay dates or leave both blank." });
+  if (value.checkIn && value.checkOut && value.checkOut <= value.checkIn) ctx.addIssue({ code: "custom", path: ["checkOut"], message: "Check-out must be after check-in." });
+});
+
+export const linkInvoiceReservationSchema = z.object({ invoiceId: z.string().min(1), reservationId: z.string().min(1) });
+
 export const markInvoicePaidSchema = z.object({
   invoiceId: z.string().min(1),
   paymentMethod: z.enum(["CASH", "CHEQUE", "FONEPAY", "ESEWA", "BANK_TRANSFER"]),
@@ -53,6 +83,7 @@ export const voidInvoiceSchema = z.object({
 export const emailInvoiceSchema = z.object({ invoiceId: z.string().min(1) });
 
 export const invoiceFilterSchema = z.object({
+  source: z.enum(["RESERVATION", "STANDALONE"]).optional(),
   status: z.enum(["ISSUED", "PAID", "VOID"]).optional(),
   paymentMethod: z.enum(["CASH", "CHEQUE", "FONEPAY", "ESEWA", "BANK_TRANSFER"]).optional(),
   from: z.iso.date().optional(),
