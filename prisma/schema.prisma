@@ -191,8 +191,12 @@ model Invoice {
   nights              Int
   roomLines           Json
   extraLines          Json
+  /// Canonical issued lines: ROOM, CHARGE, TAX, and DISCOUNT snapshots.
+  invoiceLines        Json                  @default("[]")
   standardSubtotalNpr Int
   discountTotalNpr    Int
+  subtotalNpr         Int                   @default(0)
+  taxTotalNpr         Int                   @default(0)
   grandTotalNpr       Int
   issuedAt            DateTime              @default(now())
   issuedById          String

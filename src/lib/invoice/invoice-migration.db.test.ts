@@ -8,6 +8,8 @@ const connectionString = process.env.INVOICE_TEST_DATABASE_URL;
 const enabled = Boolean(connectionString);
 const migration = readFileSync("prisma/migrations/20261117000000_invoices/migration.sql", "utf8");
 const statements = migration.split(/;\s*\n/).map((statement) => statement.trim()).filter(Boolean);
+const lineMigration = readFileSync("prisma/migrations/20261120000000_invoice_adjustment_lines/migration.sql", "utf8");
+const lineStatements = lineMigration.split(/;\s*\n/).map((statement) => statement.trim()).filter(Boolean);
 
 describe.skipIf(!enabled)("invoice migration database protections", { timeout: 120_000 }, () => {
   const schema = `invoice_test_${Date.now().toString(36)}`;
@@ -29,6 +31,7 @@ describe.skipIf(!enabled)("invoice migration database protections", { timeout: 1
     await client.query(`CREATE TABLE users (id TEXT PRIMARY KEY); CREATE TABLE reservations (id TEXT PRIMARY KEY); CREATE TABLE business_info (id INTEGER PRIMARY KEY, "placeholderFields" TEXT[] NOT NULL DEFAULT '{}')`);
     for (const statement of statements) await client.query(statement);
     await client.query(`INSERT INTO users (id) VALUES ('u1'), ('u2'); INSERT INTO reservations (id) VALUES ('r1'); INSERT INTO invoices (id, number, "reservationId", "reservationRef", "guestSnapshot", "checkIn", "checkOut", nights, "roomLines", "extraLines", "standardSubtotalNpr", "discountTotalNpr", "grandTotalNpr", "issuedById", "updatedAt") VALUES ('i1', 'INV-2026-000001', 'r1', 'BG-2026-000001', '{"name":"Guest"}', '2026-12-01', '2026-12-03', 2, '[]', '[]', 4000, 500, 3500, 'u1', now())`);
+    for (const statement of lineStatements) await client.query(statement);
   });
 
   afterAll(async () => {
@@ -39,6 +42,8 @@ describe.skipIf(!enabled)("invoice migration database protections", { timeout: 1
   it("rejects snapshot edits, deletion, and invalid status transitions while permitting payment, void and reissue", async () => {
     await expectRejected(`UPDATE invoices SET "guestSnapshot" = '{"name":"Changed"}' WHERE id = 'i1'`);
     await expectRejected(`UPDATE invoices SET "grandTotalNpr" = 1 WHERE id = 'i1'`);
+    await expectRejected(`UPDATE invoices SET "invoiceLines" = '[{"type":"TAX","amountNpr":13}]' WHERE id = 'i1'`);
+    await expectRejected(`UPDATE invoices SET "subtotalNpr" = 1 WHERE id = 'i1'`);
     await expectRejected(`DELETE FROM invoices WHERE id = 'i1'`);
     await expectRejected(`UPDATE invoices SET status = 'PAID' WHERE id = 'i1'`);
     await expectRejected(`INSERT INTO invoices (id, number, "reservationId", "reservationRef", "guestSnapshot", "checkIn", "checkOut", nights, "roomLines", "extraLines", "standardSubtotalNpr", "discountTotalNpr", "grandTotalNpr", "issuedById", "updatedAt") VALUES ('i2', 'INV-2026-000002', 'r1', 'BG-2026-000001', '{"name":"Guest"}', '2026-12-01', '2026-12-03', 2, '[]', '[]', 4000, 500, 3500, 'u1', now())`);

@@ -4,7 +4,7 @@ import type { InvoicePaymentMethod } from "@/generated/prisma/enums";
 import { logActivity } from "@/lib/activity-log";
 import { nightsBetween } from "@/lib/booking/dates";
 import { calculateInvoiceTotals, invoiceNumber } from "./pricing";
-import type { InvoiceExtraInput, InvoiceRoomInput } from "./pricing";
+import type { InvoiceAdjustmentInput, InvoiceRoomInput } from "./pricing";
 
 export const BILLABLE_BOOKING_STATUSES = ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] as const;
 
@@ -21,7 +21,7 @@ export async function issueInvoice(
     reservationId: string;
     userId: string;
     roomRates: Record<string, number>;
-    extraPrices: Record<string, number>;
+    adjustmentLines: InvoiceAdjustmentInput[];
     allowAboveStandard: boolean;
     now?: Date;
   },
@@ -45,8 +45,9 @@ export async function issueInvoice(
     throw new InvoiceRuleError("This reservation has no confirmed, checked-in, or checked-out rooms to invoice. Pending or cancelled rooms are not invoiced.");
   }
   if (eligible.some((booking) => input.roomRates[booking.id] === undefined)) throw new InvoiceRuleError("Enter a discounted rate for every billable room.");
-  const eligibleExtraIds = new Set(eligible.flatMap((booking) => booking.extras.map((extra) => extra.id)));
-  for (const id of Object.keys(input.extraPrices)) if (!eligibleExtraIds.has(id)) throw new InvoiceRuleError("An extra no longer belongs to an invoiceable room.");
+  const extrasById = new Map(eligible.flatMap((booking) => booking.extras.map((extra) => [extra.id, extra] as const)));
+  const selectedExtras = input.adjustmentLines.flatMap((line) => line.type === "CHARGE" && line.sourceExtraId ? [line.sourceExtraId] : []);
+  for (const id of selectedExtras) if (!extrasById.has(id)) throw new InvoiceRuleError("A booking extra no longer belongs to an invoiceable room.");
 
   const nights = nightsBetween(reservation.checkIn, reservation.checkOut);
   const rooms: InvoiceRoomInput[] = eligible.map((booking) => {
@@ -64,16 +65,14 @@ export async function issueInvoice(
       discountedRateNpr,
     };
   });
-  const extras: InvoiceExtraInput[] = eligible.flatMap((booking) =>
-    booking.extras.map((extra) => ({
-      id: extra.id,
-      name: extra.item.name,
-      unit: extra.item.unit,
-      quantity: Number(extra.quantity),
-      priceNpr: input.extraPrices[extra.id] ?? 0,
-    })),
-  );
-  const totals = calculateInvoiceTotals(rooms, extras, nights, { allowAboveStandard: input.allowAboveStandard });
+  const adjustments: InvoiceAdjustmentInput[] = input.adjustmentLines.map((line) => {
+    if (line.type === "CHARGE" && line.sourceExtraId) {
+      const extra = extrasById.get(line.sourceExtraId)!;
+      return { ...line, description: extra.item.name, quantity: Number(extra.quantity), unitLabel: extra.item.unit };
+    }
+    return line;
+  });
+  const totals = calculateInvoiceTotals(rooms, adjustments, nights, { allowAboveStandard: input.allowAboveStandard });
   const now = input.now ?? new Date();
   const year = Number(formatInTimeZone(now, "Asia/Kathmandu", "yyyy"));
   const sequence = await tx.$queryRaw<{ value: bigint }[]>`SELECT nextval('invoice_number_seq') AS value`;
@@ -96,8 +95,11 @@ export async function issueInvoice(
       nights,
       roomLines: totals.roomLines as unknown as Prisma.InputJsonValue,
       extraLines: totals.extraLines as unknown as Prisma.InputJsonValue,
+      invoiceLines: totals.invoiceLines as unknown as Prisma.InputJsonValue,
       standardSubtotalNpr: totals.standardSubtotalNpr,
       discountTotalNpr: totals.discountTotalNpr,
+      subtotalNpr: totals.subtotalNpr,
+      taxTotalNpr: totals.taxTotalNpr,
       grandTotalNpr: totals.grandTotalNpr,
       issuedById: input.userId,
       issuedAt: now,
@@ -108,7 +110,7 @@ export async function issueInvoice(
     action: "invoice.issued",
     entityType: "Invoice",
     entityId: created.id,
-    details: { number, reservationRef: reservation.reference, grandTotalNpr: totals.grandTotalNpr },
+    details: { number, reservationRef: reservation.reference, amountDueNpr: totals.grandTotalNpr },
   });
   return created;
 }

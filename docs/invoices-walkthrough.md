@@ -3,31 +3,29 @@
 ## What is implemented
 
 - Admin and Superuser can issue, mark paid, void, and email invoices. Staff can find, view, and print invoices.
-- Each reservation has at most one active invoice. A void invoice can be replaced.
-- Issuance includes only Confirmed, Checked-in, and Checked-out room lines. Pending and Cancelled lines are excluded. If there are no eligible lines, the page explains why issuance is unavailable.
-- Invoice room rates, guest details, reservation dates, and booking extras are copied when issued. Discounted rates default to each saved booking rate. Child charges stay as saved on the booking line. Extra prices default to zero and print as “Included”.
+- Reservation invoices copy the guest, eligible room lines, saved standard rates, dates, and booking extras at issuance. Only Confirmed, Checked-in, and Checked-out room lines are included; Pending and Cancelled lines are skipped.
+- Room discounted rates default to the saved standard rate. Issue forms accept additional Charge, Tax, and Discount lines, with optional references. Percentage tax is rounded to whole NPR at issue time and stored as an amount.
+- Totals show Subtotal (rooms and charges), Tax, Discounts, and Amount due. Booking extras with a zero price print as “Included”.
+- Guest print and email use one table with Description, Rate / night, Nights, and Amount. Room standard rate is retained in the snapshot and shown only in the staff screen.
 - Invoice numbers use `INV-YYYY-NNNNNN`, with the year determined in `Asia/Kathmandu` and a dedicated database sequence.
-- Amounts are stored as whole NPR. Summary values are standard-rate subtotal, total discount, and amount sent. There are no tax or service-charge fields.
-- The database migration adds a partial unique index, prevents snapshot edits and deletion, and restricts valid payment and void transitions.
-- Admin invoice list supports status, payment method, issued-date range, and search by invoice number, guest, or booking reference.
-- Invoice print layout uses A4 portrait and hides the admin navigation, header, and action controls. Email uses the existing Resend layer, including dev and staging redirects; the email contains the invoice details without a link.
-- PAN/VAT and footer note are editable under Admin → Website → Business info. Both remain flagged as placeholders until populated or reviewed with a value.
-- Invoice issuance, payment, void, and each email attempt are written to the activity log.
+- Issued line snapshots are immutable in application code and by a database trigger. Corrections require voiding and reissuing.
+- Invoice list supports status, payment method, issued-date range, and search by number, guest, or booking reference.
+- Print layout uses A4 portrait and hides admin navigation and controls. Email uses the existing email layer and its dev/staging redirect rules; it contains invoice details and no link.
+- PAN/VAT and footer note are editable under Admin → Website → Business info. Both remain flagged as placeholders until set.
+- Issuance, payment, void, and email attempts are written to the activity log.
 
 ## What to test
 
-1. As Admin, open a reservation with a mix of Confirmed, Pending, and Cancelled rooms. Issue an invoice and verify only the Confirmed line is copied.
-2. Open a reservation containing only Pending or Cancelled lines and verify the clear ineligible-reservation message.
-3. Change a booking or business rate after issuance and verify the invoice remains unchanged.
-4. Enter a discount, a zero-priced extra, and a priced extra; verify the live totals, printed “Included” label, and saved amounts.
-5. Try an above-standard room rate with and without the Admin+ checkbox.
-6. Mark an invoice paid using each payment method, with a date and note. Verify Staff can view/print but cannot change it.
-7. Void an issued invoice and issue a replacement. Verify a paid invoice can only be voided by Admin+ and requires a reason.
-8. Filter/search the invoice list. Print to PDF and inspect A4 layout, logo, details, and footer. Email to a staging/dev address and verify the redirect behavior.
-9. With a dedicated disposable Postgres connection in `INVOICE_TEST_DATABASE_URL`, run the opt-in database protection test: `npx vitest run src/lib/invoice/invoice-migration.db.test.ts`.
+1. Issue from a reservation with Confirmed, Pending, and Cancelled rooms; verify only eligible lines are copied. A reservation with no eligible rooms must be refused.
+2. Add Charge, percentage and fixed Tax, and Discount lines. Verify live totals and that percentage tax rounding is saved at issuance.
+3. Change a booking rate or guest after issuance and confirm the invoice remains unchanged.
+4. Verify a zero-priced booking extra prints as “Included”; test above-standard room permission.
+5. Mark an invoice paid with each payment method, then test void rules and reissue.
+6. As Staff, verify view/print access and no issue, payment, or void controls. Print to PDF and email a test invoice.
+7. With a dedicated disposable Postgres connection in `INVOICE_TEST_DATABASE_URL`, run `npx vitest run src/lib/invoice/invoice-migration.db.test.ts` to check database protections.
 
-## Placeholder and rollout notes
+## Migration and placeholders
 
-- PAN/VAT and the invoice footer note are intentionally unset placeholders until the resort supplies them.
-- The schema and additive migration are prepared, but the migration has not been applied. The required rolled-back dev dry-run still needs access to the dev database connection.
-- No PDF service was added; staff can use the browser’s Print to PDF.
+- The additive line migration has not been applied. Run `npm run db:dryrun-migration -- prisma/migrations/20261120000000_invoice_adjustment_lines/migration.sql` against dev to execute it inside a transaction that always rolls back.
+- PAN/VAT and the invoice footer note remain placeholders until the resort supplies or verifies their values.
+- No paid PDF service is used; staff can choose browser Print to PDF.

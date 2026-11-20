@@ -29,7 +29,7 @@ describe("invoice issuance snapshots", () => {
   it("copies only confirmed, checked-in, and checked-out lines from saved booking rates", async () => {
     const { reservation, tx } = setup();
     const result = await issueInvoice(tx, {
-      reservationId: "r1", userId: "u1", roomRates: { b1: 2500 }, extraPrices: { e1: 0 }, allowAboveStandard: false,
+      reservationId: "r1", userId: "u1", roomRates: { b1: 2500 }, adjustmentLines: [{ id: "booking-extra-e1", type: "CHARGE", description: "Blanket", reference: null, quantity: 1, unitAmountNpr: 0, sourceExtraId: "e1" }], allowAboveStandard: false,
       now: new Date("2026-11-17T18:30:00.000Z"),
     });
     expect(result.number).toBe("INV-2026-000007");
@@ -39,6 +39,7 @@ describe("invoice issuance snapshots", () => {
     expect(created.roomLines).toHaveLength(1);
     expect(created.roomLines[0]).toMatchObject({ standardRateNpr: 3000, discountedRateNpr: 2500, childChargeNpr: 1000 });
     expect(created.extraLines[0]).toMatchObject({ name: "Blanket", totalNpr: 0 });
+    expect(created.invoiceLines[1]).toMatchObject({ type: "CHARGE", description: "Blanket", amountNpr: 0 });
     reservation.guestName = "Changed later";
     reservation.bookings[0].pricePerNightNpr = 9000;
     expect(created.guestSnapshot.name).toBe("Guest Snapshot");
@@ -47,21 +48,21 @@ describe("invoice issuance snapshots", () => {
 
   it("refuses reservations with no eligible room lines", async () => {
     const { tx } = setup(["PENDING", "CANCELLED"]);
-    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: {}, extraPrices: {}, allowAboveStandard: false })).rejects.toThrow(/no confirmed/);
+    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: {}, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/no confirmed/);
     expect(tx.invoice.create).not.toHaveBeenCalled();
   });
 
   it("enforces the standard rate unless explicitly allowed", async () => {
     const { tx } = setup(["CHECKED_OUT"]);
-    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, extraPrices: {}, allowAboveStandard: false })).rejects.toThrow(/cannot exceed/);
+    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/cannot exceed/);
     const allowed = setup(["CHECKED_OUT"]);
-    await expect(issueInvoice(allowed.tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, extraPrices: {}, allowAboveStandard: true })).resolves.toBeTruthy();
+    await expect(issueInvoice(allowed.tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: true })).resolves.toBeTruthy();
   });
 
   it("uses Kathmandu local year for invoice numbering near New Year", async () => {
     const { tx } = setup(["CONFIRMED"]);
     const result = await issueInvoice(tx, {
-      reservationId: "r1", userId: "u1", roomRates: { b1: 3000 }, extraPrices: {}, allowAboveStandard: false,
+      reservationId: "r1", userId: "u1", roomRates: { b1: 3000 }, adjustmentLines: [], allowAboveStandard: false,
       now: new Date("2026-12-31T18:30:00.000Z"),
     });
     expect(result.number).toBe("INV-2027-000007");
