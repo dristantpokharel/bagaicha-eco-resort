@@ -17,7 +17,7 @@ function setup(statuses: string[] = ["CONFIRMED", "CANCELLED", "PENDING"]) {
     guest: { create: vi.fn(async ({ data }: { data: unknown }) => ({ id: "g1", ...data as object })) },
     invoice: {
       create: vi.fn(async ({ data }: { data: unknown }) => ({ id: "i1", ...data as object })),
-      findUnique: vi.fn(async () => ({ id: "i1", number: "INV-2026-000007", status: "ISSUED", reservationId: null, linkedReservationId: null })),
+      findUnique: vi.fn(async (args: { where: Record<string, unknown> }) => "submissionId" in args.where ? null : ({ id: "i1", number: "INV-2026-000007", status: "ISSUED", reservationId: null, linkedReservationId: null })),
       update: vi.fn(async ({ data }: { data: unknown }) => ({ id: "i1", ...data as object })),
     },
     activityLog: { create: vi.fn(async () => ({ id: "log1" })) },
@@ -30,7 +30,7 @@ describe("invoice issuance snapshots", () => {
   it("copies only confirmed, checked-in, and checked-out lines from saved booking rates", async () => {
     const { reservation, tx } = setup();
     const result = await issueInvoice(tx, {
-      reservationId: "r1", userId: "u1", roomRates: { b1: 2500 }, adjustmentLines: [{ id: "booking-extra-e1", type: "CHARGE", description: "Blanket", reference: null, quantity: 1, unitAmountNpr: 0, sourceExtraId: "e1" }], allowAboveStandard: false,
+      reservationId: "r1", submissionId: "submission-1", taxRows: [], userId: "u1", roomRates: { b1: 2500 }, adjustmentLines: [{ id: "booking-extra-e1", type: "CHARGE", description: "Blanket", reference: null, quantity: 1, unitAmountNpr: 0, sourceExtraId: "e1" }], allowAboveStandard: false,
       now: new Date("2026-11-17T18:30:00.000Z"),
     });
     expect(result.number).toBe("INV-2026-000007");
@@ -49,24 +49,34 @@ describe("invoice issuance snapshots", () => {
 
   it("refuses reservations with no eligible room lines", async () => {
     const { tx } = setup(["PENDING", "CANCELLED"]);
-    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: {}, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/no confirmed/);
+    await expect(issueInvoice(tx, { reservationId: "r1", submissionId: "s1", taxRows: [], userId: "u1", roomRates: {}, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/no confirmed/);
     expect(tx.invoice.create).not.toHaveBeenCalled();
   });
 
   it("enforces the standard rate unless explicitly allowed", async () => {
     const { tx } = setup(["CHECKED_OUT"]);
-    await expect(issueInvoice(tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/cannot exceed/);
+    await expect(issueInvoice(tx, { reservationId: "r1", submissionId: "s1", taxRows: [], userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: false })).rejects.toThrow(/cannot exceed/);
     const allowed = setup(["CHECKED_OUT"]);
-    await expect(issueInvoice(allowed.tx, { reservationId: "r1", userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: true })).resolves.toBeTruthy();
+    await expect(issueInvoice(allowed.tx, { reservationId: "r1", submissionId: "s1", taxRows: [], userId: "u1", roomRates: { b1: 3500 }, adjustmentLines: [], allowAboveStandard: true })).resolves.toBeTruthy();
   });
 
   it("uses Kathmandu local year for invoice numbering near New Year", async () => {
     const { tx } = setup(["CONFIRMED"]);
     const result = await issueInvoice(tx, {
-      reservationId: "r1", userId: "u1", roomRates: { b1: 3000 }, adjustmentLines: [], allowAboveStandard: false,
+      reservationId: "r1", submissionId: "s1", taxRows: [], userId: "u1", roomRates: { b1: 3000 }, adjustmentLines: [], allowAboveStandard: false,
       now: new Date("2026-12-31T18:30:00.000Z"),
     });
     expect(result.number).toBe("INV-2027-000007");
+  });
+
+  it("returns the original invoice when the same submission token is retried", async () => {
+    const { tx } = setup(["CONFIRMED"]);
+    const original = { id: "i1", number: "INV-2026-000007", status: "ISSUED" };
+    (tx.invoice.findUnique as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (args: { where: Record<string, unknown> }) => "submissionId" in args.where ? original : null);
+    const retried = await issueInvoice(tx, { reservationId: "r1", submissionId: "stable-token", taxRows: [], userId: "u1", roomRates: { b1: 3000 }, adjustmentLines: [], allowAboveStandard: false });
+    expect(retried).toEqual(original);
+    expect(tx.invoice.create).not.toHaveBeenCalled();
+    expect(tx.reservation.findUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -91,11 +101,10 @@ describe("standalone invoices", () => {
   it("issues a copied standalone invoice with the shared number sequence and line totals", async () => {
     const { tx } = setup();
     const created = await issueStandaloneInvoice(tx, {
-      userId: "u1", name: "Standalone Guest", phone: "9800000000", email: "guest@example.test", address: "Bardiya",
+      submissionId: "standalone-submission", taxRows: [{ id: "t", label: "VAT", mode: "PERCENT", percentage: 13 }], userId: "u1", name: "Standalone Guest", phone: "9800000000", email: "guest@example.test", address: "Bardiya",
       invoiceDate: new Date("2026-11-20T00:00:00Z"), checkIn: null, checkOut: null, referenceNote: "PO-24", saveAsGuest: true,
       lines: [
         { id: "c", type: "CHARGE", description: "Laundry", reference: "", quantity: 2, unitAmountNpr: 100 },
-        { id: "t", type: "TAX", description: "VAT", reference: "", quantity: 1, unitAmountNpr: 26 },
         { id: "d", type: "DISCOUNT", description: "Discount", reference: "", quantity: 1, unitAmountNpr: 10 },
       ], now: new Date("2026-11-20T00:00:00Z"),
     });
@@ -103,8 +112,9 @@ describe("standalone invoices", () => {
     expect(created.reservationId).toBeNull();
     const data = (tx.invoice.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
     expect(data.guestSnapshot).toMatchObject({ name: "Standalone Guest", address: "Bardiya", referenceNote: "PO-24" });
-    expect(data.invoiceLines).toHaveLength(3);
-    expect(data).toMatchObject({ subtotalNpr: 200, taxTotalNpr: 26, discountTotalNpr: 10, grandTotalNpr: 216 });
+    expect(data.invoiceLines).toHaveLength(2);
+    expect(data.taxLines).toMatchObject([{ label: "VAT", mode: "PERCENT", percentage: 13, baseNpr: 190, amountNpr: 25 }]);
+    expect(data).toMatchObject({ subtotalNpr: 200, taxTotalNpr: 25, discountTotalNpr: 10, grandTotalNpr: 215 });
     expect(tx.guest.create).toHaveBeenCalled();
     expect(tx.activityLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "invoice.issued_standalone" }) }));
   });

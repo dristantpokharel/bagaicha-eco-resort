@@ -10,6 +10,7 @@ export default async function NewStandaloneInvoicePage() {
   const guests = await db.guest.findMany({ orderBy: { name: "asc" }, take: 300, select: { id: true, name: true, phone: true, email: true, country: true } });
   return <>
     <PageHeader title="Standalone invoice" description="Issue an invoice without a reservation. All details are saved as an invoice snapshot." />
-    <StandaloneInvoiceForm guests={guests.map((guest) => ({ ...guest, address: null }))} />
+    <StandaloneInvoiceForm guests={guests.map((guest) => ({ ...guest, address: null }))} submissionId={randomUUID()} />
   </>;
 }
+import { randomUUID } from "node:crypto";

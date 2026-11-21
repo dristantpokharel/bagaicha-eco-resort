@@ -195,6 +195,10 @@ model Invoice {
   extraLines          Json
   /// Canonical issued lines: ROOM, CHARGE, TAX, and DISCOUNT snapshots.
   invoiceLines        Json                  @default("[]")
+  /// Separate tax calculation snapshots for the current invoice format.
+  taxLines            Json                  @default("[]")
+  /// Stable token for safe retry of an invoice issue attempt.
+  submissionId        String?               @unique
   standardSubtotalNpr Int
   discountTotalNpr    Int
   subtotalNpr         Int                   @default(0)

@@ -1,3 +1,5 @@
+import { formatNpr } from "@/lib/money";
+
 export type InvoiceRoomInput = {
   id: string;
   roomTypeName: string;
@@ -17,18 +19,11 @@ export type InvoiceAdjustmentInput = {
   unitAmountNpr: number;
   unitLabel?: string | null;
   sourceExtraId?: string | null;
-} | {
-  id: string;
-  type: "TAX";
-  description: string;
-  reference: string | null;
-  calculation: "QUANTITY" | "PERCENT" | "FIXED";
-  quantity?: number;
-  unitAmountNpr?: number;
-  unitLabel?: string | null;
-  percentage?: number | null;
-  amountNpr?: number | null;
 };
+
+export type InvoiceTaxInput =
+  | { id: string; label: string; mode: "PERCENT"; percentage: number }
+  | { id: string; label: string; mode: "FIXED"; amountNpr: number };
 
 export type InvoiceRoomSnapshot = InvoiceRoomInput & {
   type: "ROOM";
@@ -43,17 +38,24 @@ export type InvoiceRoomSnapshot = InvoiceRoomInput & {
 
 export type InvoiceAdjustmentSnapshot = {
   id: string;
-  type: "CHARGE" | "TAX" | "DISCOUNT";
+  type: "CHARGE" | "DISCOUNT";
   description: string;
   reference: string | null;
-  calculation: "QUANTITY" | "PERCENT" | "FIXED";
-  quantity?: number;
-  unitAmountNpr?: number;
+  calculation: "QUANTITY";
+  quantity: number;
+  unitAmountNpr: number;
   unitLabel?: string | null;
-  percentage?: number;
-  enteredAmountNpr?: number;
   amountNpr: number;
   sourceExtraId?: string | null;
+};
+
+export type InvoiceTaxSnapshot = {
+  id: string;
+  label: string;
+  mode: "PERCENT" | "FIXED";
+  percentage: number | null;
+  baseNpr: number;
+  amountNpr: number;
 };
 
 export type InvoiceLineSnapshot = InvoiceRoomSnapshot | InvoiceAdjustmentSnapshot;
@@ -63,12 +65,16 @@ export type InvoiceTotals = {
   roomLines: InvoiceRoomSnapshot[];
   extraLines: InvoiceExtraSnapshot[];
   invoiceLines: InvoiceLineSnapshot[];
+  taxLines: InvoiceTaxSnapshot[];
   standardSubtotalNpr: number;
   subtotalNpr: number;
-  taxTotalNpr: number;
   discountTotalNpr: number;
+  netNpr: number;
+  taxTotalNpr: number;
   grandTotalNpr: number;
 };
+
+export type InvoiceTotalsRow = { kind: "subtotal" | "discount" | "net" | "tax" | "amountDue"; label: string; amountNpr: number };
 
 const MAX_NPR_INT = 2_147_483_647;
 
@@ -86,7 +92,7 @@ export function calculateInvoiceTotals(
   rooms: InvoiceRoomInput[],
   adjustments: InvoiceAdjustmentInput[],
   nights: number,
-  options: { allowAboveStandard?: boolean } = {},
+  options: { allowAboveStandard?: boolean; taxRows?: InvoiceTaxInput[] } = {},
 ): InvoiceTotals {
   if (!Number.isInteger(nights) || nights < 1) throw new Error("Invoice nights must be a positive whole number.");
   const roomLines = rooms.map((room): InvoiceRoomSnapshot => {
@@ -97,78 +103,66 @@ export function calculateInvoiceTotals(
     const standardTotalNpr = assertDatabaseInteger(room.standardRateNpr * nights + childChargeNpr);
     const amountNpr = assertDatabaseInteger(room.discountedRateNpr * nights + childChargeNpr);
     return {
-      ...room,
-      type: "ROOM",
-      description: `${room.roomTypeName}${room.roomName ? ` · ${room.roomName}` : ""}`,
-      reference: null,
-      ratePerNightNpr: room.discountedRateNpr,
-      nights,
-      childChargeNpr,
-      standardTotalNpr,
-      amountNpr,
+      ...room, type: "ROOM", description: `${room.roomTypeName}${room.roomName ? ` · ${room.roomName}` : ""}`,
+      reference: null, ratePerNightNpr: room.discountedRateNpr, nights, childChargeNpr, standardTotalNpr, amountNpr,
+    };
+  });
+
+  const adjustmentLines = adjustments.map((line): InvoiceAdjustmentSnapshot => {
+    assertRate(line.unitAmountNpr);
+    if (!Number.isFinite(line.quantity) || line.quantity <= 0) throw new Error("Line quantity must be greater than zero.");
+    return {
+      id: line.id, type: line.type, description: line.description.trim(), reference: line.reference?.trim() || null,
+      calculation: "QUANTITY", quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: line.unitLabel ?? null,
+      amountNpr: assertDatabaseInteger(Math.round(line.quantity * line.unitAmountNpr)),
+      ...(line.type === "CHARGE" && line.sourceExtraId ? { sourceExtraId: line.sourceExtraId } : {}),
     };
   });
 
   const roomAmount = roomLines.reduce((sum, line) => sum + line.amountNpr, 0);
   const standardSubtotalNpr = assertDatabaseInteger(roomLines.reduce((sum, line) => sum + line.standardTotalNpr, 0));
-  const preliminary = adjustments.map((line): InvoiceAdjustmentSnapshot => {
-    const common = { id: line.id, type: line.type, description: line.description.trim(), reference: line.reference?.trim() || null };
-    if (line.type === "CHARGE" || line.type === "DISCOUNT") {
-      assertRate(line.unitAmountNpr);
-      if (!Number.isFinite(line.quantity) || line.quantity <= 0) throw new Error("Line quantity must be greater than zero.");
-      const amountNpr = assertDatabaseInteger(Math.round(line.quantity * line.unitAmountNpr));
-      if (line.type === "CHARGE") {
-        return { ...common, calculation: "QUANTITY", quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: line.unitLabel ?? null, amountNpr, sourceExtraId: line.sourceExtraId ?? null };
-      }
-      return { ...common, calculation: "QUANTITY", quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: line.unitLabel ?? null, amountNpr };
-    }
-    if (line.type !== "TAX") throw new Error("Unsupported invoice line type.");
-    if (line.calculation === "QUANTITY") {
-      const unitAmountNpr = line.unitAmountNpr ?? 0;
-      const quantity = line.quantity ?? 0;
-      assertRate(unitAmountNpr);
-      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Line quantity must be greater than zero.");
-      return { ...common, calculation: "QUANTITY", quantity, unitAmountNpr, unitLabel: line.unitLabel ?? null, amountNpr: assertDatabaseInteger(Math.round(quantity * unitAmountNpr)) };
-    }
-    if (line.calculation === "FIXED") {
-      const enteredAmountNpr = line.amountNpr ?? 0;
-      assertRate(enteredAmountNpr);
-      return { ...common, calculation: "FIXED", enteredAmountNpr, amountNpr: enteredAmountNpr };
-    }
-    const percentage = line.percentage ?? 0;
-    if (!Number.isFinite(percentage) || percentage < 0) throw new Error("Tax percentage must be a nonnegative number.");
-    return { ...common, calculation: "PERCENT", percentage, amountNpr: 0 };
-  });
+  const chargeAmount = adjustmentLines.filter((line) => line.type === "CHARGE").reduce((sum, line) => sum + line.amountNpr, 0);
+  const subtotalNpr = assertDatabaseInteger(roomAmount + chargeAmount);
+  const discountTotalNpr = assertDatabaseInteger(adjustmentLines.filter((line) => line.type === "DISCOUNT").reduce((sum, line) => sum + line.amountNpr, 0));
+  const netNpr = assertDatabaseInteger(subtotalNpr - discountTotalNpr);
+  if (netNpr < 0) throw new Error("Discounts cannot exceed the subtotal.");
 
-  const subtotalNpr = assertDatabaseInteger(roomAmount + preliminary.filter((line) => line.type === "CHARGE").reduce((sum, line) => sum + line.amountNpr, 0));
-  const invoiceLines = preliminary.map((line, index): InvoiceAdjustmentSnapshot => {
-    const source = adjustments[index];
-    if (source.type === "TAX" && line.type === "TAX" && line.calculation === "PERCENT") {
-      const percentage = line.percentage ?? 0;
-      return { ...line, calculation: "PERCENT", percentage, amountNpr: assertDatabaseInteger(Math.round(subtotalNpr * percentage / 100)) };
+  const taxLines = (options.taxRows ?? []).map((tax): InvoiceTaxSnapshot => {
+    const label = tax.label.trim() || "Tax";
+    if (tax.mode === "FIXED") {
+      assertRate(tax.amountNpr);
+      return { id: tax.id, label, mode: tax.mode, percentage: null, baseNpr: netNpr, amountNpr: tax.amountNpr };
     }
-    return line;
+    if (!Number.isFinite(tax.percentage) || tax.percentage < 0 || tax.percentage > 100 || Math.abs(tax.percentage * 100 - Math.round(tax.percentage * 100)) >= 1e-8) {
+      throw new Error("Tax percentage must be from 0 to 100 with up to 2 decimals.");
+    }
+    return { id: tax.id, label, mode: tax.mode, percentage: tax.percentage, baseNpr: netNpr, amountNpr: assertDatabaseInteger(Math.round(netNpr * tax.percentage / 100)) };
   });
-  const taxTotalNpr = assertDatabaseInteger(invoiceLines.filter((line) => line.type === "TAX").reduce((sum, line) => sum + line.amountNpr, 0));
-  const discountTotalNpr = assertDatabaseInteger(invoiceLines.filter((line) => line.type === "DISCOUNT").reduce((sum, line) => sum + line.amountNpr, 0));
-  const grandTotalNpr = assertDatabaseInteger(subtotalNpr + taxTotalNpr - discountTotalNpr);
-  if (grandTotalNpr < 0) throw new Error("Discounts cannot exceed the subtotal and tax amounts.");
+  const taxTotalNpr = assertDatabaseInteger(taxLines.reduce((sum, tax) => sum + tax.amountNpr, 0));
+  const grandTotalNpr = assertDatabaseInteger(netNpr + taxTotalNpr);
 
-  const extraLines = invoiceLines.flatMap((line): InvoiceExtraSnapshot[] => {
-    if (line.type !== "CHARGE" || !line.sourceExtraId) return [];
-    return [{ id: line.sourceExtraId, name: line.description, unit: line.unitLabel ?? "", quantity: line.quantity ?? 1, priceNpr: line.unitAmountNpr ?? 0, totalNpr: line.amountNpr }];
-  });
+  const extraLines = adjustmentLines.flatMap((line): InvoiceExtraSnapshot[] => line.type === "CHARGE" && line.sourceExtraId
+    ? [{ id: line.sourceExtraId, name: line.description, unit: line.unitLabel ?? "", quantity: line.quantity, priceNpr: line.unitAmountNpr, totalNpr: line.amountNpr }]
+    : []);
 
   return {
-    roomLines,
-    extraLines,
-    invoiceLines: [...roomLines, ...invoiceLines],
-    standardSubtotalNpr,
-    subtotalNpr,
-    taxTotalNpr,
-    discountTotalNpr,
-    grandTotalNpr,
+    roomLines, extraLines, invoiceLines: [...roomLines, ...adjustmentLines], taxLines,
+    standardSubtotalNpr, subtotalNpr, discountTotalNpr, netNpr, taxTotalNpr, grandTotalNpr,
   };
+}
+
+export function invoiceTotalsRows(totals: Pick<InvoiceTotals, "subtotalNpr" | "discountTotalNpr" | "netNpr" | "taxLines" | "grandTotalNpr">): InvoiceTotalsRow[] {
+  return [
+    { kind: "subtotal", label: "Subtotal (charges)", amountNpr: totals.subtotalNpr },
+    { kind: "discount", label: "Discounts", amountNpr: -totals.discountTotalNpr },
+    { kind: "net", label: "Net", amountNpr: totals.netNpr },
+    ...totals.taxLines.map((tax) => ({
+      kind: "tax" as const,
+      label: tax.mode === "PERCENT" ? `${tax.label} ${tax.percentage}% on ${formatNpr(tax.baseNpr)} —` : `${tax.label} (fixed) on ${formatNpr(tax.baseNpr)} —`,
+      amountNpr: tax.amountNpr,
+    })),
+    { kind: "amountDue", label: "Amount due", amountNpr: totals.grandTotalNpr },
+  ];
 }
 
 export function invoiceNumber(year: number, sequence: number | bigint) {

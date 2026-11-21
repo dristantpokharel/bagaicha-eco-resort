@@ -10,22 +10,24 @@ import { PageHeader } from "@/components/admin/page-header";
 import { buttonClasses } from "@/components/ui/button";
 import { InvoiceControls } from "../invoice-controls";
 import { LinkReservationForm } from "../link-reservation-form";
-import { invoiceDisplayLines, invoiceDisplayTotals } from "@/lib/invoice/lines";
+import { invoiceDisplayLines, invoiceDisplayTotalsRows } from "@/lib/invoice/lines";
+import { FormMessage } from "@/components/ui/form";
 
 export const metadata = { title: "Invoice" };
 
 type Guest = { name: string; email: string | null; phone: string | null; country: string | null; address?: string | null; referenceNote?: string | null };
 function displayPaymentMethod(method: string | null) { return method?.replaceAll("_", " ") ?? ""; }
 
-export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requirePagePermission("invoices.view");
   const { id } = await params;
+  const query = await searchParams;
   const [invoice, business] = await Promise.all([db.invoice.findUnique({ where: { id } }), db.businessInfo.findUnique({ where: { id: 1 } })]);
   if (!invoice) notFound();
   const guest = invoice.guestSnapshot as Guest;
   const linkedReservation = invoice.linkedReservationId ? await db.reservation.findUnique({ where: { id: invoice.linkedReservationId }, select: { id: true, reference: true } }) : null;
   const lines = invoiceDisplayLines(invoice);
-  const totals = invoiceDisplayTotals(invoice);
+  const totalRows = invoiceDisplayTotalsRows(invoice);
   const staff = can(user.role, "invoices.issue");
   const panVat = business?.panVatNumber && !business.placeholderFields.includes("panVatNumber") ? business.panVatNumber : null;
   const footerNote = business?.invoiceFooterNote && !business.placeholderFields.includes("invoiceFooterNote") ? business.invoiceFooterNote : null;
@@ -36,6 +38,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     <div className="print:hidden">
       <p className="mb-2 text-sm"><Link href="/admin/invoices" className="text-forest underline underline-offset-4">← All invoices</Link></p>
       <PageHeader title={invoice.number} description={`Invoice date ${formatStayDate(invoice.invoiceDate)}${invoice.reservationRef ? ` · Booking ${invoice.reservationRef}` : " · Standalone"}`} />
+      {(query.issued === "1" || Array.isArray(query.issued) && query.issued[0] === "1") && <div className="mb-3"><FormMessage type="success">Invoice {invoice.number} issued.</FormMessage></div>}
       <InvoiceControls invoiceId={invoice.id} status={invoice.status} canManage={staff} />
       <div className="mt-4 flex flex-wrap gap-2 text-sm">
         {invoice.reservationId && <Link href={`/admin/bookings/${invoice.reservationId}`} className={buttonClasses({ variant: "secondary", size: "sm" })}>Open reservation</Link>}
@@ -55,10 +58,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <div><h2 className="text-xs font-semibold uppercase tracking-wider text-charcoal-light">Billed to</h2><p className="mt-1 font-semibold">{guest.name}</p>{guest.email && <p className="text-sm">{guest.email}</p>}{guest.phone && <p className="text-sm">{guest.phone}</p>}{guest.address && <p className="text-sm">{guest.address}</p>}{guest.country && <p className="text-sm">{guest.country}</p>}{guest.referenceNote && <p className="mt-2 text-sm">Reference: {guest.referenceNote}</p>}</div>
         {(invoice.reservationRef || invoice.checkIn || invoice.checkOut || linkedReservation) && <div><h2 className="text-xs font-semibold uppercase tracking-wider text-charcoal-light">Stay details</h2>{invoice.reservationRef && <p className="mt-1">Booking reference: {invoice.reservationRef}</p>}{linkedReservation && <p className="mt-1">Linked reservation: {linkedReservation.reference}</p>}{invoice.checkIn && <p className="text-sm">Check-in: {formatStayDate(invoice.checkIn)}</p>}{invoice.checkOut && <p className="text-sm">Check-out: {formatStayDate(invoice.checkOut)}</p>}{invoice.nights && invoice.nights > 0 && <p className="text-sm">Nights: {invoice.nights}</p>}</div>}
       </section>
-      <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="border-b border-forest/20 text-xs uppercase tracking-wide text-charcoal-light"><tr><th className="py-3 pr-3">Description</th><th className="px-2 py-3 text-right">Rate / night</th><th className="px-2 py-3 text-right">Nights</th><th className="py-3 pl-2 text-right">Amount</th></tr></thead>
-        <tbody className="divide-y divide-forest/10">{lines.map((line) => <tr key={line.id}><td className="py-3 pr-3"><span className="font-medium">{line.description}</span>{staff && line.type === "ROOM" && <span className="print:hidden block text-xs text-charcoal-light">Standard {formatNpr(line.standardRateNpr ?? 0)}</span>}</td><td className="px-2 py-3 text-right align-top">{line.ratePerNightNpr === null ? "—" : formatNpr(line.ratePerNightNpr)}</td><td className="px-2 py-3 text-right align-top">{line.nights ?? "—"}</td><td className="py-3 pl-2 text-right align-top font-medium">{line.included ? "Included" : line.type === "DISCOUNT" ? `−${formatNpr(line.amountNpr)}` : formatNpr(line.amountNpr)}</td></tr>)}</tbody>
+      <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="border-b border-forest/20 text-xs uppercase tracking-wide text-charcoal-light"><tr><th className="py-3 pr-3">Description</th><th className="px-2 py-3 text-right">Rate</th><th className="px-2 py-3 text-right">Qty / nights</th><th className="py-3 pl-2 text-right">Amount</th></tr></thead>
+        <tbody className="divide-y divide-forest/10">{lines.map((line) => <tr key={line.id}><td className="py-3 pr-3"><span className="font-medium">{line.description}</span>{staff && line.type === "ROOM" && <span className="print:hidden block text-xs text-charcoal-light">Standard {formatNpr(line.standardRateNpr ?? 0)}</span>}</td><td className="px-2 py-3 text-right align-top">{formatNpr(line.rateNpr)}</td><td className="px-2 py-3 text-right align-top">{line.quantity}{line.quantityLabel ? ` ${line.quantityLabel}` : ""}</td><td className="py-3 pl-2 text-right align-top font-medium">{line.included ? "Included" : line.type === "DISCOUNT" ? `−${formatNpr(line.amountNpr)}` : formatNpr(line.amountNpr)}</td></tr>)}</tbody>
       </table></div>
-      <section className="ml-auto mt-5 grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 border-t border-forest/20 pt-4 text-sm"><span>Subtotal</span><span className="text-right">{formatNpr(totals.subtotalNpr)}</span><span>Tax</span><span className="text-right">{formatNpr(totals.taxTotalNpr)}</span><span>Discounts</span><span className="text-right">{formatNpr(totals.discountTotalNpr)}</span><span className="border-t border-forest/20 pt-2 text-base font-semibold">Amount due</span><span className="border-t border-forest/20 pt-2 text-right text-base font-semibold">{formatNpr(totals.amountDueNpr)}</span></section>
+      <section className="ml-auto mt-5 grid max-w-md grid-cols-[1fr_auto] gap-x-6 gap-y-2 border-t border-forest/20 pt-4 text-sm">{totalRows.map((row, index) => <div key={`${row.kind}-${index}`} className={`col-span-2 grid grid-cols-[1fr_auto] gap-x-6 ${row.kind === "amountDue" ? "mt-1 border-t border-forest/20 pt-2 text-base font-semibold" : row.kind === "net" ? "font-medium" : ""}`}><span>{row.label}</span><span className="text-right">{formatNpr(row.amountNpr)}</span></div>)}</section>
       {invoice.status === "VOID" && invoice.voidReason && <p className="mt-5 border border-error/25 bg-error/5 p-3 text-sm"><strong>Void reason:</strong> {invoice.voidReason}</p>}{footerNote && <footer className="mt-8 border-t border-forest/20 pt-4 text-center text-sm">{footerNote}</footer>}
     </article>
   </>;

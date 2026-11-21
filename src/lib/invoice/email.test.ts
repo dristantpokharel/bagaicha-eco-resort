@@ -9,12 +9,11 @@ describe("invoice email output", () => {
       status: "ISSUED", paymentMethod: null, paidAt: null, paymentNote: null,
       invoiceLines: [
         { id: "room", type: "ROOM", description: "Cottage", standardRateNpr: 3000, ratePerNightNpr: 2500, nights: 2, amountNpr: 5000, children: 0, childChargeNpr: 0 },
-        { id: "tax", type: "TAX", description: "VAT 13%", calculation: "PERCENT", percentage: 13, amountNpr: 650 },
-      ], roomLines: [], extraLines: [], subtotalNpr: 5000, taxTotalNpr: 650, discountTotalNpr: 0, grandTotalNpr: 5650,
+      ], taxLines: [{ id: "tax", label: "VAT", mode: "PERCENT", percentage: 13, baseNpr: 5000, amountNpr: 650 }], roomLines: [], extraLines: [], subtotalNpr: 5000, taxTotalNpr: 650, discountTotalNpr: 0, grandTotalNpr: 5650,
     }, { name: "Resort", address: null, phones: [], emails: [], panVatNumber: null, invoiceFooterNote: null }, null);
     expect(rendered.html).toContain("Description");
-    expect(rendered.html).toContain("Rate / night");
-    expect(rendered.html).toContain("Nights");
+    expect(rendered.html).toContain("Qty / nights");
+    expect(rendered.html).toContain("VAT 13% on NPR 5,000");
     expect(rendered.html).toContain("Amount");
     expect(rendered.html).toContain("NPR 2,500");
     expect(rendered.html).not.toContain("Standard / night");
@@ -30,7 +29,7 @@ describe("invoice email output", () => {
     }, { name: "Resort", address: null, phones: [], emails: [], panVatNumber: null, invoiceFooterNote: null }, null);
     expect(rendered.html).toContain("Ward 2 &lt;Bardiya&gt;");
     expect(rendered.html).toContain("PO-2");
-    expect(rendered.html).toContain("Rate / night");
+    expect(rendered.html).toContain("Rate</th>");
     expect(rendered.html).not.toContain("Booking:");
     expect(rendered.text).toContain("200");
   });

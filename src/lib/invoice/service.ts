@@ -4,7 +4,7 @@ import type { InvoicePaymentMethod } from "@/generated/prisma/enums";
 import { logActivity } from "@/lib/activity-log";
 import { nightsBetween } from "@/lib/booking/dates";
 import { calculateInvoiceTotals, invoiceNumber } from "./pricing";
-import type { InvoiceAdjustmentInput, InvoiceRoomInput } from "./pricing";
+import type { InvoiceAdjustmentInput, InvoiceRoomInput, InvoiceTaxInput } from "./pricing";
 
 export const BILLABLE_BOOKING_STATUSES = ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] as const;
 
@@ -19,13 +19,17 @@ export async function issueInvoice(
   tx: Prisma.TransactionClient,
   input: {
     reservationId: string;
+    submissionId: string;
     userId: string;
     roomRates: Record<string, number>;
     adjustmentLines: InvoiceAdjustmentInput[];
+    taxRows: InvoiceTaxInput[];
     allowAboveStandard: boolean;
     now?: Date;
   },
 ) {
+  const retried = await tx.invoice.findUnique({ where: { submissionId: input.submissionId } });
+  if (retried) return retried;
   const reservation = await tx.reservation.findUnique({
     where: { id: input.reservationId },
     include: {
@@ -72,7 +76,7 @@ export async function issueInvoice(
     }
     return line;
   });
-  const totals = calculateInvoiceTotals(rooms, adjustments, nights, { allowAboveStandard: input.allowAboveStandard });
+  const totals = calculateInvoiceTotals(rooms, adjustments, nights, { allowAboveStandard: input.allowAboveStandard, taxRows: input.taxRows });
   const now = input.now ?? new Date();
   const year = Number(formatInTimeZone(now, "Asia/Kathmandu", "yyyy"));
   const sequence = await tx.$queryRaw<{ value: bigint }[]>`SELECT nextval('invoice_number_seq') AS value`;
@@ -87,6 +91,7 @@ export async function issueInvoice(
   const created = await tx.invoice.create({
     data: {
       number,
+      submissionId: input.submissionId,
       reservationId: reservation.id,
       reservationRef: reservation.reference,
       guestSnapshot,
@@ -97,6 +102,7 @@ export async function issueInvoice(
       roomLines: totals.roomLines as unknown as Prisma.InputJsonValue,
       extraLines: totals.extraLines as unknown as Prisma.InputJsonValue,
       invoiceLines: totals.invoiceLines as unknown as Prisma.InputJsonValue,
+      taxLines: totals.taxLines as unknown as Prisma.InputJsonValue,
       standardSubtotalNpr: totals.standardSubtotalNpr,
       discountTotalNpr: totals.discountTotalNpr,
       subtotalNpr: totals.subtotalNpr,
@@ -119,6 +125,7 @@ export async function issueInvoice(
 export async function issueStandaloneInvoice(
   tx: Prisma.TransactionClient,
   input: {
+    submissionId: string;
     userId: string;
     name: string;
     phone: string;
@@ -129,10 +136,13 @@ export async function issueStandaloneInvoice(
     checkOut: Date | null;
     referenceNote: string | null;
     saveAsGuest: boolean;
-    lines: Array<{ id: string; type: "CHARGE" | "TAX" | "DISCOUNT"; description: string; reference: string; quantity: number; unitAmountNpr: number }>;
+    lines: Array<{ id: string; type: "CHARGE" | "DISCOUNT"; description: string; reference: string; quantity: number; unitAmountNpr: number }>;
+    taxRows: InvoiceTaxInput[];
     now?: Date;
   },
 ) {
+  const retried = await tx.invoice.findUnique({ where: { submissionId: input.submissionId } });
+  if (retried) return retried;
   if (input.saveAsGuest) {
     await tx.guest.create({ data: { name: input.name, phone: input.phone, email: input.email, notes: input.address ? `Invoice address: ${input.address}` : null } });
   }
@@ -140,10 +150,9 @@ export async function issueStandaloneInvoice(
   const adjustments: InvoiceAdjustmentInput[] = input.lines.map((line) => {
     const base = { id: line.id, description: line.description, reference: line.reference || null, quantity: line.quantity, unitAmountNpr: line.unitAmountNpr, unitLabel: null };
     if (line.type === "CHARGE") return { ...base, type: "CHARGE" };
-    if (line.type === "DISCOUNT") return { ...base, type: "DISCOUNT" };
-    return { ...base, type: "TAX", calculation: "QUANTITY" };
+    return { ...base, type: "DISCOUNT" };
   });
-  const totals = calculateInvoiceTotals([], adjustments, nights);
+  const totals = calculateInvoiceTotals([], adjustments, nights, { taxRows: input.taxRows });
   const now = input.now ?? new Date();
   const year = Number(formatInTimeZone(now, "Asia/Kathmandu", "yyyy"));
   const sequence = await tx.$queryRaw<{ value: bigint }[]>`SELECT nextval('invoice_number_seq') AS value`;
@@ -152,6 +161,7 @@ export async function issueStandaloneInvoice(
   const created = await tx.invoice.create({
     data: {
       number,
+      submissionId: input.submissionId,
       reservationId: null,
       reservationRef: null,
       guestSnapshot,
@@ -162,6 +172,7 @@ export async function issueStandaloneInvoice(
       roomLines: [] as unknown as Prisma.InputJsonValue,
       extraLines: [] as unknown as Prisma.InputJsonValue,
       invoiceLines: totals.invoiceLines as unknown as Prisma.InputJsonValue,
+      taxLines: totals.taxLines as unknown as Prisma.InputJsonValue,
       standardSubtotalNpr: 0,
       discountTotalNpr: totals.discountTotalNpr,
       subtotalNpr: totals.subtotalNpr,

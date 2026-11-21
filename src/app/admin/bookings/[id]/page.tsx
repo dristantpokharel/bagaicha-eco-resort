@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { loadStayTerms } from "@/lib/content/stay-terms";
@@ -182,6 +183,7 @@ export default async function ReservationPage({
               if (eligible.length === 0) return <p className="text-sm text-charcoal-light">This reservation has no confirmed, checked-in, or checked-out rooms to invoice. Pending or cancelled rooms are not invoiced.</p>;
               return <InvoiceIssueForm
                 reservationId={reservation.id}
+                submissionId={randomUUID()}
                 nights={nights}
                 allowAboveStandard={user.role === "ADMIN" || user.role === "SUPERUSER"}
                 rooms={eligible.map((b) => ({ id: b.id, name: b.roomType.name, roomName: b.room?.name ?? null, standardRateNpr: b.pricePerNightNpr, childRateNpr: b.childPricePerNightNpr, children: b.children }))}

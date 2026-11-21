@@ -28,28 +28,35 @@ export async function issueInvoiceAction(_prev: ActionResult | null, formData: F
     }
     const parsed = issueInvoiceSchema.safeParse({
       reservationId,
+      submissionId: formData.get("submissionId"),
       roomLines,
       adjustmentLines: formData.get("adjustmentLines"),
+      taxRows: formData.get("taxRows"),
       allowAboveStandard: formData.get("allowAboveStandard") === "on",
     });
     if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Check the invoice lines.");
+    let invoice;
     try {
-      await db.$transaction((tx) => issueInvoice(tx, {
+      invoice = await db.$transaction((tx) => issueInvoice(tx, {
         reservationId,
+        submissionId: parsed.data.submissionId,
         userId: actor.id,
         roomRates: Object.fromEntries(parsed.data.roomLines.map((line) => [line.bookingId, line.discountedRateNpr])),
         adjustmentLines: parsed.data.adjustmentLines,
+        taxRows: parsed.data.taxRows,
         allowAboveStandard: parsed.data.allowAboveStandard,
       }));
     } catch (error) {
       if (error instanceof InvoiceRuleError) throw new ActionError(error.message);
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new ActionError("This reservation already has an active invoice. Void it before issuing another.");
+        invoice = await db.invoice.findUnique({ where: { submissionId: parsed.data.submissionId } });
+        if (!invoice) throw new ActionError("This reservation already has an active invoice. Void it before issuing another.");
+      } else {
+        throw error;
       }
-      throw error;
     }
     revalidateInvoices(reservationId);
-    return { ok: true, message: "Invoice issued from the current reservation snapshot." };
+    return { ok: true, message: `Invoice ${invoice.number} issued.`, invoiceId: invoice.id };
   });
 }
 
@@ -57,23 +64,35 @@ export async function issueStandaloneInvoiceAction(_prev: ActionResult | null, f
   return runAction(async () => {
     const actor = await requirePermission("invoices.issue");
     const parsed = standaloneInvoiceSchema.safeParse({
+      submissionId: formData.get("submissionId"),
       name: formData.get("name"), phone: formData.get("phone"), email: formData.get("email"), address: formData.get("address"),
       invoiceDate: formData.get("invoiceDate"), checkIn: formData.get("checkIn"), checkOut: formData.get("checkOut"),
-      referenceNote: formData.get("referenceNote"), saveAsGuest: formData.get("saveAsGuest") === "on", lines: formData.get("lines"),
+      referenceNote: formData.get("referenceNote"), saveAsGuest: formData.get("saveAsGuest") === "on", lines: formData.get("lines"), taxRows: formData.get("taxRows"),
     });
     if (!parsed.success) throw new ActionError(parsed.error.issues[0]?.message ?? "Check the standalone invoice details.");
     const invoiceDate = parseDateOnly(parsed.data.invoiceDate);
     const checkIn = parsed.data.checkIn ? parseDateOnly(parsed.data.checkIn) : null;
     const checkOut = parsed.data.checkOut ? parseDateOnly(parsed.data.checkOut) : null;
     if (!invoiceDate || (parsed.data.checkIn && !checkIn) || (parsed.data.checkOut && !checkOut)) throw new ActionError("Enter valid invoice and stay dates.");
-    await db.$transaction((tx) => issueStandaloneInvoice(tx, {
-      userId: actor.id, name: parsed.data.name, phone: parsed.data.phone,
-      email: parsed.data.email || null, address: parsed.data.address || null, invoiceDate,
-      checkIn, checkOut, referenceNote: parsed.data.referenceNote || null, saveAsGuest: parsed.data.saveAsGuest,
-      lines: parsed.data.lines,
-    }));
+    let invoice;
+    try {
+      invoice = await db.$transaction((tx) => issueStandaloneInvoice(tx, {
+        submissionId: parsed.data.submissionId,
+        userId: actor.id, name: parsed.data.name, phone: parsed.data.phone,
+        email: parsed.data.email || null, address: parsed.data.address || null, invoiceDate,
+        checkIn, checkOut, referenceNote: parsed.data.referenceNote || null, saveAsGuest: parsed.data.saveAsGuest,
+        lines: parsed.data.lines, taxRows: parsed.data.taxRows,
+      }));
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        invoice = await db.invoice.findUnique({ where: { submissionId: parsed.data.submissionId } });
+        if (!invoice) throw error;
+      } else {
+        throw error;
+      }
+    }
     revalidateInvoices();
-    return { ok: true, message: "Standalone invoice issued." };
+    return { ok: true, message: `Invoice ${invoice.number} issued.`, invoiceId: invoice.id };
   });
 }
 

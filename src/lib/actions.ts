@@ -3,7 +3,7 @@ import { AuthorizationError } from "@/lib/auth/session";
 
 /** Result shape returned by server actions to client forms. */
 export type ActionResult =
-  | { ok: true; message: string }
+  | { ok: true; message: string; invoiceId?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** Expected, user-facing failure inside an action (validation, business rule). */
