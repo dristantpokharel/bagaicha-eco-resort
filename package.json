@@ -16,6 +16,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:dryrun-migration": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs scripts/dryrun-migration.ts",
+    "db:prelaunch-clean": "node --env-file=.env.local node_modules/tsx/dist/cli.mjs scripts/prelaunch-clean.ts",
     "db:seed": "prisma db seed",
     "db:generate": "prisma generate",
     "media:seed-photos": "tsx scripts/seed-photos.ts",
