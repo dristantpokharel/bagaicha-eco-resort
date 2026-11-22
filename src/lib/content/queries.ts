@@ -7,6 +7,7 @@ import { CONTENT_TAG } from "./revalidate";
 import { loadStayTerms } from "./stay-terms";
 import { fillTokens, type TokenContext } from "./tokens";
 import { activeFlags, hasPlaceholderIn, liveValue, mediaVisible, showPlaceholders } from "./placeholder";
+import { selectHomepageActivities } from "./homepage-activities";
 
 /**
  * Every public page reads content through here: one cached read per kind, all
@@ -121,6 +122,9 @@ export type PublicActivity = {
   /** The primary photo, for compact views. */
   cover: PublicMedia | null;
   placeholderFields: string[];
+  showOnHomepage: boolean;
+  homepageOrder: number;
+  hasPlaceholder: boolean;
 };
 
 export const getActivities = cached(async (): Promise<PublicActivity[]> => {
@@ -143,6 +147,9 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
         slug: r.slug,
         title: r.title,
         group: r.group,
+        showOnHomepage: r.showOnHomepage,
+        homepageOrder: r.homepageOrder,
+        hasPlaceholder: activeFlags("activities", r.placeholderFields).length > 0,
         category: liveValue<string>(r, "category"),
         description: liveValue<string>(r, "overview"),
         destination: d
@@ -159,6 +166,11 @@ export const getActivities = cached(async (): Promise<PublicActivity[]> => {
       };
     });
 }, "activities");
+
+export const getHomepageActivities = cached(async (): Promise<PublicActivity[]> => {
+  const activities = await getActivities();
+  return selectHomepageActivities(activities, showPlaceholders);
+}, "homepage-activities");
 
 export type PublicEventType = {
   id: string;

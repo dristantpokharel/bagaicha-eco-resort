@@ -565,6 +565,8 @@ model Activity {
   destinationId     String?
   coverMediaId      String?
   sortOrder         Int           @default(0)
+  showOnHomepage    Boolean       @default(false)
+  homepageOrder     Int           @default(0)
   isActive          Boolean       @default(true)
   /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
   placeholderFields String[]      @default([])

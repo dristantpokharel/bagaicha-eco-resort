@@ -69,4 +69,19 @@ describe("content schemas", () => {
     const ok = parse("activities", { title: "Pickleball", group: "AT_BAGAICHA", destinationId: "" });
     expect(ok.success && ok.data.destinationId).toBeNull();
   });
+
+  it("validates homepage selection and order for activities", () => {
+    const selected = parse("activities", {
+      title: "Birdwatching",
+      group: "DAY_TRIP",
+      showOnHomepage: "on",
+      homepageOrder: "3",
+    });
+    expect(selected.success && selected.data).toMatchObject({ showOnHomepage: true, homepageOrder: 3 });
+
+    const unchecked = parse("activities", { title: "Walk", group: "AT_BAGAICHA", homepageOrder: "0" });
+    expect(unchecked.success && unchecked.data.showOnHomepage).toBe(false);
+    expect(parse("activities", { title: "Walk", group: "AT_BAGAICHA", homepageOrder: "1000" }).success).toBe(false);
+    expect(parse("activities", { title: "Walk", group: "AT_BAGAICHA", homepageOrder: "1.5" }).success).toBe(false);
+  });
 });

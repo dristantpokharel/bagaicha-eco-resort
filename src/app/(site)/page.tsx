@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getActivities, getBusiness, getHomepageSlots, getNearby, getRoomTypes } from "@/lib/content/queries";
+import { getBusiness, getHomepageActivities, getHomepageSlots, getNearby, getRoomTypes } from "@/lib/content/queries";
 import { About } from "@/components/site/sections/about";
 import { ExperiencesBand } from "@/components/site/sections/experiences-band";
 import { Hero } from "@/components/site/sections/hero";
@@ -23,7 +23,7 @@ export default async function HomePage() {
     getBusiness(),
     getHomepageSlots(),
     getRoomTypes(),
-    getActivities(),
+    getHomepageActivities(),
     getNearby(),
   ]);
 

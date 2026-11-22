@@ -44,7 +44,7 @@ export function ContentForm({
 
   const control = (f: FieldDef) => {
     const id = `${prefix}-${f.name}`;
-    const value = row?.values[f.name] ?? "";
+    const value = row?.values[f.name] ?? f.defaultValue ?? "";
     const common = { id, name: f.name, defaultValue: value, ...a11y(f.name) };
     switch (f.kind) {
       case "textarea":
@@ -54,6 +54,8 @@ export function ContentForm({
       case "int":
       case "float":
         return <Input {...common} inputMode={f.kind === "int" ? "numeric" : "decimal"} />;
+      case "checkbox":
+        return <input id={id} name={f.name} type="checkbox" value="on" defaultChecked={value === "true"} className="size-4 accent-forest" {...a11y(f.name)} />;
       case "url":
         return <Input {...common} type="url" inputMode="url" placeholder="https://" />;
       case "select":
@@ -115,6 +117,18 @@ export function ContentForm({
         {collection.fields.map((f) => {
           const wide = f.kind === "textarea" || f.kind === "lines";
           const flagged = row?.placeholderFields.includes(f.name);
+          if (f.kind === "checkbox") {
+            return (
+              <div key={f.name} className="sm:col-span-2">
+                <label htmlFor={`${prefix}-${f.name}`} className="flex min-h-10 items-center gap-2 text-sm font-medium text-charcoal">
+                  {control(f)}
+                  {f.label}
+                </label>
+                {f.hint && <p className="mt-1 text-xs text-charcoal-light">{f.hint}</p>}
+                {errors?.[f.name] && <p id={`${prefix}-${f.name}-error`} className="mt-1 text-xs text-error">{errors[f.name]}</p>}
+              </div>
+            );
+          }
           return (
             <div key={f.name} className={wide ? "sm:col-span-2" : ""}>
               <Field

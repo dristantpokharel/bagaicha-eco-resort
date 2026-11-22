@@ -2,7 +2,6 @@ import Link from "next/link";
 import { HOME } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import type { PublicActivity } from "@/lib/content/queries";
-import { showPlaceholders } from "@/lib/content/placeholder";
 import { MediaPhoto } from "../photo";
 import { Placeholder } from "../placeholder";
 import { Reveal } from "../reveal";
@@ -10,11 +9,10 @@ import { SectionHeading } from "../typography";
 
 const TILES = 4;
 
-/** Home experiences: up to four "At Bagaicha" activities as photo tiles (name only), then a link to /explore. */
+/** Home experiences: up to four selected activities as photo tiles (name only), then a link to /explore. */
 export function ExperiencesBand({ activities }: { activities: PublicActivity[] }) {
-  const here = activities.filter((a) => a.group === "AT_BAGAICHA");
-  // Tiles with a photo first; in development a missing photo shows a marked placeholder instead.
-  const tiles = [...here.filter((a) => a.cover), ...(showPlaceholders ? here.filter((a) => !a.cover) : [])].slice(0, TILES);
+  // Preserve the homepage order selected by the content query.
+  const tiles = activities.slice(0, TILES);
   if (tiles.length === 0) return null;
   const copy = HOME.explore;
   return (

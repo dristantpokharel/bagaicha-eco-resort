@@ -7,7 +7,7 @@ import { TOKEN_HELP } from "./tokens";
  * validation schema and the save action, so a field is declared exactly once.
  */
 
-export type FieldKind = "text" | "textarea" | "lines" | "url" | "int" | "float" | "select" | "media" | "section" | "destination";
+export type FieldKind = "text" | "textarea" | "lines" | "url" | "int" | "float" | "select" | "media" | "section" | "destination" | "checkbox";
 
 export type Field = {
   name: string;
@@ -18,6 +18,7 @@ export type Field = {
   hint?: string;
   rows?: number;
   placeholder?: string;
+  defaultValue?: string;
   options?: readonly { value: string; label: string }[];
   /** Checks each non-empty line (kind "lines"). Return an error message or null. */
   lineCheck?: (line: string) => string | null;
@@ -131,6 +132,8 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
         hint: "At Bagaicha, close by, or a day trip.",
       },
       { name: "category", label: "Category", kind: "text", max: 40, hint: "e.g. Wildlife, Culture, Nature, Relax." },
+      { name: "showOnHomepage", label: "Show on homepage", kind: "checkbox", hint: "Selected activities may appear in the homepage Experiences band." },
+      { name: "homepageOrder", label: "Homepage order", kind: "int", defaultValue: "0", min: 0, maxValue: 999, hint: "Lower numbers appear first when several activities are selected." },
       { name: "overview", label: "Description", kind: "textarea", max: 1500, rows: 4, hint: "One paragraph." },
       {
         name: "destinationId",
@@ -271,6 +274,8 @@ function fieldSchema(field: Field): z.ZodType {
       if (field.maxValue !== undefined) n = n.max(field.maxValue, { error: `At most ${field.maxValue}.` });
       const clean = (v: unknown) => (typeof v === "string" ? v.replace(/[,\s]/g, "") : v);
       if (field.required) return z.preprocess((v) => (clean(v) === "" ? undefined : clean(v)), n);
+      if (field.defaultValue !== undefined)
+        return z.preprocess((v) => (clean(v) === "" || clean(v) == null ? field.defaultValue : clean(v)), n);
       return z.preprocess(clean, z.preprocess(emptyToNull, n.nullable()));
     }
     case "select": {
@@ -278,6 +283,8 @@ function fieldSchema(field: Field): z.ZodType {
       const choice = z.string().refine((v) => allowed.includes(v), { error: "Choose one." });
       return field.required ? choice : z.preprocess(emptyToNull, choice.nullable());
     }
+    case "checkbox":
+      return z.preprocess((v) => v === "on" || v === "true", z.boolean());
     case "media":
     case "section": {
       const id = z.string().trim().min(1).max(64);
