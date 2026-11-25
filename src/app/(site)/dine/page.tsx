@@ -3,6 +3,8 @@ import { BOOKING_HREF, PAGES } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import { formatNpr } from "@/lib/money";
 import { getBusiness, getDining, getHomepageSlots } from "@/lib/content/queries";
+import { RelatedLinks } from "@/components/site/related-links";
+import { isKrishnasaarPublic } from "@/lib/krishnasaar/queries";
 import { pageMetadata } from "@/lib/seo";
 import { JsonLd } from "@/components/site/json-ld";
 import { restaurantJsonLd } from "@/lib/structured-data";
@@ -15,7 +17,7 @@ import { ContentText } from "@/components/site/sections/content-text";
 export const generateMetadata = () => pageMetadata({ title: PAGES.dine.title, description: PAGES.dine.description, path: "/dine" });
 
 export default async function DinePage() {
-  const [sections, slots, business] = await Promise.all([getDining(), getHomepageSlots(), getBusiness()]);
+  const [sections, slots, business, krishnasaar] = await Promise.all([getDining(), getHomepageSlots(), getBusiness(), isKrishnasaarPublic()]);
   const [lead, second] = slots.DINE ?? [];
   const copy = PAGES.dine;
   return (
@@ -70,6 +72,7 @@ export default async function DinePage() {
           </Link>
         </div>
       </div>
+      <RelatedLinks keys={["stay", "explore", "location", "guides"]} krishnasaar={krishnasaar} />
     </>
   );
 }

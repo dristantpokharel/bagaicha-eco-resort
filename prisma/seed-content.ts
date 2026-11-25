@@ -22,7 +22,8 @@ const ph = (what: string) => `Placeholder: ${what}, owner to provide.`;
 const BUSINESS = {
   name: "Bagaicha Eco Resort",
   tagline: "Where nature meets comfort",
-  intro: "A perfect escape in the heart of Bardiya",
+  // Seed default only (fills an empty field; never overwrites live content).
+  intro: "A peaceful eco resort and hotel in Gulariya, in the heart of Bardiya",
   address: "Khairi, Gulariya-3, Bardiya, Nepal",
   phones: ["+977 9747932458"],
   whatsapp: "9779851081502",

@@ -3,7 +3,7 @@ import { getImageProps } from "next/image";
 import { buttonClasses } from "@/components/ui/button";
 import { cloudinaryLoader } from "@/lib/cloudinary/delivery";
 import type { PublicMedia } from "@/lib/content/queries";
-import { BOOKING_HREF } from "@/config/site-copy";
+import { BOOKING_HREF, HOME } from "@/config/site-copy";
 import { Wave } from "../decor";
 
 /** Full-screen hero. Desktop and phone photos come from the Media placements; the first is preloaded. */
@@ -46,6 +46,7 @@ export function Hero({
       <div className="container-page relative flex h-full flex-col justify-end pb-28 md:pb-40">
         <h1 id="hero-heading" className="text-display mt-5 max-w-3xl animate-fade-up [animation-delay:150ms]">
           {name}
+          <span className="mt-4 block font-label text-sm font-semibold tracking-[0.2em] text-cream/90 uppercase md:text-base">{HOME.hero.kicker}</span>
         </h1>
         {tagline && <p className="text-heading-soft mt-3 animate-fade-up [animation-delay:300ms]">{tagline}</p>}
         <div className="mt-9 flex flex-wrap gap-3 animate-fade-up [animation-delay:450ms]">

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { PAGES } from "@/config/site-copy";
 import { getRoomTypes, getStayTerms } from "@/lib/content/queries";
+import { RelatedLinks } from "@/components/site/related-links";
+import { isKrishnasaarPublic } from "@/lib/krishnasaar/queries";
 import { pageMetadata } from "@/lib/seo";
 import { PageIntro } from "@/components/site/page-intro";
 import { RoomSection } from "@/components/site/sections/room-section";
@@ -8,7 +10,7 @@ import { RoomSection } from "@/components/site/sections/room-section";
 export const generateMetadata = () => pageMetadata({ title: PAGES.stay.title, description: PAGES.stay.description, path: "/stay" });
 
 export default async function StayPage() {
-  const [rooms, { childUnderAge }] = await Promise.all([getRoomTypes(), getStayTerms()]);
+  const [rooms, { childUnderAge }, krishnasaar] = await Promise.all([getRoomTypes(), getStayTerms(), isKrishnasaarPublic()]);
   const copy = PAGES.stay;
   return (
     <>
@@ -26,6 +28,7 @@ export default async function StayPage() {
         </Link>
         .
       </p>
+      <RelatedLinks keys={["dine", "explore", "location", "guides"]} krishnasaar={krishnasaar} />
     </>
   );
 }

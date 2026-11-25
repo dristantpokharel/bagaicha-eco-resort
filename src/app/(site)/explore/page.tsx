@@ -4,6 +4,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { getActivities, getHomepageSlots, type ActivityGroupKey } from "@/lib/content/queries";
 import { getKrishnasaar } from "@/lib/krishnasaar/queries";
 import { MediaPhoto } from "@/components/site/photo";
+import { RelatedLinks } from "@/components/site/related-links";
 import { pageMetadata } from "@/lib/seo";
 import { Reveal } from "@/components/site/reveal";
 import { SectionHeading } from "@/components/site/typography";
@@ -76,6 +77,8 @@ export default async function ExplorePage() {
       })}
 
       {activities.length === 0 && <p className="container-page py-16 text-body">Experiences will be listed here soon.</p>}
+
+      <RelatedLinks keys={["stay", "dine", "location", "guides"]} />
 
       <section aria-labelledby="planning-heading" className="bg-forest py-10 text-cream md:py-16">
         <div className="container-page text-center">

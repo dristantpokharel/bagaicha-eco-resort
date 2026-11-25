@@ -72,8 +72,20 @@ const loadPage = unstable_cache(
   { tags: [CONTENT_TAG], revalidate: 3600 },
 );
 
+/** Prisma's "table does not exist": the migration has not been applied yet, so the page simply is not live. */
+const isMissingTable = (error: unknown) => (error as { code?: string } | null)?.code === "P2021";
+
+async function livePage() {
+  try {
+    return await loadPage();
+  } catch (error) {
+    if (isMissingTable(error)) return null;
+    throw error;
+  }
+}
+
 export async function getKrishnasaar(): Promise<PublicKrishnasaar | null> {
-  const page = await loadPage();
+  const page = await livePage();
   if (!page) return null;
   const [nearby, guides] = await Promise.all([getNearby(), visibleGuides()]);
   const { guideSlugs, ...rest } = page;
@@ -89,5 +101,5 @@ export async function getKrishnasaar(): Promise<PublicKrishnasaar | null> {
 
 /** Whether the page exists for the public (for links, sitemap and llms.txt). */
 export async function isKrishnasaarPublic(): Promise<boolean> {
-  return (await loadPage()) !== null;
+  return (await livePage()) !== null;
 }

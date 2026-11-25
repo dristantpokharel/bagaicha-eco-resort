@@ -27,6 +27,10 @@ export const FOOTER_NAV = [
 ] as const;
 
 export const HOME = {
+  hero: {
+    /** Small line inside the H1, under the name: where we are and what we are. */
+    kicker: "Hotel and eco resort in Gulariya, Bardiya",
+  },
   about: {
     strong: "Surrounded by greenery",
     soft: "and open skies",
@@ -46,7 +50,7 @@ export const HOME = {
     soft: "Celebrate surrounded by nature.",
     body: "Celebrate life’s special moments surrounded by nature. With beautiful gardens, open spaces and a relaxed atmosphere, Bagaicha is a welcoming setting for weddings, celebrations and gatherings.",
   },
-  dining: { title: "Dining" },
+  dining: { title: "Restaurant & dining in Gulariya" },
   gatherings: { title: "Events & gatherings" },
   location: {
     body: "Set amid the greenery of Gulariya, Bagaicha is a peaceful retreat in the heart of Bardiya. Its relaxed garden setting offers a quiet escape while keeping you within easy reach of the region’s natural and cultural highlights.",
@@ -86,24 +90,33 @@ export const KRISHNASAAR = {
   },
 } as const;
 
+/** Internal links between the main pages (anchor text carries the keywords naturally). */
+export const RELATED_LINKS = {
+  stay: { href: "/stay", label: "Rooms and stays in Gulariya" },
+  dine: { href: "/dine", label: "Restaurant and food in Gulariya" },
+  explore: { href: "/explore", label: "Things to do in Bardiya" },
+  location: { href: "/location", label: "How to find us, near Bardiya National Park" },
+  guides: { href: "/guides", label: "Guides for a peaceful stay in Bardiya" },
+} as const;
+
 export const PAGES = {
   guides: {
     title: "Guides",
     heading: { strong: "Guides", soft: "for visiting Bardiya" },
     line: "Planning notes and local know-how for your stay.",
-    description: "Guides for planning a visit to Bardiya, from Bagaicha Eco Resort.",
+    description: "Guides for planning a peaceful stay in Bardiya, from Bagaicha Eco Resort in Gulariya.",
   },
   stay: {
-    title: "Stay",
+    title: "Hotel & Lodge Stay in Gulariya",
     heading: { strong: "A stay", soft: "closer to nature" },
-    line: "Quiet, comfortable stays surrounded by nature.",
-    description: "Quiet, comfortable stays surrounded by nature at Bagaicha Eco Resort in Bardiya, Nepal.",
+    line: "Quiet, comfortable rooms for a peaceful stay in Bardiya, surrounded by nature.",
+    description: "Stay at Bagaicha Eco Resort, a peaceful hotel and lodge in Gulariya, Bardiya. Comfortable rooms surrounded by nature; request your booking online.",
   },
   dine: {
-    title: "Dine",
+    title: "Restaurant & Food in Gulariya",
     heading: { strong: "Local Flavours,", soft: "Rooted in Culture" },
     line: "Experience the flavours of Bardiya in a setting surrounded by nature, with local tastes, relaxed dining and warm hospitality.",
-    description: "Local flavours, garden dining and warm hospitality at Bagaicha Eco Resort in Bardiya.",
+    description: "Restaurant and garden dining at Bagaicha Eco Resort in Gulariya, Bardiya: local flavours and warm hospitality, for food in a peaceful setting.",
   },
   explore: {
     groups: {
@@ -115,10 +128,10 @@ export const PAGES = {
       heading: "Tell us your dates and interests.",
       line: "Tell us when you are coming and what you would like to see, and we will help you plan.",
     },
-    title: "Explore",
+    title: "Things to Do in Bardiya",
     heading: { strong: "Slow down,", soft: "explore the outdoors" },
-    line: "Village walks, birdwatching, pickleball and more.",
-    description: "Village walks, birdwatching, pickleball and outdoor relaxation at Bagaicha Eco Resort.",
+    line: "Village walks, birdwatching, pickleball and more around Gulariya and Bardiya.",
+    description: "Things to do around Bagaicha Eco Resort in Gulariya, Bardiya: village walks, birdwatching, pickleball, and trips towards Bardiya National Park.",
   },
   events: {
     title: "Events",
@@ -134,10 +147,10 @@ export const PAGES = {
     description: "Photographs of the rooms, gardens, dining and events at Bagaicha Eco Resort.",
   },
   location: {
-    title: "Location",
-    heading: { strong: "Our", soft: "Location" },
+    title: "Resort near Bardiya National Park",
+    heading: { strong: "Our location", soft: "in Gulariya, Bardiya" },
     line: "Within easy reach of the region’s natural and cultural highlights.",
-    description: "Find Bagaicha Eco Resort in Khairi, Gulariya-3, Bardiya, Nepal, with directions and nearby places.",
+    description: "Find Bagaicha Eco Resort in Khairi, Gulariya-3, Bardiya, Nepal: a resort near Bardiya National Park and within reach of Nepalgunj, with directions.",
   },
   contact: {
     title: "Contact",

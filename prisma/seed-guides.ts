@@ -59,6 +59,30 @@ const GUIDES: { title: string; slug: string; tags: string[]; headings: string[] 
     headings: ["Why birdwatch here", "Where to look", "When to go", "What to bring", "Birdwatching with us"],
   },
   {
+    title: "Staying near Nepalgunj: Bagaicha Eco Resort in Gulariya",
+    slug: "staying-near-nepalgunj-bagaicha-eco-resort-in-gulariya",
+    tags: ["planning", "getting there"],
+    headings: ["Overview", "Why stay outside the city", "Getting between Nepalgunj and Gulariya", "What to expect at Bagaicha", "Booking your stay"],
+  },
+  {
+    title: "Resort near Bardiya National Park: what to know",
+    slug: "resort-near-bardiya-national-park-what-to-know",
+    tags: ["planning", "wildlife"],
+    headings: ["Overview", "Choosing where to stay", "Visiting the park from the resort", "Practical notes", "Planning with us"],
+  },
+  {
+    title: "Where to eat in Gulariya",
+    slug: "where-to-eat-in-gulariya",
+    tags: ["food"],
+    headings: ["Overview", "Eating at Bagaicha", "Local flavours to try", "Eating out in Gulariya", "Tips for your visit"],
+  },
+  {
+    title: "A peaceful weekend in Bardiya",
+    slug: "a-peaceful-weekend-in-bardiya",
+    tags: ["itineraries", "planning"],
+    headings: ["Overview", "Friday: arriving and settling in", "Saturday: out and about", "Sunday: slow morning, safe journey home", "Booking your weekend"],
+  },
+  {
     title: "Weddings and events in Bardiya",
     slug: "weddings-and-events-in-bardiya",
     tags: ["events"],

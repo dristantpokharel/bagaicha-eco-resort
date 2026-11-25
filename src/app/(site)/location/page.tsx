@@ -2,6 +2,8 @@ import { MapPin, Phone } from "lucide-react";
 import { HOME, PAGES } from "@/config/site-copy";
 import { getBusiness, getHomepageSlots, getNearby } from "@/lib/content/queries";
 import { telHref } from "@/lib/content/contact";
+import { RelatedLinks } from "@/components/site/related-links";
+import { isKrishnasaarPublic } from "@/lib/krishnasaar/queries";
 import { pageMetadata } from "@/lib/seo";
 import { PageIntro } from "@/components/site/page-intro";
 import { MapBlock, NearbyList } from "@/components/site/sections/location";
@@ -9,7 +11,7 @@ import { MapBlock, NearbyList } from "@/components/site/sections/location";
 export const generateMetadata = () => pageMetadata({ title: PAGES.location.title, description: PAGES.location.description, path: "/location" });
 
 export default async function LocationPage() {
-  const [business, nearby, slots] = await Promise.all([getBusiness(), getNearby(), getHomepageSlots()]);
+  const [business, nearby, slots, krishnasaar] = await Promise.all([getBusiness(), getNearby(), getHomepageSlots(), isKrishnasaarPublic()]);
   const [phone] = business.phones;
   const copy = PAGES.location;
   return (
@@ -43,6 +45,7 @@ export default async function LocationPage() {
           <MapBlock business={business} map={slots.LOCATION?.[0]} />
         </div>
       </div>
+      <RelatedLinks keys={["stay", "dine", "explore", "guides"]} krishnasaar={krishnasaar} />
     </>
   );
 }
