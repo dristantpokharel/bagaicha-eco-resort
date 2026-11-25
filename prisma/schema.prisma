@@ -454,13 +454,15 @@ model Media {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  roomTypes      RoomTypeMedia[]
-  galleryItems   GalleryItem[]
-  homepageSlots  HomepageSlot[]
-  activities     Activity[]
-  eventTypes     EventType[]
-  activityPhotos ActivityMedia[]
-  guides         Guide[]
+  roomTypes         RoomTypeMedia[]
+  galleryItems      GalleryItem[]
+  homepageSlots     HomepageSlot[]
+  activities        Activity[]
+  eventTypes        EventType[]
+  activityPhotos    ActivityMedia[]
+  guides            Guide[]
+  krishnasaarPages  KrishnasaarPage[]
+  krishnasaarPhotos KrishnasaarMedia[]
 
   @@map("media")
 }
@@ -696,9 +698,63 @@ model NearbyDestination {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  activities Activity[]
+  activities       Activity[]
+  krishnasaarPages KrishnasaarPage[]
 
   @@map("nearby_destinations")
+}
+
+/// The /krishnasaar page: one row (id = 1). Every factual text starts flagged in placeholderFields ("verify");
+/// the page is hidden in production until title, intro and whatItIs are reviewed (src/lib/krishnasaar/visibility.ts).
+model KrishnasaarPage {
+  id                Int      @id @default(1)
+  title             String
+  intro             String?
+  /// Section texts. Blank lines start a new paragraph.
+  whatItIs          String?
+  history           String?
+  wildlife          String?
+  bestTime          String?
+  gettingThere      String?
+  whatToBring       String?
+  coverMediaId      String?
+  /// Distance and travel time come only from this place (never typed on the page).
+  destinationId     String?
+  /// Slugs of guides to link under "Related guides"; only visible guides are shown.
+  relatedGuides     String[] @default([])
+  /// Fields still holding dev placeholder text. Editing a field in admin clears its flag.
+  placeholderFields String[] @default([])
+  updatedAt         DateTime @updatedAt
+
+  coverMedia  Media?             @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  destination NearbyDestination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+
+  @@map("krishnasaar_page")
+}
+
+model KrishnasaarFaq {
+  id                String   @id @default(cuid())
+  question          String
+  answer            String
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  placeholderFields String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("krishnasaar_faqs")
+}
+
+/// The Krishnasaar page's photo gallery, in order.
+model KrishnasaarMedia {
+  id        String @id @default(cuid())
+  mediaId   String @unique
+  sortOrder Int    @default(0)
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([sortOrder])
+  @@map("krishnasaar_media")
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────

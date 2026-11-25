@@ -25,7 +25,8 @@
     "setup:deluxe-room": "tsx scripts/setup-deluxe-room.ts",
     "place:photos": "tsx scripts/place-photos.ts",
     "seed:content": "tsx prisma/seed-content.ts",
-    "seed:guides": "tsx prisma/seed-guides.ts"
+    "seed:guides": "tsx prisma/seed-guides.ts",
+    "seed:krishnasaar": "tsx prisma/seed-krishnasaar.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

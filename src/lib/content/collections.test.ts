@@ -85,3 +85,23 @@ describe("content schemas", () => {
     expect(parse("activities", { title: "Walk", group: "AT_BAGAICHA", homepageOrder: "1.5" }).success).toBe(false);
   });
 });
+
+describe("Krishnasaar schemas", () => {
+  it("is a single-row collection whose page-gate fields are required live", () => {
+    expect(COLLECTIONS.krishnasaar.singleton).toBe(true);
+    expect(COLLECTIONS.krishnasaar.requiredLive).toEqual(["title", "intro", "whatItIs"]);
+  });
+
+  it("requires a title, turns blank sections into null and splits related guide slugs", () => {
+    expect(parse("krishnasaar", { title: "" }).success).toBe(false);
+    const ok = parse("krishnasaar", { title: "Krishnasaar", history: " ", destinationId: "", relatedGuides: "one\n\ntwo" });
+    expect(ok.success).toBe(true);
+    if (ok.success) expect(ok.data).toMatchObject({ title: "Krishnasaar", history: null, destinationId: null, relatedGuides: ["one", "two"] });
+  });
+
+  it("requires a question and an answer for each Krishnasaar FAQ", () => {
+    expect(parse("krishnasaarFaqs", { question: "Q?", answer: "" }).success).toBe(false);
+    expect(parse("krishnasaarFaqs", { question: "Q?", answer: "A." }).success).toBe(true);
+  });
+});
+

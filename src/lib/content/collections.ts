@@ -34,7 +34,9 @@ export type CollectionKey =
   | "eventTypes"
   | "faqs"
   | "policies"
-  | "nearby";
+  | "nearby"
+  | "krishnasaar"
+  | "krishnasaarFaqs";
 
 export type Collection = {
   key: CollectionKey;
@@ -217,6 +219,38 @@ export const COLLECTIONS: Record<CollectionKey, Collection> = {
       { name: "distance", label: "Distance", kind: "text", max: 40, hint: 'Shown as written, e.g. "~40 km".' },
       { name: "travelTime", label: "Travel time", kind: "text", max: 40, hint: 'Shown as written, e.g. "53 mins".' },
       { name: "icon", label: "Icon", kind: "select", options: ICON_OPTIONS },
+    ],
+  },
+  krishnasaar: {
+    key: "krishnasaar",
+    label: "Krishnasaar page",
+    singular: "Krishnasaar page",
+    titleField: "title",
+    singleton: true,
+    requiredLive: ["title", "intro", "whatItIs"],
+    fields: [
+      { name: "title", label: "Page title", kind: "text", required: true, max: 120 },
+      { name: "intro", label: "Intro", kind: "textarea", rows: 3, max: 400, hint: "Shown under the page heading and used as the page description." },
+      { name: "whatItIs", label: "What it is", kind: "textarea", rows: 5, max: 3000, hint: "Blank lines start a new paragraph." },
+      { name: "history", label: "History and conservation", kind: "textarea", rows: 5, max: 3000 },
+      { name: "wildlife", label: "Wildlife and best season", kind: "textarea", rows: 5, max: 3000 },
+      { name: "bestTime", label: "Best time to visit", kind: "textarea", rows: 4, max: 2000 },
+      { name: "gettingThere", label: "Getting there", kind: "textarea", rows: 4, max: 2000, hint: "Do not type distances here: choose the place below and its distance is shown automatically." },
+      { name: "whatToBring", label: "What to bring", kind: "textarea", rows: 4, max: 2000 },
+      { name: "destinationId", label: "Where it is (nearby place)", kind: "destination", hint: "Distance and travel time come from Content → Nearby, so they are never typed twice." },
+      { name: "coverMediaId", label: "Hero photo", kind: "media", hint: "More photos can be added to the gallery below." },
+      { name: "relatedGuides", label: "Related guides", kind: "lines", max: 6, hint: "One guide URL slug per line (the part after /guides/). Only published guides are shown." },
+    ],
+  },
+  krishnasaarFaqs: {
+    key: "krishnasaarFaqs",
+    label: "Krishnasaar questions",
+    singular: "question",
+    titleField: "question",
+    requiredLive: ["question", "answer"],
+    fields: [
+      { name: "question", label: "Question", kind: "text", required: true, max: 200 },
+      { name: "answer", label: "Answer", kind: "textarea", required: true, max: 2000, rows: 4 },
     ],
   },
 };

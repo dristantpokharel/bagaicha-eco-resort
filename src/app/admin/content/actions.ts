@@ -29,6 +29,8 @@ function delegate(tx: Prisma.TransactionClient, key: CollectionKey): Delegate {
     faqs: tx.faq,
     policies: tx.policy,
     nearby: tx.nearbyDestination,
+    krishnasaar: tx.krishnasaarPage,
+    krishnasaarFaqs: tx.krishnasaarFaq,
   };
   return map[key] as Delegate;
 }
@@ -42,6 +44,8 @@ const ENTITY: Record<CollectionKey, string> = {
   faqs: "Faq",
   policies: "Policy",
   nearby: "NearbyDestination",
+  krishnasaar: "KrishnasaarPage",
+  krishnasaarFaqs: "KrishnasaarFaq",
 };
 
 /**

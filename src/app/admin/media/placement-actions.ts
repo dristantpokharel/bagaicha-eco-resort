@@ -17,6 +17,7 @@ import { ActionError, runAction, type ActionResult } from "@/lib/actions";
 const targetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("roomType"), roomTypeId: z.string().min(1).max(64) }),
   z.object({ kind: z.literal("activity"), activityId: z.string().min(1).max(64) }),
+  z.object({ kind: z.literal("krishnasaar") }),
   z.object({ kind: z.literal("gallery"), category: z.enum(GalleryCategory) }),
   z.object({ kind: z.literal("homepage"), slot: z.enum(HomepageSlotKey) }),
 ]);
@@ -58,6 +59,17 @@ function placements(tx: Prisma.TransactionClient, target: PlacementTarget) {
           if (!exists) throw new ActionError("That activity no longer exists.");
         },
         paths: ["/admin/content/activities"],
+      };
+    }
+    case "krishnasaar": {
+      return {
+        where: {},
+        list: (): Promise<Row[]> => tx.krishnasaarMedia.findMany({ orderBy: { sortOrder: "asc" } }),
+        create: (mediaId: string, sortOrder: number) => tx.krishnasaarMedia.create({ data: { mediaId, sortOrder } }),
+        setOrder: (id: string, sortOrder: number) => tx.krishnasaarMedia.update({ where: { id }, data: { sortOrder } }),
+        remove: (id: string) => tx.krishnasaarMedia.delete({ where: { id } }),
+        async assertTarget() {},
+        paths: ["/admin/content/krishnasaar"],
       };
     }
     case "gallery": {

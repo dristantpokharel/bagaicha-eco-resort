@@ -18,7 +18,7 @@ import { selectHomepageActivities } from "./homepage-activities";
 const cached = <A extends unknown[], R>(fn: (...args: A) => Promise<R>, key: string) =>
   unstable_cache(fn, ["site", key], { tags: [CONTENT_TAG], revalidate: 3600 });
 
-const mediaSelect = {
+export const mediaSelect = {
   url: true,
   altText: true,
   width: true,
@@ -31,8 +31,8 @@ const mediaSelect = {
 type MediaRow = { url: string; altText: string; width: number; height: number; blurDataUrl: string | null; isPlaceholder: boolean; placeholderNote: string | null };
 
 /** Flagged images (stand-ins, rights unconfirmed) show with a badge in dev and are hidden everywhere in production. */
-const isShown = (m: { isPlaceholder: boolean }) => mediaVisible(m);
-const toPublicMedia = (m: MediaRow): PublicMedia => ({
+export const isShown = (m: { isPlaceholder: boolean }) => mediaVisible(m);
+export const toPublicMedia = (m: MediaRow): PublicMedia => ({
   url: m.url,
   altText: m.altText,
   width: m.width,
@@ -41,7 +41,7 @@ const toPublicMedia = (m: MediaRow): PublicMedia => ({
   isPlaceholder: m.isPlaceholder,
   placeholderNote: m.placeholderNote,
 });
-const shownMedia = (rows: MediaRow[]): PublicMedia[] => rows.filter(isShown).map(toPublicMedia);
+export const shownMedia = (rows: MediaRow[]): PublicMedia[] => rows.filter(isShown).map(toPublicMedia);
 
 /** `isPlaceholder`: a stand-in or rights-unconfirmed image; only ever present in development. */
 export type PublicMedia = MediaImageData & { isPlaceholder?: boolean; placeholderNote?: string | null };
