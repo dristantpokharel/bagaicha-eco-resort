@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FOOTER_NAV, NAV } from "@/config/site-copy";
 import robots from "./robots";
-import sitemap from "./sitemap";
+import sitemap, { sitemapPaths } from "./sitemap";
 
 vi.mock("@/lib/guides/queries", () => ({
   visibleGuides: async () => [{ slug: "a-guide", updatedAt: new Date("2026-10-01T00:00:00Z") }],
 }));
+
+vi.mock("@/lib/krishnasaar/queries", () => ({ isKrishnasaarPublic: async () => false }));
 
 describe("sitemap and robots", () => {
   it("lists every nav page, the booking pages, and never admin or login", async () => {
@@ -13,6 +15,12 @@ describe("sitemap and robots", () => {
     for (const item of FOOTER_NAV) expect(paths).toContain(item.href);
     expect(paths).toEqual(expect.arrayContaining(["/book", "/enquiry", "/guides"]));
     expect(paths.some((p) => p.startsWith("/admin") || p === "/login")).toBe(false);
+  });
+
+  it("lists /krishnasaar only while the page is live", async () => {
+    expect(sitemapPaths(false)).not.toContain("/krishnasaar");
+    expect(sitemapPaths(true)).toContain("/krishnasaar");
+    expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/krishnasaar");
   });
 
   it("lists published guides with their last-modified date", async () => {

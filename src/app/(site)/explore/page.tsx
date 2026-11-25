@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { BOOKING_HREF, PAGES } from "@/config/site-copy";
+import { BOOKING_HREF, KRISHNASAAR, PAGES } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import { getActivities, getHomepageSlots, type ActivityGroupKey } from "@/lib/content/queries";
+import { getKrishnasaar } from "@/lib/krishnasaar/queries";
+import { MediaPhoto } from "@/components/site/photo";
 import { pageMetadata } from "@/lib/seo";
 import { Reveal } from "@/components/site/reveal";
 import { SectionHeading } from "@/components/site/typography";
@@ -14,7 +16,8 @@ const GROUP_ORDER: ActivityGroupKey[] = ["AT_BAGAICHA", "CLOSE_BY", "DAY_TRIP"];
 const GROUP_ID: Record<ActivityGroupKey, string> = { AT_BAGAICHA: "at-bagaicha", CLOSE_BY: "close-by", DAY_TRIP: "day-trips" };
 
 export default async function ExplorePage() {
-  const [activities, slots] = await Promise.all([getActivities(), getHomepageSlots()]);
+  const [activities, slots, krishnasaar] = await Promise.all([getActivities(), getHomepageSlots(), getKrishnasaar()]);
+  const featuredPhoto = krishnasaar?.cover ?? krishnasaar?.gallery[0] ?? null;
   const copy = PAGES.explore;
 
   return (
@@ -26,6 +29,29 @@ export default async function ExplorePage() {
         desktop={slots.EXPLORE_HERO_DESKTOP?.[0]}
         mobile={slots.EXPLORE_HERO_MOBILE?.[0]}
       />
+
+      {krishnasaar && (
+        <section aria-labelledby="krishnasaar-feature" className="py-8 md:py-12">
+          <div className="container-page">
+            <Reveal className="grid items-center gap-6 bg-sage p-5 md:grid-cols-12 md:gap-10 md:p-8">
+              {featuredPhoto && (
+                <div className="md:col-span-5">
+                  <MediaPhoto media={featuredPhoto} sizes="(min-width: 768px) 40vw, 100vw" className="aspect-[16/10]" />
+                </div>
+              )}
+              <div className={`flex flex-col items-start gap-4 ${featuredPhoto ? "md:col-span-7" : "md:col-span-12"}`}>
+                <h2 id="krishnasaar-feature" className="text-heading-strong text-ink-heading">
+                  {krishnasaar.title}
+                </h2>
+                {krishnasaar.intro && <p className="text-body max-w-xl">{krishnasaar.intro}</p>}
+                <Link href={KRISHNASAAR.path} className={buttonClasses({ variant: "brand", size: "lg" })}>
+                  {KRISHNASAAR.band.cta}
+                </Link>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      )}
 
       {GROUP_ORDER.map((group) => {
         const items = activities.filter((a) => a.group === group);

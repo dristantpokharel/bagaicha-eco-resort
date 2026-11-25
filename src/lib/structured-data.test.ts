@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumbJsonLd, faqPageJsonLd, hotelJsonLd, serializeJsonLd, toIsoTime } from "./structured-data";
+import { breadcrumbJsonLd, faqPageJsonLd, hotelJsonLd, restaurantJsonLd, serializeJsonLd, toIsoTime, touristAttractionJsonLd } from "./structured-data";
 import type { Business, PublicRoomType } from "@/lib/content/queries";
 
 const business: Business = {
@@ -51,5 +51,40 @@ describe("other builders", () => {
   it("returns no FAQPage for an empty list", () => expect(faqPageJsonLd([])).toBeNull());
   it("escapes < so a field cannot close the script tag", () => {
     expect(serializeJsonLd({ a: "</script>" })).not.toContain("</script>");
+  });
+});
+
+describe("areaServed", () => {
+  it("names Bardiya, Gulariya and Nepalgunj on the hotel and the restaurant", () => {
+    const names = (d: { areaServed?: { name: string }[] } | null) => d?.areaServed?.map((a) => a.name);
+    expect(names(hotelJsonLd(business, []))).toEqual(["Bardiya", "Gulariya", "Nepalgunj"]);
+    const menu = [{ title: "Mains", description: null, items: [{ id: "1", name: "Dal bhat", description: null, priceNpr: 400 }] }];
+    expect(names(restaurantJsonLd(business, menu))).toEqual(["Bardiya", "Gulariya", "Nepalgunj"]);
+  });
+});
+
+describe("restaurantJsonLd", () => {
+  it("describes the menu with NPR prices and claims no opening hours", () => {
+    const d = restaurantJsonLd(business, [
+      { title: "Mains", description: "Daily", items: [{ id: "1", name: "Dal bhat", description: null, priceNpr: 400 }, { id: "2", name: "Tea", description: null, priceNpr: null }] },
+      { title: "Empty", description: null, items: [] },
+    ]);
+    expect(d?.["@type"]).toBe("Restaurant");
+    expect(d?.hasMenu.hasMenuSection).toHaveLength(1);
+    expect(d?.hasMenu.hasMenuSection[0].hasMenuItem[0].offers).toMatchObject({ price: 400, priceCurrency: "NPR" });
+    expect(d?.hasMenu.hasMenuSection[0].hasMenuItem[1].offers).toBeUndefined();
+    expect(d).not.toHaveProperty("openingHours");
+  });
+  it("is omitted when there is no menu", () => {
+    expect(restaurantJsonLd(business, [])).toBeNull();
+    expect(restaurantJsonLd(business, [{ title: "Mains", description: null, items: [] }])).toBeNull();
+  });
+});
+
+describe("touristAttractionJsonLd", () => {
+  it("carries only the page's own live text, with no invented place or numbers", () => {
+    const d = touristAttractionJsonLd({ title: "Krishnasaar", intro: "About them.", cover: null });
+    expect(d).toMatchObject({ "@type": "TouristAttraction", name: "Krishnasaar", description: "About them." });
+    expect(Object.keys(JSON.parse(JSON.stringify(d))).sort()).toEqual(["@context", "@type", "description", "name", "url"]);
   });
 });

@@ -61,6 +61,31 @@ export const EVENT_ICONS: Record<string, "rings" | "cake" | "glasses" | "present
   "conferences-and-trainings": "presentation",
 };
 
+/** Structure words for /krishnasaar. The page's facts and prose come from the database (Content → Krishnasaar). */
+export const KRISHNASAAR = {
+  path: "/krishnasaar",
+  navLabel: "Krishnasaar blackbuck",
+  fallbackDescription: "A guide to the Krishnasaar blackbuck near Bagaicha Eco Resort in Gulariya, Bardiya.",
+  sections: {
+    whatItIs: "What it is",
+    history: "History and conservation",
+    wildlife: "Wildlife and best season",
+    gettingThere: "Getting there",
+    whatToBring: "What to bring",
+    nearby: "Nearby attractions",
+    gallery: "Photographs",
+    faq: "Questions and answers",
+    guides: "Related guides",
+  },
+  band: { cta: "Read about Krishnasaar" },
+  cta: {
+    heading: "Visit Krishnasaar from Bagaicha",
+    line: "Stay in Gulariya, in the heart of Bardiya, and plan your visit with us.",
+    plan: "Plan your visit",
+    book: "Book your stay",
+  },
+} as const;
+
 export const PAGES = {
   guides: {
     title: "Guides",

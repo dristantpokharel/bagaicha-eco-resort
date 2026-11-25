@@ -7,8 +7,8 @@ export function ContentText({ text, flagged = false, className = "text-body" }: 
 }
 
 /** Text with blank-line paragraph breaks (policies, long descriptions). */
-export function Paragraphs({ text, flagged = false }: { text: string; flagged?: boolean }) {
-  if (flagged) return <Placeholder>{text}</Placeholder>;
+export function Paragraphs({ text, flagged = false, flagLabel }: { text: string; flagged?: boolean; flagLabel?: string }) {
+  if (flagged) return <Placeholder label={flagLabel}>{text}</Placeholder>;
   return (
     <div className="space-y-4">
       {text.split(/\n{2,}/).map((p, i) => (

@@ -1,5 +1,6 @@
-import { BOOKING_HREF, FOOTER_NAV, NAV } from "@/config/site-copy";
+import { BOOKING_HREF, FOOTER_NAV, KRISHNASAAR, NAV } from "@/config/site-copy";
 import { getBusiness, getHomepageSlots, getRoomTypes } from "@/lib/content/queries";
+import { isKrishnasaarPublic } from "@/lib/krishnasaar/queries";
 import { RouteBreadcrumbData } from "@/components/site/breadcrumbs";
 import { LodgingJsonLd } from "@/components/site/json-ld";
 import { SiteFooter } from "@/components/site/site-footer";
@@ -9,7 +10,8 @@ import { WhatsAppButton } from "@/components/site/whatsapp-button";
 
 /** Public site frame: skip link, header, page, footer and the WhatsApp shortcut. */
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [business, rooms, slots] = await Promise.all([getBusiness(), getRoomTypes(), getHomepageSlots()]);
+  const [business, rooms, slots, krishnasaarLive] = await Promise.all([getBusiness(), getRoomTypes(), getHomepageSlots(), isKrishnasaarPublic()]);
+  const footerNav = krishnasaarLive ? [...FOOTER_NAV, { label: KRISHNASAAR.navLabel, href: KRISHNASAAR.path }] : FOOTER_NAV;
   return (
     <>
       <a
@@ -24,7 +26,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main id="main" className="flex-1">
         {children}
       </main>
-      <SiteFooter business={business} nav={FOOTER_NAV} bookingHref={BOOKING_HREF} />
+      <SiteFooter business={business} nav={footerNav} bookingHref={BOOKING_HREF} />
       <WhatsAppButton number={business.whatsapp} />
       <StagingBanner />
     </>

@@ -1,7 +1,8 @@
 import { deliveryUrl } from "@/lib/cloudinary/delivery";
-import type { Business, PublicMedia, PublicRoomType } from "@/lib/content/queries";
+import type { Business, PublicDiningSection, PublicMedia, PublicRoomType } from "@/lib/content/queries";
+import type { PublicKrishnasaar } from "@/lib/krishnasaar/queries";
 import type { PublicGuide } from "@/lib/guides/queries";
-import { SITE } from "@/config/site";
+import { SERVICE_AREAS, SITE } from "@/config/site";
 
 /** Builders for schema.org JSON-LD. Pure functions: every value comes from the database or SITE. */
 
@@ -88,6 +89,7 @@ export function hotelJsonLd(business: Business, rooms: PublicRoomType[], image?:
         ? { "@type": "GeoCoordinates", latitude: business.latitude, longitude: business.longitude }
         : undefined,
     hasMap: business.googleMapsUrl ?? undefined,
+    areaServed: SERVICE_AREAS.map((a) => ({ "@type": a.type, name: a.name })),
     sameAs: [business.instagramUrl, business.facebookUrl].filter(Boolean),
     checkinTime: checkin ?? undefined,
     checkoutTime: checkout ?? undefined,
@@ -113,5 +115,55 @@ export function hotelJsonLd(business: Business, rooms: PublicRoomType[], image?:
           priceSpecification: { "@type": "UnitPriceSpecification", price: r.basePriceNpr, priceCurrency: "NPR", unitText: "night" },
         }))
       : undefined,
+  };
+}
+
+/**
+ * The Krishnasaar page as a TouristAttraction. Only text that is already live on the page goes in
+ * (the query hides flagged text in production); no place, coordinates or counts: those are facts the owner has to verify first.
+ */
+export function touristAttractionJsonLd(page: Pick<PublicKrishnasaar, "title" | "intro" | "cover">) {
+  const url = abs("/krishnasaar");
+  return {
+    "@context": "https://schema.org",
+    "@type": "TouristAttraction",
+    name: page.title,
+    description: page.intro ?? undefined,
+    url,
+    image: page.cover ? deliveryUrl(page.cover.url, 1200) : undefined,
+  };
+}
+
+/**
+ * The resort's dining as a Restaurant with its menu, from the live dining sections. Returns null when
+ * there is no menu to describe. There is no opening-hours data, so none is claimed.
+ */
+export function restaurantJsonLd(business: Business, sections: Pick<PublicDiningSection, "title" | "description" | "items">[], image?: PublicMedia) {
+  const filled = sections.filter((s) => s.items.length > 0);
+  if (filled.length === 0) return null;
+  return {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: business.name,
+    url: abs("/dine"),
+    image: image ? deliveryUrl(image.url, 1200) : undefined,
+    telephone: business.phones[0],
+    address: business.address ? { "@type": "PostalAddress", streetAddress: business.address, addressCountry: "NP" } : undefined,
+    hasMap: business.googleMapsUrl ?? undefined,
+    areaServed: SERVICE_AREAS.map((a) => ({ "@type": a.type, name: a.name })),
+    hasMenu: {
+      "@type": "Menu",
+      hasMenuSection: filled.map((s) => ({
+        "@type": "MenuSection",
+        name: s.title,
+        description: s.description ?? undefined,
+        hasMenuItem: s.items.map((i) => ({
+          "@type": "MenuItem",
+          name: i.name,
+          description: i.description ?? undefined,
+          offers: i.priceNpr != null ? { "@type": "Offer", price: i.priceNpr, priceCurrency: "NPR" } : undefined,
+        })),
+      })),
+    },
   };
 }

@@ -21,6 +21,13 @@ export const SITE = {
   url: siteUrl,
 } as const;
 
+/** Places the resort serves guests from or near, for structured data (areaServed). */
+export const SERVICE_AREAS = [
+  { type: "AdministrativeArea", name: "Bardiya" },
+  { type: "City", name: "Gulariya" },
+  { type: "City", name: "Nepalgunj" },
+] as const;
+
 /** Share-card fallback (the logo on cream, 1200x630) for pages without their own photo. */
 export const DEFAULT_OG_IMAGE = {
   url: "/brand/og-default.jpg",

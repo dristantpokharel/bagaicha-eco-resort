@@ -6,6 +6,8 @@ import { Hero } from "@/components/site/sections/hero";
 import { LocationSection } from "@/components/site/sections/location";
 import { RoomsBand } from "@/components/site/sections/rooms-teaser";
 import { DiningBand, EventsBand } from "@/components/site/sections/slim-bands";
+import { KrishnasaarBand } from "@/components/site/sections/krishnasaar-band";
+import { getKrishnasaar } from "@/lib/krishnasaar/queries";
 import { eventsCollage } from "@/lib/content/collage";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -19,12 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Hero, About, Rooms, Experiences, Dining, Events & gatherings, Location. Every line comes from the database. */
 export default async function HomePage() {
-  const [business, slots, rooms, activities, nearby] = await Promise.all([
+  const [business, slots, rooms, activities, nearby, krishnasaar] = await Promise.all([
     getBusiness(),
     getHomepageSlots(),
     getRoomTypes(),
     getHomepageActivities(),
     getNearby(),
+    getKrishnasaar(),
   ]);
 
   return (
@@ -33,6 +36,7 @@ export default async function HomePage() {
       <About text={business.homeAbout} photos={slots.ABOUT ?? []} />
       <RoomsBand rooms={rooms} />
       <ExperiencesBand activities={activities} />
+      {krishnasaar && <KrishnasaarBand title={krishnasaar.title} intro={krishnasaar.intro} photo={krishnasaar.cover ?? krishnasaar.gallery[0] ?? null} />}
       <DiningBand line={business.homeDiningLine} photo={slots.DINE?.[0]} />
       <EventsBand line={business.homeEventsLine} photos={eventsCollage(slots.EVENTS, slots.CONFERENCE)} />
       <LocationSection business={business} nearby={nearby} map={slots.LOCATION?.[0]} />

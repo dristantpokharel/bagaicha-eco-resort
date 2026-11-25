@@ -2,8 +2,10 @@ import Link from "next/link";
 import { BOOKING_HREF, PAGES } from "@/config/site-copy";
 import { buttonClasses } from "@/components/ui/button";
 import { formatNpr } from "@/lib/money";
-import { getDining, getHomepageSlots } from "@/lib/content/queries";
+import { getBusiness, getDining, getHomepageSlots } from "@/lib/content/queries";
 import { pageMetadata } from "@/lib/seo";
+import { JsonLd } from "@/components/site/json-ld";
+import { restaurantJsonLd } from "@/lib/structured-data";
 import { PageIntro } from "@/components/site/page-intro";
 import { MediaPhoto } from "@/components/site/photo";
 import { Reveal } from "@/components/site/reveal";
@@ -13,11 +15,12 @@ import { ContentText } from "@/components/site/sections/content-text";
 export const generateMetadata = () => pageMetadata({ title: PAGES.dine.title, description: PAGES.dine.description, path: "/dine" });
 
 export default async function DinePage() {
-  const [sections, slots] = await Promise.all([getDining(), getHomepageSlots()]);
+  const [sections, slots, business] = await Promise.all([getDining(), getHomepageSlots(), getBusiness()]);
   const [lead, second] = slots.DINE ?? [];
   const copy = PAGES.dine;
   return (
     <>
+      <JsonLd data={restaurantJsonLd(business, sections, lead)} />
       <PageIntro strong={copy.heading.strong} soft={copy.heading.soft} line={copy.line} />
 
       {lead && (

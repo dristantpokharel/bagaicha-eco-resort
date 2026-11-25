@@ -1,5 +1,7 @@
 import { SITE } from "@/config/site";
 import { getBusiness, getRoomTypes } from "@/lib/content/queries";
+import { KRISHNASAAR } from "@/config/site-copy";
+import { getKrishnasaar } from "@/lib/krishnasaar/queries";
 import { visibleGuides } from "@/lib/guides/queries";
 import { buildLlmsTxt } from "@/lib/llms";
 import { isStaging } from "@/lib/site-env";
@@ -21,7 +23,8 @@ const PAGES = [
 /** Production only: staging is hidden from search and AI crawlers alike. */
 export async function GET() {
   if (isStaging) return new Response("Not found", { status: 404 });
-  const [business, rooms, guides] = await Promise.all([getBusiness(), getRoomTypes(), visibleGuides()]);
-  const body = buildLlmsTxt({ business, rooms, guides, pages: PAGES, origin: SITE.url.origin });
+  const [business, rooms, guides, krishnasaar] = await Promise.all([getBusiness(), getRoomTypes(), visibleGuides(), getKrishnasaar()]);
+  const pages = krishnasaar ? [...PAGES, { title: krishnasaar.title, path: KRISHNASAAR.path }] : PAGES;
+  const body = buildLlmsTxt({ business, rooms, guides, pages, origin: SITE.url.origin });
   return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
