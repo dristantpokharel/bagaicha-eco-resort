@@ -10,6 +10,7 @@ import { issueInvoiceSchema, markInvoicePaidSchema, voidInvoiceSchema, emailInvo
 import { InvoiceRuleError, issueInvoice, issueStandaloneInvoice, linkStandaloneInvoice, markInvoicePaid, voidInvoice } from "@/lib/invoice/service";
 import { sendEmail } from "@/lib/email/send";
 import { emailLogoUrl } from "@/lib/email/logo";
+import { loadEmailContact } from "@/lib/email/contact";
 import { renderInvoiceEmail } from "@/lib/invoice/email";
 
 function revalidateInvoices(reservationId?: string) {
@@ -133,6 +134,7 @@ export async function emailInvoiceAction(_prev: ActionResult | null, formData: F
       emails: row?.emails ?? [],
       panVatNumber: row && !row.placeholderFields.includes("panVatNumber") ? row.panVatNumber : null,
       invoiceFooterNote: row && !row.placeholderFields.includes("invoiceFooterNote") ? row.invoiceFooterNote : null,
+      contact: await loadEmailContact(),
     };
     const rendered = renderInvoiceEmail({ ...invoice, guestSnapshot: guest }, business, emailLogoUrl());
     const result = await sendEmail({ to: guest.email, ...rendered });

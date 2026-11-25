@@ -5,6 +5,7 @@ import { logActivity } from "@/lib/activity-log";
 import { nightsBetween } from "@/lib/booking/dates";
 import { computeQuote } from "@/lib/booking/pricing";
 import { ENQUIRY_TYPE_LABELS } from "@/lib/booking/labels";
+import { loadEmailContact } from "./contact";
 import { sendEmail, type EmailMessage, type SendResult } from "./send";
 import {
   bookingCancelledEmail,
@@ -65,6 +66,7 @@ export async function loadReservationEmailData(reservationId: string): Promise<R
       }),
     })),
     terms: await loadStayTerms(),
+    contact: await loadEmailContact(),
   };
 }
 

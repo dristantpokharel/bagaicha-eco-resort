@@ -22,6 +22,7 @@ const booking = (childUnderAge: number): ReservationEmailData => ({
   guestName: "Test Guest",
   guestEmail: "guest@example.com",
   guestPhone: null,
+  contact: { name: "Resort", address: null, phone: null, whatsapp: null, email: null, websiteUrl: null, mapsUrl: null },
   checkIn: new Date("2026-11-10T00:00:00Z"),
   checkOut: new Date("2026-11-12T00:00:00Z"),
   nights: 2,

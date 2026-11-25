@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { computeQuote } from "@/lib/booking/pricing";
 import { parseDateOnly } from "@/lib/booking/dates";
 import { escapeHtml, singleLine } from "./escape";
+import type { EmailContact } from "./footer";
 import { applyDevRedirect, sendEmail } from "./send";
 import {
   bookingCancelledEmail,
@@ -18,6 +19,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+
+const CONTACT: EmailContact = {
+  name: "Bagaicha Eco Resort",
+  address: "Khairi, Gulariya-3, Bardiya, Nepal",
+  phone: "+977 984-0000000",
+  whatsapp: "9779851000000",
+  email: "bookings@example.test",
+  websiteUrl: "https://example.test",
+  mapsUrl: "https://maps.example.test/place",
+};
 
 const line = (over: Partial<EmailLine> = {}): EmailLine => ({
   roomTypeName: "Family Room",
@@ -42,6 +53,7 @@ const reservation = (over: Partial<ReservationEmailData> = {}): ReservationEmail
   lines: [line()],
   specialRequests: null,
   terms: { checkInTime: "2:00 PM", checkOutTime: "11:00 AM", childUnderAge: 8, cancellationPolicy: "Plans changed? Tell us 24 hours ahead." },
+  contact: CONTACT,
   ...over,
 });
 
@@ -256,5 +268,55 @@ describe("bookingModifiedEmail", () => {
     const email = bookingModifiedEmail(reservation({ guestName: "<b>Sita</b>" }));
     expect(email.html).not.toContain("<b>Sita</b>");
     expect(email.html).toContain("&lt;b&gt;Sita&lt;/b&gt;");
+  });
+});
+
+describe("contact footer", () => {
+  const guestEmails = (r: ReservationEmailData) => [
+    requestReceivedEmail(r),
+    bookingConfirmedEmail(r),
+    bookingPartiallyConfirmedEmail(r),
+    bookingCancelledEmail(r),
+    bookingModifiedEmail(r),
+  ];
+
+  it("ends every guest email with the contact details, in HTML and plain text", () => {
+    for (const mail of guestEmails(reservation())) {
+      for (const part of [
+        "Bagaicha Eco Resort",
+        "Khairi, Gulariya-3, Bardiya, Nepal",
+        "bookings@example.test",
+        "https://example.test",
+        "https://maps.example.test/place",
+      ]) {
+        expect(mail.html).toContain(part);
+        expect(mail.text).toContain(part);
+      }
+      expect(mail.html).toContain('href="https://wa.me/9779851000000"');
+      expect(mail.html).toContain('href="tel:+9779840000000"');
+      expect(mail.text).toContain("WhatsApp: +977 9851000000");
+    }
+  });
+
+  it("leaves out facts that are not saved", () => {
+    const mail = bookingConfirmedEmail(reservation({ contact: { ...CONTACT, phone: null, whatsapp: null, mapsUrl: null } }));
+    expect(mail.html).not.toContain("Phone:");
+    expect(mail.text).not.toContain("WhatsApp");
+    expect(mail.text).not.toContain("Google Maps");
+    expect(mail.text).toContain("Bookings: bookings@example.test");
+  });
+
+  it("escapes values and refuses non-http links", () => {
+    const mail = bookingConfirmedEmail(
+      reservation({ contact: { ...CONTACT, name: "A <b>&</b>", mapsUrl: "javascript:alert(1)" } }),
+    );
+    expect(mail.html).toContain("A &lt;b&gt;&amp;&lt;/b&gt;");
+    expect(mail.html).not.toContain("href=\"javascript:");
+  });
+
+  it("adds no guest footer to the internal alerts", () => {
+    const alert = newRequestAlertEmail(reservation(), "https://example.test/admin/bookings/1");
+    expect(alert.html).not.toContain("wa.me");
+    expect(alert.text).not.toContain("WhatsApp");
   });
 });

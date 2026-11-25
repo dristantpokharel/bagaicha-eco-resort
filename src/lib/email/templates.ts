@@ -5,6 +5,7 @@ import { formatShortDate, formatStayDate } from "@/lib/booking/dates";
 import { quoteLines, type Quote } from "@/lib/booking/pricing";
 import { formatNpr } from "@/lib/money";
 import { escapeHtml as esc, singleLine } from "./escape";
+import { renderEmailFooter, type EmailContact } from "./footer";
 import { emailLogoUrl, EMAIL_LOGO_WIDTH } from "./logo";
 
 /** One room line in an email, built from the line's own snapshots. */
@@ -33,6 +34,8 @@ export type ReservationEmailData = {
   specialRequests: string | null;
   /** Times and cancellation wording from the database (BusinessInfo, Policies). */
   terms: StayTerms;
+  /** Contact details for the footer (from Business info). */
+  contact: EmailContact;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -103,14 +106,18 @@ function header(): string {
   return `<img src="${esc(logo)}" width="${EMAIL_LOGO_WIDTH}" alt="${esc(SITE.name)}" style="display:block;border:0;height:auto;width:${EMAIL_LOGO_WIDTH}px">`;
 }
 
-function layout(title: string, bodyHtml: string): string {
+/** `contact` adds the guest contact footer; internal alerts to the team pass none. */
+function layout(title: string, bodyHtml: string, contact?: EmailContact): string {
+  const footer = contact
+    ? renderEmailFooter(contact, COLORS).html
+    : `<hr style="border:none;border-top:1px solid ${COLORS.line};margin:24px 0 12px">
+<div style="font-size:12px;color:${COLORS.muted}">${esc(SITE.name)}, ${esc(SITE.address)}</div>`;
   return `<!doctype html><html><body style="margin:0;background:${COLORS.cream};font-family:Arial,Helvetica,sans-serif;color:${COLORS.ink}">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
 ${header()}
 <h1 style="font-size:22px;color:${COLORS.forest};margin:12px 0 16px">${esc(title)}</h1>
 ${bodyHtml}
-<hr style="border:none;border-top:1px solid ${COLORS.line};margin:24px 0 12px">
-<div style="font-size:12px;color:${COLORS.muted}">${esc(SITE.name)}, ${esc(SITE.address)}</div>
+${footer}
 </div></body></html>`;
 }
 
@@ -155,6 +162,7 @@ ${roomsHtml(b, c.sections)}
 ${totalLine ? `<div style="margin-top:12px;font-size:14px;font-weight:bold">${esc(totalLine)}</div>` : ""}
 ${policy.html ? `<div style="margin-top:16px">${policy.html}</div>` : ""}
 ${c.outro ? `<p style="font-size:14px">${esc(c.outro)}</p>` : ""}`,
+    b.contact,
   );
   const text = [
     c.title,
@@ -167,7 +175,8 @@ ${c.outro ? `<p style="font-size:14px">${esc(c.outro)}</p>` : ""}`,
     ...(policy.text ? ["", policy.text] : []),
     ...(c.outro ? ["", c.outro] : []),
     "",
-    `${SITE.name}, ${SITE.address}`,
+    "--",
+    renderEmailFooter(b.contact, COLORS).text,
   ].join("\n");
   return { subject: singleLine(c.subject), html, text };
 }

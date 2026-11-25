@@ -33,4 +33,18 @@ describe("invoice email output", () => {
     expect(rendered.html).not.toContain("Booking:");
     expect(rendered.text).toContain("200");
   });
+  it("adds the contact footer to the invoice email when contact details are given", () => {
+    const base = {
+      number: "INV-2026-000003", reservationRef: null, guestSnapshot: { name: "Guest", email: null, phone: null, country: null },
+      invoiceDate: new Date("2026-11-20T00:00:00Z"), checkIn: null, checkOut: null, nights: 0, issuedAt: new Date("2026-11-20T00:00:00Z"), status: "ISSUED" as const, paymentMethod: null, paidAt: null, paymentNote: null,
+      invoiceLines: [{ id: "1", type: "CHARGE", description: "Laundry", calculation: "QUANTITY", quantity: 1, unitAmountNpr: 100, amountNpr: 100 }],
+      roomLines: [], extraLines: [], subtotalNpr: 100, taxTotalNpr: 0, discountTotalNpr: 0, grandTotalNpr: 100,
+    };
+    const business = { name: "Resort", address: null, phones: [], emails: [], panVatNumber: null, invoiceFooterNote: null };
+    const contact = { name: "Resort", address: "Bardiya", phone: null, whatsapp: "9779851000000", email: "b@example.test", websiteUrl: "https://example.test", mapsUrl: "https://maps.example.test/x" };
+    const withFooter = renderInvoiceEmail(base, { ...business, contact }, null);
+    expect(withFooter.html).toContain("https://wa.me/9779851000000");
+    expect(withFooter.text).toContain("Website: https://example.test");
+    expect(renderInvoiceEmail(base, business, null).html).not.toContain("wa.me");
+  });
 });
