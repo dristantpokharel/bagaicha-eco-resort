@@ -11,7 +11,8 @@
 import { config as loadEnv } from "dotenv";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { KRISHNASAAR_FAQS, KRISHNASAAR_FLAGGED, KRISHNASAAR_SEED } from "../src/lib/krishnasaar/seed-content";
+import { KRISHNASAAR_FAQS } from "../src/lib/krishnasaar/seed-content";
+import { createFaqRows, createPageRow, missingSeedRows } from "../src/lib/krishnasaar/seed-rows";
 
 loadEnv({ path: ".env.local", quiet: true });
 
@@ -28,20 +29,15 @@ async function main() {
     console.log(`  ${apply ? "created" : "would create"}  ${msg}`);
   };
   try {
-    if (!(await db.krishnasaarPage.findUnique({ where: { id: 1 } }))) {
+    const { pageMissing, faqsMissing } = await missingSeedRows(db);
+    if (pageMissing) {
       note("Krishnasaar page (all text flagged verify)");
-      if (apply) {
-        await db.krishnasaarPage.create({
-          data: { id: 1, ...KRISHNASAAR_SEED, relatedGuides: [...KRISHNASAAR_SEED.relatedGuides], placeholderFields: [...KRISHNASAAR_FLAGGED] },
-        });
-      }
+      if (apply) await createPageRow(db);
     } else console.log("  Krishnasaar page: already exists, left alone");
 
-    if ((await db.krishnasaarFaq.count()) === 0) {
-      for (const [i, f] of KRISHNASAAR_FAQS.entries()) {
-        note(`question: ${f.question}`);
-        if (apply) await db.krishnasaarFaq.create({ data: { ...f, sortOrder: i, placeholderFields: ["question", "answer"] } });
-      }
+    if (faqsMissing) {
+      for (const f of KRISHNASAAR_FAQS) note(`question: ${f.question}`);
+      if (apply) await createFaqRows(db);
     } else console.log("  Krishnasaar questions: already exist, left alone");
 
     console.log(`${created} row(s) ${apply ? "created" : "would be created"}.`);

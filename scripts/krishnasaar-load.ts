@@ -13,25 +13,29 @@ import {
   summarize,
   type Decision,
 } from "../src/lib/krishnasaar/content-load";
+import { createFaqRows, createPageRow, faqRowsData, missingSeedRows, pageRowData } from "../src/lib/krishnasaar/seed-rows";
 import { maskHost } from "./prelaunch-clean";
 
 /**
  * One-off load of the owner-approved text in docs/krishnasaar-content.md into the Krishnasaar page tables.
  *
- *   npm run krishnasaar:load -- --target=staging|live --expect-host=<host> [--apply] [--overwrite]
+ *   npm run krishnasaar:load -- --target=staging|live --expect-host=<host> [--apply] [--overwrite] [--create-page-row]
  *
  * Staging connects with DIRECT_URL, live with DIRECT_URL_LIVE (read through `node --env-file`, never printed).
  * Dry run by default: reads, prints a plan per field, writes nothing. --apply writes in one transaction.
+ * --create-page-row also creates the starter page row and question rows when they are missing (same rows as
+ * seed:krishnasaar, in the same transaction); an existing row is never modified by it.
  */
 
 export type Target = "staging" | "live";
-export type LoadOptions = { target: Target; expectHost: string; apply: boolean; overwrite: boolean };
+export type LoadOptions = { target: Target; expectHost: string; apply: boolean; overwrite: boolean; createPageRow: boolean };
 
 export function parseOptions(args: readonly string[]): LoadOptions {
   let target: Target | undefined;
   let expectHost: string | undefined;
   let apply = false;
   let overwrite = false;
+  let createPageRow = false;
   for (const arg of args) {
     if (arg.startsWith("--target=")) {
       if (target) throw new Error("--target may only be specified once.");
@@ -48,13 +52,16 @@ export function parseOptions(args: readonly string[]): LoadOptions {
     } else if (arg === "--overwrite") {
       if (overwrite) throw new Error("--overwrite may only be specified once.");
       overwrite = true;
+    } else if (arg === "--create-page-row") {
+      if (createPageRow) throw new Error("--create-page-row may only be specified once.");
+      createPageRow = true;
     } else {
-      throw new Error("Unknown option. Use --target=staging|live --expect-host=<host> and optionally --apply, --overwrite.");
+      throw new Error("Unknown option. Use --target=staging|live --expect-host=<host> and optionally --apply, --overwrite, --create-page-row.");
     }
   }
   if (!target) throw new Error("--target=staging or --target=live is required.");
   if (!expectHost) throw new Error("--expect-host=<host> is required.");
-  return { target, expectHost, apply, overwrite };
+  return { target, expectHost, apply, overwrite, createPageRow };
 }
 
 const normalizeHost = (host: string) => host.trim().toLowerCase().replace(/\.$/, "").replace(/^\[(.*)\]$/, "$1");
@@ -126,8 +133,35 @@ async function load(tx: Prisma.TransactionClient, options: LoadOptions, host: st
   const content = parseContent(markdown);
   await assertTablesExist(tx);
 
-  const page = await tx.krishnasaarPage.findUnique({ where: { id: 1 } });
-  if (!page) throw new Error("There is no Krishnasaar page row in this database. Run `npm run seed:krishnasaar -- --apply` first.");
+  console.log(`Target: ${options.target}. Connected host: ${maskHost(host)}`);
+  console.log(options.apply ? "Mode: APPLY" : "Mode: DRY RUN (nothing is written)");
+
+  // Missing starter rows are created only with --create-page-row, and only with --apply; an existing row is never touched.
+  let virtual = false;
+  if (options.createPageRow) {
+    const missing = await missingSeedRows(tx);
+    if (!missing.pageMissing) console.log("Page row: already exists, left untouched.");
+    else if (options.apply) {
+      await createPageRow(tx);
+      console.log("Page row: created.");
+    } else {
+      virtual = true;
+      console.log("would create page row");
+    }
+    if (!missing.faqsMissing) console.log("Question rows: already exist, left untouched.");
+    else if (options.apply) {
+      await createFaqRows(tx);
+      console.log("Question rows: created.");
+    } else {
+      virtual = true;
+      console.log("would create question rows");
+    }
+  }
+
+  const stored = await tx.krishnasaarPage.findUnique({ where: { id: 1 } });
+  // Dry run only: plan as if the row existed.
+  const page = stored ?? (virtual ? { ...pageRowData(), coverMediaId: null, destinationId: null } : null);
+  if (!page) throw new Error("There is no Krishnasaar page row in this database. Run `npm run seed:krishnasaar -- --apply` first, or pass --create-page-row.");
 
   const destinations = await tx.nearbyDestination.findMany({ where: { name: content.destinationName }, select: { id: true } });
   if (destinations.length === 0) throw new Error(`No nearby destination named "${content.destinationName}" exists in this database. Add it in Content → Nearby, then run this again.`);
@@ -143,13 +177,12 @@ async function load(tx: Prisma.TransactionClient, options: LoadOptions, host: st
   const heroMissing = media.problems.find((p) => p.filename === content.heroFilename)?.reason;
 
   const pagePlan = planPage(page, content, { destinationId: destinations[0].id, heroId, heroMissing }, options.overwrite);
-  const faqRows = await tx.krishnasaarFaq.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
+  const storedFaqs = await tx.krishnasaarFaq.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
+  const faqRows = storedFaqs.length === 0 && virtual ? faqRowsData().map((f, i) => ({ ...f, id: `new-${i}` })) : storedFaqs;
   const faqPlan = planFaqs(content.faqs, faqRows, options.overwrite);
   const existing = await tx.krishnasaarMedia.findMany({ orderBy: { sortOrder: "asc" }, select: { mediaId: true, sortOrder: true } });
   const galleryPlan = planGallery(content.galleryFilenames, media.found, existing.map((g) => g.mediaId));
 
-  console.log(`Target: ${options.target}. Connected host: ${maskHost(host)}`);
-  console.log(options.apply ? "Mode: APPLY" : "Mode: DRY RUN (nothing is written)");
   if (options.overwrite) console.log("--overwrite: fields already edited by a person will be replaced.");
   print("Page:", pagePlan.decisions);
   print("Questions:", faqPlan.decisions);
@@ -178,6 +211,7 @@ async function load(tx: Prisma.TransactionClient, options: LoadOptions, host: st
     details: {
       target: options.target,
       overwrite: options.overwrite,
+      createPageRow: options.createPageRow,
       pageFields: pagePlan.writtenFields,
       links: ["destinationId", "coverMediaId"].filter((k) => k in pagePlan.data),
       faqRowsWritten: faqPlan.writes.length,
@@ -185,6 +219,11 @@ async function load(tx: Prisma.TransactionClient, options: LoadOptions, host: st
       skipped: totals.skipped,
     },
   });
+}
+
+/** The whole load in one transaction: any failure rolls back everything, including a newly created page row. */
+export function runLoad(client: Pick<PrismaClient, "$transaction">, options: LoadOptions, host: string, markdown: string) {
+  return client.$transaction((tx) => load(tx, options, host, markdown), { maxWait: 10_000, timeout: 60_000 });
 }
 
 async function main(): Promise<void> {
@@ -201,7 +240,7 @@ async function main(): Promise<void> {
 
   const client = new PrismaClient({ adapter: new PrismaNeon({ connectionString: url }) });
   try {
-    await client.$transaction((tx) => load(tx, options, host, markdown), { maxWait: 10_000, timeout: 60_000 });
+    await runLoad(client, options, host, markdown);
     console.log(options.apply ? "Krishnasaar content loaded. Public pages refresh within the hour, or at once after any admin save." : "Dry run complete. No data was changed.");
   } catch (error) {
     const known = error instanceof Error && !("code" in error);
